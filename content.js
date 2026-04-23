@@ -7,9 +7,13 @@ function initOverlay(viewer) {
     return;
   }
   
-  //viewer.setMouseNavEnabled(false);
   console.log("Viewer found:", viewer);
+
+  // Attach overlay HERE
+  //viewer.appendChild(overlay);
+  viewer.insertBefore(overlay, viewer.firstChild);
 }
+
 function waitForViewer() {
   const viewer = document.querySelector(".openseadragon-canvas");
 
@@ -32,16 +36,17 @@ overlay.style.top = "0";
 overlay.style.left = "0";
 overlay.style.width = "100%";
 overlay.style.height = "100%";
-overlay.style.zIndex = 9998;
+overlay.style.zIndex = "99999";
 overlay.style.cursor = "crosshair";
-overlay.style.background = "rgba(0,0,0,0.05)"; // light tint so you can see it
+overlay.style.background = "rgba(255,0,0,0.2)"; // light tint so you can see it
+overlay.style.border = "3px solid red";
 overlay.style.pointerEvents = "auto";
 
 waitForViewer();
 
-window.addEventListener("load", () => {
-  initOverlay();
-});
+//window.addEventListener("load", () => {
+//  initOverlay();
+//});
 
 
 
