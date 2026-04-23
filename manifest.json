@@ -5,12 +5,12 @@
   "description": "Annotate Riksarkivet images with WikiTree profiles",
   "permissions": ["storage"],
   "host_permissions": [
-    "https://sok.riksarkivet.se/*",
+    "https://sok.riksarkivet.se/bildvisning/*",
     "https://api.wikitree.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://sok.riksarkivet.se/*"],
+      "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
       "js": ["content.js"]
     }
   ]
