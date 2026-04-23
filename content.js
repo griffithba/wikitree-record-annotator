@@ -9,9 +9,11 @@ function initOverlay(viewer) {
   
   console.log("Viewer found:", viewer);
 
-  // Attach overlay HERE
-  //viewer.appendChild(overlay);
   viewer.insertBefore(overlay, viewer.firstChild);
+
+  document.addEventListener("mousedown", onMouseDown, true);
+  document.addEventListener("mousemove", onMouseMove, true);
+  document.addEventListener("mouseup", onMouseUp, true);
 }
 
 function waitForViewer() {
@@ -55,6 +57,7 @@ let isDragging = false;
 let startX = 0;
 let startY = 0;
 let box = null;
+let viewerRect = null;
 
 // --- Mouse down ---
 overlay.addEventListener("mousedown", (e) => {
