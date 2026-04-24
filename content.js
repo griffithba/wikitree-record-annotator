@@ -1,5 +1,11 @@
 console.log("WikiTree overlay with drag enabled");
 
+document.addEventListener("mousedown", (e) => {
+  console.log("GLOBAL mousedown");
+}, true);
+
+console.log("OSD:", window.OpenSeadragonImaging);
+
 // --- Create overlay ---
 let overlay = document.createElement("div");
 overlay.id = "wt-overlay";
@@ -10,7 +16,7 @@ overlay.style.width = "100%";
 overlay.style.height = "100%";
 overlay.style.zIndex = "99999";
 overlay.style.cursor = "crosshair";
-overlay.style.background = "rgba(255,0,0,0.2)"; // light tint so you can see it
+overlay.style.background = "rgba(255,0,0,0.1)"; // light tint so you can see it
 overlay.style.border = "3px solid red";
 overlay.style.pointerEvents = "auto";
 
@@ -24,39 +30,15 @@ let box = null;
 
 let annotations = [];
 
-function initOverlay(viewer) {
-  if (!viewer) {
-    console.warn("Viewer missing");
-    return;
-  }
-  
-  console.log("Viewer found:", viewer);
-
-  viewer.insertBefore(overlay, viewer.firstChild);
-
-  document.addEventListener("mousedown", onMouseDown, true);
-  document.addEventListener("mousemove", onMouseMove, true);
-  document.addEventListener("mouseup", onMouseUp, true);
-}
-
-function waitForViewer() {
-  const viewer = document.querySelector(".openseadragon-canvas");
-
-  if (viewer) {
-    console.log("Viewer ready");
-    initOverlay(viewer);
-    return;
-  }
-
-  setTimeout(waitForViewer, 200);
-}
-
-waitForViewer();
-
 // --- Mouse down ---
 function onMouseDown(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  console.log("onMouseDown fired");
   const viewer = document.querySelector(".openseadragon-canvas");
-  if (!viewer || !e.target.closest(".openseadragon-canvas")) return;
+  //if (!viewer || !e.target.closest(".openseadragon-canvas")) return;
+  if (!viewer) return;
 
   viewerRect = viewer.getBoundingClientRect();
 
@@ -68,7 +50,7 @@ function onMouseDown(e) {
   box = document.createElement("div");
   box.style.position = "absolute";
   box.style.border = "2px dashed red";
-  box.style.background = "rgba(255,0,0,0.1)";
+  box.style.background = "rgba(25, 0, 255, 0.1)";
   box.style.pointerEvents = "none";
 
   box.style.left = `${startX}px`;
@@ -79,6 +61,9 @@ function onMouseDown(e) {
 
 // --- Mouse move ---
 function onMouseMove(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
   if (!isDragging || !box) return;
 
   const x = e.clientX - viewerRect.left;
@@ -93,6 +78,9 @@ function onMouseMove(e) {
 
 // --- Mouse up ---
 function onMouseUp(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
   if (!isDragging || !box) return;
 
   isDragging = false;
@@ -112,3 +100,100 @@ function onMouseUp(e) {
 
   box = null;
 }
+
+function positionOverlay(viewer) {
+  if (!viewer) return;
+
+  const rect = viewer.getBoundingClientRect();
+
+  overlay.style.top = rect.top + window.scrollY + "px";
+  overlay.style.left = rect.left + window.scrollX + "px";
+  overlay.style.width = rect.width + "px";
+  overlay.style.height = rect.height + "px";
+}
+
+function initOverlay() {
+  const viewer = document.querySelector(".openseadragon-canvas");
+
+  if (!viewer) {
+    console.warn("Viewer not found");
+    return;
+  }
+
+  console.log("Viewer found:", viewer);
+
+  //viewer.appendChild(overlay);
+  //viewer.parentElement.appendChild(overlay);
+  document.body.appendChild(overlay);
+
+  positionOverlay(viewer);
+  /*
+const rect = viewer.getBoundingClientRect();
+
+overlay.style.position = "absolute";
+overlay.style.top = rect.top + window.scrollY + "px";
+overlay.style.left = rect.left + window.scrollX + "px";
+overlay.style.width = rect.width + "px";
+overlay.style.height = rect.height + "px";
+*/
+  overlay.addEventListener("mousedown", onMouseDown);
+  overlay.addEventListener("mousemove", onMouseMove);
+  overlay.addEventListener("mouseup", onMouseUp);
+}
+
+function waitForViewer() {
+  const viewer = document.querySelector(".openseadragon-canvas");
+
+  if (viewer) {
+    console.log("Viewer ready");
+    initOverlay();
+    return;
+  }
+
+  setTimeout(waitForViewer, 200);
+}
+
+waitForViewer();
+
+/*
+function initOSDOverlay(osd) {
+  console.log("Hooking OpenSeadragon events");
+
+  osd.addHandler("canvas-press", onMouseDown);
+  osd.addHandler("canvas-drag", onMouseMove);
+  osd.addHandler("canvas-release", onMouseUp);
+
+ /* if (!viewer) {
+    console.warn("Viewer missing");
+    return;
+  }
+  
+  console.log("Viewer found:", viewer);
+
+  viewer.appendChild(overlay); 
+  viewer.addEventListener("mousedown", onMouseDown);
+  viewer.addEventListener("mousemove", onMouseMove);
+  viewer.addEventListener("mouseup", onMouseUp);
+  */
+ /*
+}
+
+function waitForViewer() {
+  //const viewer = document.querySelector(".openseadragon-canvas");
+  const osd =
+    window.OpenSeadragonImaging ||
+    window.viewer ||
+    window.osdViewer;
+
+  if (osd && osd.addHandler) {
+    console.log("OpenSeadragon ready:", osd);
+    initOSDOverlay(osd);
+    return;
+  }
+
+  setTimeout(waitForViewer, 200);
+}
+
+waitForViewer();
+*/
+
