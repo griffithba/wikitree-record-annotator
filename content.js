@@ -1,12 +1,5 @@
 console.log("WikiTree overlay with drag enabled");
 
-/*document.addEventListener("mousedown", (e) => {
-  console.log("GLOBAL mousedown");
-}, true);
-
-console.log("OSD:", window.OpenSeadragonImaging);
-*/
-
 // --- Create overlay ---
 let overlay = document.createElement("div");
 overlay.id = "wt-overlay";
@@ -20,8 +13,6 @@ overlay.style.cursor = "crosshair";
 overlay.style.background = "rgba(255,0,0,0.1)"; // light tint so you can see it
 overlay.style.border = "3px solid red";
 overlay.style.pointerEvents = "auto";
-
-let viewerRect = null;
 
 // --- Create pointer mode indicator ---
 let modeIndicator = document.createElement("div");
@@ -43,7 +34,6 @@ modeIndicator.style.pointerEvents = "none";
 
 document.body.appendChild(modeIndicator);
 
-
 // --- Selection state ---
 let isDragging = false;
 let startX = 0;
@@ -60,44 +50,8 @@ let container = null;
 let annotations = [];
 let annotationLayer = document.createElement("div");
 
-/*
-function getViewerElement() {
-  return document.querySelector(".openseadragon-canvas");
-}
+let currentViewport = null;
 
-function getTransform(el) {
-  const style = window.getComputedStyle(el);
-  return style.transform;
-}
-*/ 
-
-function syncOverlayTransform() {
-  const canvas = container.querySelector(".openseadragon-canvas");
-  if (!canvas) return;
-
-  const style = window.getComputedStyle(canvas);
-  const transform = style.transform;
-
-  annotationLayer.style.transform = transform;
-  annotationLayer.style.transformOrigin = "0 0";
-}
-
-function getContainerRect() {
-  return container.getBoundingClientRect();
-}
-
-/*
-function getScale(el) {
-  const transform = getTransform(el);
-  if (!transform || transform === "none") return 1;
-
-  const match = transform.match(/matrix\(([^)]+)\)/);
-  if (!match) return 1;
-
-  const values = match[1].split(",");
-  return parseFloat(values[0]); // scaleX
-}
-*/
 
 // --- Toggle between drawing mode and default behavior ---
 function setDrawMode(enabled) {
@@ -122,15 +76,15 @@ function onMouseDown(e) {
   e.stopPropagation();
 
   console.log("onMouseDown fired");
-  //if (!viewer || !e.target.closest(".openseadragon-canvas")) return;
-  if (!container) return;
 
-  viewerRect = getContainerRect()
+  if (!container) return;
 
   isDragging = true;
 
-  startX = e.clientX - viewerRect.left;
-  startY = e.clientY - viewerRect.top;
+  const rect = overlay.getBoundingClientRect();
+
+  startX = e.clientX - rect.left;
+  startY = e.clientY - rect.top;
 
   box = document.createElement("div");
   box.style.position = "absolute";
@@ -153,8 +107,10 @@ function onMouseMove(e) {
 
   if (!isDragging || !box) return;
 
-  endX = e.clientX - viewerRect.left;
-  endY = e.clientY - viewerRect.top;
+  const rect = overlay.getBoundingClientRect();
+
+  endX = e.clientX - rect.left;
+  endY = e.clientY - rect.top;
   
   box.style.width = Math.abs(endX - startX) + "px";
   box.style.height = Math.abs(endY - startY) + "px";
@@ -175,47 +131,76 @@ function onMouseUp(e) {
   isDragging = false;
 
   const overlayRect = overlay.getBoundingClientRect();
-  
-  const clamp = (v) => Math.max(0, Math.min(1, v));
 
-  const x1 = Math.min(startX, endX);
-  const y1 = Math.min(startY, endY);
-  const x2 = Math.max(startX, endX);
-  const y2 = Math.max(startY, endY);
+  const vp = currentViewport;
 
-  const normalized = {
-    x: clamp(x1 / overlayRect.width),
-    y: clamp(y1 / overlayRect.height),
-    w: clamp((x2 - x1) / overlayRect.width),
-    h: clamp((y2 - y1) / overlayRect.height)
-  };
-  
-  console.log("Normalized:", normalized);
+  const x1 = vp.x + (startX / overlayRect.width) * vp.w;
+  const y1 = vp.y + (startY / overlayRect.height) * vp.h;
+  const x2 = vp.x + (endX / overlayRect.width) * vp.w;
+  const y2 = vp.y + (endY / overlayRect.height) * vp.h;
 
-  annotations.push(normalized);
-  renderAnnotations(); 
+  // normalize in IMAGE SPACE
+  const x = Math.min(x1, x2);
+  const y = Math.min(y1, y2);
+  const w = Math.abs(x2 - x1);
+  const h = Math.abs(y2 - y1);
+
+  annotations.push({ x, y, w, h });
+
+  renderAnnotations();
   
   box.remove();
   box = null;
 }
 
+function getViewportFromUrl() {
+  const hash = window.location.hash;
+
+  // hash looks like "#?xywh=..."
+  const query = hash.startsWith("#") ? hash.slice(1) : hash;
+
+  const params = new URLSearchParams(query);
+
+  const xywh = params.get("xywh");
+
+  if (!xywh) {
+    console.warn("No xywh in hash:", hash);
+    return null;
+  }
+
+  const [x, y, w, h] = xywh.split(",").map(Number);
+
+  return { x, y, w, h };
+}
+
+function syncViewport() {
+  currentViewport = getViewportFromUrl();
+}
+
 function renderAnnotations() {
   if (!container) return;
 
-  // remove old boxes
-  container.querySelectorAll(".wt-annotation").forEach(el => el.remove());
+  syncViewport();
 
+  const vp = currentViewport;
   const rect = container.getBoundingClientRect();
 
+  annotationLayer.innerHTML = "";
+
   annotations.forEach(a => {
+    const relX = (a.x - vp.x) / vp.w;
+    const relY = (a.y - vp.y) / vp.h;
+    const relW = a.w / vp.w;
+    const relH = a.h / vp.h;
+
     const box = document.createElement("div");
     box.className = "wt-annotation";
 
     box.style.position = "absolute";
-    box.style.left = (a.x * rect.width) + "px";
-    box.style.top = (a.y * rect.height) + "px";
-    box.style.width = (a.w * rect.width) + "px";
-    box.style.height = (a.h * rect.height) + "px";
+    box.style.left = (relX * rect.width) + "px";
+    box.style.top = (relY * rect.height) + "px";
+    box.style.width = (relW * rect.width) + "px";
+    box.style.height = (relH * rect.height) + "px";
 
     box.style.border = "2px solid lime";
     box.style.background = "rgba(0,255,0,0.1)";
@@ -225,16 +210,6 @@ function renderAnnotations() {
   });
 }
 
-function positionOverlay() {
-  if (!container) return;
-
-  const rect = container.getBoundingClientRect();
-
-  overlay.style.top = rect.top + window.scrollY + "px";
-  overlay.style.left = rect.left + window.scrollX + "px";
-  overlay.style.width = rect.width + "px";
-  overlay.style.height = rect.height + "px";
-}
 
 function initOverlay() {
   container = document.querySelector(".openseadragon-container");
@@ -245,13 +220,10 @@ function initOverlay() {
 
   console.log("Container found:", container);
 
-  overlay.addEventListener("mousedown", onMouseDown);
-  overlay.addEventListener("mousemove", onMouseMove);
-  overlay.addEventListener("mouseup", onMouseUp);
-  //container.addEventListener("mousemove", renderAnnotations);
-  // initially don't be in box drawing mode
-  setDrawMode(false);
+  // 🔥 correct positioning context
+  container.style.position = "relative";
 
+  // --- annotation layer ---
   annotationLayer.style.position = "absolute";
   annotationLayer.style.top = "0";
   annotationLayer.style.left = "0";
@@ -259,21 +231,28 @@ function initOverlay() {
   annotationLayer.style.height = "100%";
   annotationLayer.style.pointerEvents = "none";
 
-  container.style.position = "absolute";
+  // --- overlay (interaction layer) ---
+  overlay.style.position = "absolute";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+
+  // attach events
+  overlay.addEventListener("mousedown", onMouseDown);
+  overlay.addEventListener("mousemove", onMouseMove);
+  overlay.addEventListener("mouseup", onMouseUp);
+
+  // add to DOM (order matters)
   container.appendChild(annotationLayer);
-  container.appendChild(overlay); // MUST be last
+  container.appendChild(overlay);
 
-  positionOverlay();
+  // initial mode
+  setDrawMode(false);
 
-  const canvas = container.querySelector(".openseadragon-canvas");
+  window.addEventListener("popstate", renderAnnotations);
 
-  if (canvas) {
-    new MutationObserver(syncOverlayTransform).observe(canvas, {
-      attributes: true,
-      attributeFilter: ["style"]
-    });
-  }
-  
+  // keyboard toggle
   if (!keyListenerAdded) {
     document.addEventListener("keydown", (e) => {
       if (e.key === "t") {
@@ -282,20 +261,23 @@ function initOverlay() {
     });
     keyListenerAdded = true;
   }
+
+  syncViewport(); // initial
+  setInterval(syncViewport, 100); // keep it fresh
 }
 
-function waitForViewer() {
-   const viewer = document.querySelector(".openseadragon-canvas");
+function waitForOSDContainer() {
+  const container = document.querySelector(".openseadragon-canvas");
 
-  if (viewer) {
-    console.log("Layer ready");
+  if (container) {
+    console.log("OSD container ready");
     initOverlay();
     return;
   }
 
-  setTimeout(waitForViewer, 200);
+  setTimeout(waitForOSDContainer, 200);
 }
 
-waitForViewer();
+waitForOSDContainer();
 
 
