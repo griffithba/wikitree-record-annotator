@@ -15,9 +15,6 @@ overlay.id = "wt-overlay";
 // Visual layer for rendered annotations
 const annotationLayer = document.createElement("div");
 
-// Mode indicator (top-right UI)
-const modeIndicator = document.createElement("div");
-
 
 // --- STATE --------------------------------------------------------
 
@@ -33,24 +30,65 @@ let endX = 0, endY = 0;
 let box = null;
 
 // Mode state
-let drawMode = false;
-let keyListenerAdded = false;
+let tool = "nav";  // "nav" | "draw" | "select" 
 
+let showAnnotations = true;
+let selectedAnnotationId = null;
+
+let lastPageKey = null;
 
 // ============================================================
 // MODE CONTROL
 // ============================================================
 
-function setDrawMode(enabled) {
-  drawMode = enabled;
+function setTool(nextTool) {
+  tool = nextTool;
 
-  overlay.style.pointerEvents = enabled ? "auto" : "none";
-  overlay.style.cursor = enabled ? "crosshair" : "default";
+  const isDraw = tool === "draw";
 
-  modeIndicator.textContent = enabled ? "DRAW MODE" : "NAV MODE";
-  modeIndicator.style.background = enabled
-    ? "rgba(180, 0, 0, 0.75)"
-    : "rgba(0, 0, 0, 0.7)";
+  overlay.style.pointerEvents = isDraw ? "auto" : "none";
+  overlay.style.cursor = isDraw ? "crosshair" : "default";
+  if (!showAnnotations && isDraw) {
+    showAnnotations = true;
+    renderAnnotations();
+  }
+
+  updateToolUI();
+
+  // (optional) show overlay tint only in draw mode
+  overlay.style.background = isDraw ? "rgba(255,0,0,0.1)" : "transparent";
+  overlay.style.border = isDraw ? "2px solid red" : "none";
+
+  console.log("Tool:", tool);
+}
+
+function makeToolButton(label, onClick) {
+  const btn = document.createElement("button");
+
+  btn.textContent = label;
+
+  Object.assign(btn.style, {
+    padding: "6px 10px",
+    fontSize: "12px",
+    cursor: "pointer"
+  });
+
+  btn.addEventListener("click", onClick);
+
+  return btn;
+}
+
+function updateToolUI() {
+  document.querySelectorAll(".wt-annotation").forEach(el => {
+    if (tool === "select") {
+      el.style.cursor = "pointer";
+    } else {
+      el.style.cursor = "default";
+    }
+  });
+
+  overlay.style.cursor =
+    tool === "draw" ? "crosshair" : "default";
 }
 
 
@@ -59,7 +97,7 @@ function setDrawMode(enabled) {
 // ============================================================
 
 function onMouseDown(e) {
-  if (!drawMode || !container) return;
+  if (tool !== "draw" || !container) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -83,7 +121,7 @@ function onMouseDown(e) {
 }
 
 function onMouseMove(e) {
-  if (!drawMode || !isDragging || !box) return;
+  if (tool !== "draw" || !isDragging || !box) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -107,7 +145,7 @@ function onMouseMove(e) {
 }
 
 function onMouseUp(e) {
-  if (!drawMode || !isDragging || !box) return;
+  if (tool !== "draw" || !isDragging || !box) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -126,6 +164,7 @@ function onMouseUp(e) {
 
   // Normalize rectangle in IMAGE SPACE
   const annotation = {
+    id: crypto.randomUUID(),
     x: Math.min(x1, x2),
     y: Math.min(y1, y2),
     w: Math.abs(x2 - x1),
@@ -133,7 +172,7 @@ function onMouseUp(e) {
   };
 
   annotations.push(annotation);
-
+  saveAnnotations();
   renderAnnotations();
 
   box.remove();
@@ -164,6 +203,38 @@ function syncViewport() {
 
 
 // ============================================================
+// SAVING/CLEARING ANNOTATIONS
+// ============================================================
+
+function getPageKey() {
+  const match = window.location.href.match(/([A-Z]\d+_\d+)/);
+  return match ? match[1] : "unknown";
+}
+
+function saveAnnotations() {
+  const key = getPageKey();
+  localStorage.setItem(key, JSON.stringify(annotations));
+}
+
+function clearAnnotations() {
+  annotations = [];
+  saveAnnotations();
+  renderAnnotations();
+}
+
+function loadAnnotationsIfNeeded() {
+  const key = getPageKey();
+
+  if (key === lastPageKey) return;
+
+  lastPageKey = key;
+
+  const saved = localStorage.getItem(key);
+
+  annotations = saved ? JSON.parse(saved) : [];
+}
+
+// ============================================================
 // RENDERING
 // ============================================================
 
@@ -173,13 +244,18 @@ function renderAnnotations() {
   // Always sync before rendering (prevents lag)
   syncViewport();
 
+  // Clear previous render
+  annotationLayer.innerHTML = "";
+
+  if (!showAnnotations) return;
+
+  // 🔥 always ensure correct annotations for current page
+  loadAnnotationsIfNeeded();
+
   const vp = currentViewport;
   if (!vp) return;
 
   const rect = container.getBoundingClientRect();
-
-  // Clear previous render
-  annotationLayer.innerHTML = "";
 
   annotations.forEach(a => {
     // IMAGE SPACE → viewport-relative → screen pixels
@@ -198,12 +274,46 @@ function renderAnnotations() {
 
     box.style.border = "2px solid lime";
     box.style.background = "rgba(0,255,0,0.1)";
-    box.style.pointerEvents = "none";
+    box.style.pointerEvents = "auto";
+    if (tool === "select") {
+      box.style.cursor = "pointer";
+    } else {
+      box.style.cursor = "default";
+    }
+
+    if (a.id === selectedAnnotationId) {
+      box.style.border = "3px solid orange";
+      box.style.background = "rgba(255,165,0,0.15)";
+    } else {
+      box.style.border = "2px solid lime";
+      box.style.background = "rgba(0,255,0,0.1)";
+    }
+
+    box.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (tool !== "select") return;
+      selectAnnotation(a.id);
+    });
+
+    box.dataset.id = a.id;
+    box.className = "wt-annotation";
 
     annotationLayer.appendChild(box);
   });
 }
 
+function selectAnnotation(id) {
+  selectedAnnotationId =
+    selectedAnnotationId === id ? null : id;
+
+  renderAnnotations();
+}
+
+function clearSelection() {
+  if (!selectedAnnotationId) return;
+  selectedAnnotationId = null;
+  renderAnnotations();
+}
 
 // ============================================================
 // INITIALIZATION
@@ -238,24 +348,6 @@ function initOverlay() {
     pointerEvents: "none"
   });
 
-  // Mode indicator UI
-  Object.assign(modeIndicator.style, {
-    position: "fixed",
-    top: "10px",
-    right: "10px",
-    zIndex: "100000",
-    padding: "6px 10px",
-    fontSize: "12px",
-    fontFamily: "sans-serif",
-    background: "rgba(0,0,0,0.7)",
-    color: "white",
-    borderRadius: "6px",
-    pointerEvents: "none"
-  });
-
-  modeIndicator.textContent = "NAV MODE";
-  document.body.appendChild(modeIndicator);
-
   // Attach mouse events
   overlay.addEventListener("mousedown", onMouseDown);
   overlay.addEventListener("mousemove", onMouseMove);
@@ -265,28 +357,114 @@ function initOverlay() {
   container.appendChild(annotationLayer);
   container.appendChild(overlay);
 
-  // Keyboard toggle (press "t")
-  if (!keyListenerAdded) {
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "t") {
-        setDrawMode(!drawMode);
-      }
+  function createToolbar() {
+    const bar = document.createElement("div");
+    bar.id = "wt-toolbar";
+
+    Object.assign(bar.style, {
+      position: "fixed",
+      top: "10px",
+      right: "40px",
+      zIndex: "100000",
+      display: "flex",
+      gap: "6px",
+      padding: "6px",
+      background: "rgba(0,0,0,0.7)",
+      borderRadius: "8px"
     });
-    keyListenerAdded = true;
+
+    document.body.appendChild(bar);
+
+    return bar;
   }
 
-  setDrawMode(false);
+  const toolbar = createToolbar();
+
+  toolbar.appendChild(makeToolButton("Draw", () => setTool("draw")));
+
+  toolbar.appendChild(makeToolButton("Select", () => setTool("select")));
+
+  toolbar.appendChild(
+    makeToolButton("Toggle", () => {
+      showAnnotations = !showAnnotations;
+      renderAnnotations();
+    })
+  );
+
+  toolbar.appendChild(
+    makeToolButton("Nav", () => setTool("nav"))
+  );
+    
+  setTool("nav");
+
+  overlay.addEventListener("click", () => {
+    if (selectedAnnotationId === null) return;
+    selectedAnnotationId = null;
+    renderAnnotations();
+  });
+
+  overlay.addEventListener("click", clearSelection);
 
   // Keep viewport synced
   syncViewport();
+  loadAnnotations();
+
   let lastHash = "";
 
-  setInterval(() => {
-    if (window.location.hash !== lastHash) {
-      lastHash = window.location.hash;
+  (function () {
+    const originalReplaceState = history.replaceState;
+
+    history.replaceState = function (...args) {
+      const result = originalReplaceState.apply(this, args);
+
+      // trigger re-render whenever viewer updates URL
+      renderAnnotations();
+
+      return result;
+    };
+  })();
+
+  window.addEventListener("popstate", renderAnnotations);
+//clearAnnotations();  // nuclear option to remove all annotations on a page on reload
+  function loadAnnotations() {
+    const key = getPageKey();
+    const saved = localStorage.getItem(key);
+
+    // 🔥 ALWAYS reset first
+    annotations = [];
+
+    if (saved) {
+      annotations = JSON.parse(saved);
       renderAnnotations();
     }
-  }, 50);
+  }
+
+  const style = document.createElement("style");
+    style.textContent = `
+      .wt-annotation {
+        border: 2px solid lime;
+        background: rgba(0,255,0,0.1);
+        position: absolute;
+        pointer-events: auto;
+        transition: border 0.05s ease;
+      }
+
+      .wt-annotation.wt-selected {
+        border: 3px solid orange;
+        background: rgba(255,165,0,0.15);
+      }
+    `;
+    document.head.appendChild(style);
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Delete") return;
+    if (!selectedAnnotationId) return;
+
+    annotations = annotations.filter(a => a.id !== selectedAnnotationId);
+    selectedAnnotationId = null;
+    saveAnnotations();
+    renderAnnotations(); // rebuild geometry
+  });
 }
 
 
