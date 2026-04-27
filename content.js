@@ -86,8 +86,10 @@ function updateToolUI() {
   document.querySelectorAll(".wt-annotation").forEach(el => {
     if (tool === "select") {
       el.style.cursor = "pointer";
+      el.style.pointerEvents = "auto";
     } else {
       el.style.cursor = "default";
+      el.style.pointerEvents = "none";
     }
   });
 
@@ -105,6 +107,18 @@ function updateToolbarButtons() {
     } else {
       btn.style.background = "#eee";
       btn.style.color = "black";
+    }
+  });
+}
+
+function updateSelectionStyles() {
+  document.querySelectorAll(".wt-annotation").forEach(el => {
+    const id = el.dataset.id;
+
+    if (String(id) === String(selectedAnnotationId)) {
+      el.classList.add("wt-selected");
+    } else {
+      el.classList.remove("wt-selected");
     }
   });
 }
@@ -319,13 +333,6 @@ function renderAnnotations() {
       box.classList.add("wt-selected");
     }
 
-    box.style.pointerEvents = "auto";
-    if (tool === "select") {
-      box.style.cursor = "pointer";
-    } else {
-      box.style.cursor = "default";
-    }
-
     if (a.wtId) {
       box.title = a.wtId;
     }
@@ -343,24 +350,24 @@ function renderAnnotations() {
         );
       }
     });
-
     box.dataset.id = a.id;
-
     annotationLayer.appendChild(box);
   });
+
+  updateSelectionStyles();
+  updateToolUI();
 }
 
 function selectAnnotation(id) {
-  selectedAnnotationId =
-    selectedAnnotationId === id ? null : id;
+  selectedAnnotationId = selectedAnnotationId === id ? null : id;
 
-  renderAnnotations();
+  updateSelectionStyles();
 }
 
 function clearSelection() {
   if (!selectedAnnotationId) return;
   selectedAnnotationId = null;
-  renderAnnotations();
+  updateSelectionStyles();
 }
 
 // ============================================================
@@ -450,8 +457,13 @@ function initOverlay() {
 
   // Keep viewport synced
   syncViewport();
-  //loadAnnotationsIfNeeded();
-
+  // Load and render any pre-existing annotations
+  loadAnnotationsIfNeeded();
+  requestAnimationFrame(() => {
+    renderAnnotations();
+    updateToolUI();
+  });
+  
   (function () {
     const originalReplaceState = history.replaceState;
 
