@@ -30,7 +30,7 @@ let endX = 0, endY = 0;
 let box = null;
 
 // Mode state
-let tool = "nav";  // "nav" | "draw" | "select" 
+let tool = "nav";  // "null" | "draw" | "select" 
 
 let showAnnotations = true;
 let selectedAnnotationId = null;
@@ -42,18 +42,21 @@ let lastPageKey = null;
 // ============================================================
 
 function setTool(nextTool) {
-  tool = nextTool;
+  // toggle behavior
+  tool = (tool === nextTool) ? null : nextTool;
 
   const isDraw = tool === "draw";
 
   overlay.style.pointerEvents = isDraw ? "auto" : "none";
   overlay.style.cursor = isDraw ? "crosshair" : "default";
+
   if (!showAnnotations && isDraw) {
     showAnnotations = true;
     renderAnnotations();
   }
 
   updateToolUI();
+  updateToolbarButtons();
 
   // (optional) show overlay tint only in draw mode
   overlay.style.background = isDraw ? "rgba(255,0,0,0.1)" : "transparent";
@@ -62,10 +65,11 @@ function setTool(nextTool) {
   console.log("Tool:", tool);
 }
 
-function makeToolButton(label, onClick) {
+function makeToolButton(label, toolName) {
   const btn = document.createElement("button");
 
   btn.textContent = label;
+  btn.dataset.tool = toolName;
 
   Object.assign(btn.style, {
     padding: "6px 10px",
@@ -73,7 +77,7 @@ function makeToolButton(label, onClick) {
     cursor: "pointer"
   });
 
-  btn.addEventListener("click", onClick);
+  btn.addEventListener("click", () => setTool(toolName));
 
   return btn;
 }
@@ -91,6 +95,19 @@ function updateToolUI() {
     tool === "draw" ? "crosshair" : "default";
 }
 
+function updateToolbarButtons() {
+  document.querySelectorAll("#wt-toolbar button").forEach(btn => {
+    const btnTool = btn.dataset.tool;
+
+    if (btnTool && btnTool === tool) {
+      btn.style.background = "#c33";
+      btn.style.color = "white";
+    } else {
+      btn.style.background = "#eee";
+      btn.style.color = "black";
+    }
+  });
+}
 
 // ============================================================
 // MOUSE HANDLERS (DRAWING)
@@ -168,8 +185,29 @@ function onMouseUp(e) {
     x: Math.min(x1, x2),
     y: Math.min(y1, y2),
     w: Math.abs(x2 - x1),
-    h: Math.abs(y2 - y1)
+    h: Math.abs(y2 - y1),
+    wtId: null
   };
+  
+  // 🔥 Prompt immediately
+  const wtId = prompt("Enter WikiTree ID (e.g., Smith-123):");
+
+  // ❌ If user cancels or leaves blank → discard
+  if (!wtId || !wtId.trim()) {
+    box.remove();
+    box = null;
+    return;
+  }
+
+  if (!isValidWtId(wtId)) {
+    alert("Invalid WikiTree ID format (e.g., Smith-123)");
+    box.remove();
+    box = null;
+    return;
+  }
+
+  // ✅ Save only if valid
+  annotation.wtId = wtId.trim();
 
   annotations.push(annotation);
   saveAnnotations();
@@ -234,6 +272,9 @@ function loadAnnotationsIfNeeded() {
   annotations = saved ? JSON.parse(saved) : [];
 }
 
+function isValidWtId(id) {
+  return /^\p{L}+-\d+$/u.test(id);
+}
 // ============================================================
 // RENDERING
 // ============================================================
@@ -289,11 +330,34 @@ function renderAnnotations() {
       box.style.background = "rgba(0,255,0,0.1)";
     }
 
+    if (a.wtId) {
+      box.title = a.wtId;
+    }
+
     box.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (tool !== "select") return;
-      selectAnnotation(a.id);
+      if (tool === "select") {
+        selectAnnotation(a.id);
+        return;
+      } else {
+        if (!a.wtId) return;
+      }
+      window.open(
+        `https://www.wikitree.com/wiki/${a.wtId}`,
+        "_blank");
     });
+
+    /*
+    box.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+
+      if (!a.wtId) return;
+
+      window.open(
+        `https://www.wikitree.com/wiki/${a.wtId}`,
+        "_blank"
+    );
+  });*/
 
     box.dataset.id = a.id;
     box.className = "wt-annotation";
@@ -380,22 +444,23 @@ function initOverlay() {
 
   const toolbar = createToolbar();
 
-  toolbar.appendChild(makeToolButton("Draw", () => setTool("draw")));
+  toolbar.appendChild(makeToolButton("Draw", "draw"));
+  toolbar.appendChild(makeToolButton("Select", "select"));
 
-  toolbar.appendChild(makeToolButton("Select", () => setTool("select")));
+  const toggleBtn = document.createElement("button");
 
-  toolbar.appendChild(
-    makeToolButton("Toggle", () => {
-      showAnnotations = !showAnnotations;
-      renderAnnotations();
-    })
-  );
+  function updateToggleButton() {
+    toggleBtn.textContent = showAnnotations ? "Hide" : "Show";
+  }
 
-  toolbar.appendChild(
-    makeToolButton("Nav", () => setTool("nav"))
-  );
-    
-  setTool("nav");
+  toggleBtn.addEventListener("click", () => {
+    showAnnotations = !showAnnotations;
+    updateToggleButton();
+    renderAnnotations();
+  });
+
+  updateToggleButton();
+  toolbar.appendChild(toggleBtn);
 
   overlay.addEventListener("click", () => {
     if (selectedAnnotationId === null) return;
