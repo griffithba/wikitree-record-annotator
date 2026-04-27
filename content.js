@@ -338,6 +338,7 @@ function renderAnnotations() {
     }
 
     box.addEventListener("click", (e) => {
+      e.stopPropagation();
       if (tool === "select") {
         selectAnnotation(a.id);
         return;
@@ -359,15 +360,18 @@ function renderAnnotations() {
 }
 
 function selectAnnotation(id) {
-  selectedAnnotationId = selectedAnnotationId === id ? null : id;
-
+  //selectedAnnotationId = selectedAnnotationId === id ? null : id;
+  selectedAnnotationId = id;
+  console.log("select:", id);
   updateSelectionStyles();
 }
 
 function clearSelection() {
-  if (!selectedAnnotationId) return;
+  //if (!selectedAnnotationId) return;
+  console.log("clear");
   selectedAnnotationId = null;
   updateSelectionStyles();
+  //hideEditor?.();
 }
 
 // ============================================================
@@ -412,6 +416,15 @@ function initOverlay() {
   container.appendChild(annotationLayer);
   container.appendChild(overlay);
 
+  container.addEventListener("click", (e) => {
+    if (tool !== "select") return;
+
+    // If click was on an annotation, ignore
+    if (e.target.closest(".wt-annotation")) return;
+
+    clearSelection();
+  });
+
   function createToolbar() {
     const bar = document.createElement("div");
     bar.id = "wt-toolbar";
@@ -453,7 +466,7 @@ function initOverlay() {
   updateToggleButton();
   toolbar.appendChild(toggleBtn);
 
-  overlay.addEventListener("click", clearSelection);
+  overlay.addEventListener("click", clearSelection());
 
   // Keep viewport synced
   syncViewport();
