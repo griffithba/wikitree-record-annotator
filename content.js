@@ -313,8 +313,6 @@ function renderAnnotations() {
     box.style.width = (relW * rect.width) + "px";
     box.style.height = (relH * rect.height) + "px";
 
-    //box.style.border = "2px solid lime";
-    //box.style.background = "rgba(0,255,0,0.1)";
     box.className = "wt-annotation";
     
     if (a.id === selectedAnnotationId) {
@@ -326,10 +324,6 @@ function renderAnnotations() {
       box.style.cursor = "pointer";
     } else {
       box.style.cursor = "default";
-    }
-
-    if (a.id === selectedAnnotationId) {
-      box.classList.add("wt-selected");
     }
 
     if (a.wtId) {
@@ -351,7 +345,6 @@ function renderAnnotations() {
     });
 
     box.dataset.id = a.id;
-    box.className = "wt-annotation";
 
     annotationLayer.appendChild(box);
   });
@@ -452,14 +445,6 @@ function initOverlay() {
 
   updateToggleButton();
   toolbar.appendChild(toggleBtn);
-
- /*
-  overlay.addEventListener("click", () => {
-    if (selectedAnnotationId === null) return;
-    selectedAnnotationId = null;
-    renderAnnotations();
-  });
-*/
 
   overlay.addEventListener("click", clearSelection);
 
