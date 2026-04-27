@@ -30,7 +30,7 @@ let endX = 0, endY = 0;
 let box = null;
 
 // Mode state
-let tool = "nav";  // "null" | "draw" | "select" 
+let tool = "nav";  // null | "draw" | "select" 
 
 let showAnnotations = true;
 let selectedAnnotationId = null;
@@ -313,8 +313,14 @@ function renderAnnotations() {
     box.style.width = (relW * rect.width) + "px";
     box.style.height = (relH * rect.height) + "px";
 
-    box.style.border = "2px solid lime";
-    box.style.background = "rgba(0,255,0,0.1)";
+    //box.style.border = "2px solid lime";
+    //box.style.background = "rgba(0,255,0,0.1)";
+    box.className = "wt-annotation";
+    
+    if (a.id === selectedAnnotationId) {
+      box.classList.add("wt-selected");
+    }
+
     box.style.pointerEvents = "auto";
     if (tool === "select") {
       box.style.cursor = "pointer";
@@ -323,11 +329,7 @@ function renderAnnotations() {
     }
 
     if (a.id === selectedAnnotationId) {
-      box.style.border = "3px solid orange";
-      box.style.background = "rgba(255,165,0,0.15)";
-    } else {
-      box.style.border = "2px solid lime";
-      box.style.background = "rgba(0,255,0,0.1)";
+      box.classList.add("wt-selected");
     }
 
     if (a.wtId) {
@@ -335,29 +337,18 @@ function renderAnnotations() {
     }
 
     box.addEventListener("click", (e) => {
-      e.stopPropagation();
       if (tool === "select") {
         selectAnnotation(a.id);
         return;
-      } else {
-        if (!a.wtId) return;
       }
-      window.open(
-        `https://www.wikitree.com/wiki/${a.wtId}`,
-        "_blank");
+
+      if (a.wtId) {
+        window.open(
+          `https://www.wikitree.com/wiki/${encodeURIComponent(a.wtId)}`,
+          "_blank"
+        );
+      }
     });
-
-    /*
-    box.addEventListener("dblclick", (e) => {
-      e.stopPropagation();
-
-      if (!a.wtId) return;
-
-      window.open(
-        `https://www.wikitree.com/wiki/${a.wtId}`,
-        "_blank"
-    );
-  });*/
 
     box.dataset.id = a.id;
     box.className = "wt-annotation";
@@ -462,19 +453,19 @@ function initOverlay() {
   updateToggleButton();
   toolbar.appendChild(toggleBtn);
 
+ /*
   overlay.addEventListener("click", () => {
     if (selectedAnnotationId === null) return;
     selectedAnnotationId = null;
     renderAnnotations();
   });
+*/
 
   overlay.addEventListener("click", clearSelection);
 
   // Keep viewport synced
   syncViewport();
-  loadAnnotations();
-
-  let lastHash = "";
+  //loadAnnotationsIfNeeded();
 
   (function () {
     const originalReplaceState = history.replaceState;
@@ -491,18 +482,6 @@ function initOverlay() {
 
   window.addEventListener("popstate", renderAnnotations);
 //clearAnnotations();  // nuclear option to remove all annotations on a page on reload
-  function loadAnnotations() {
-    const key = getPageKey();
-    const saved = localStorage.getItem(key);
-
-    // 🔥 ALWAYS reset first
-    annotations = [];
-
-    if (saved) {
-      annotations = JSON.parse(saved);
-      renderAnnotations();
-    }
-  }
 
   const style = document.createElement("style");
     style.textContent = `
