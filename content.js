@@ -89,7 +89,7 @@ function updateToolUI() {
       el.style.pointerEvents = "auto";
     } else {
       el.style.cursor = "default";
-      el.style.pointerEvents = "none";
+      el.style.pointerEvents = "auto";
     }
   });
 
@@ -338,11 +338,13 @@ function renderAnnotations() {
     }
 
     box.addEventListener("click", (e) => {
-      e.stopPropagation();
       if (tool === "select") {
+        e.stopPropagation();
         selectAnnotation(a.id);
         return;
       }
+
+      if (tool === "draw") return; 
 
       if (a.wtId) {
         window.open(
@@ -351,6 +353,14 @@ function renderAnnotations() {
         );
       }
     });
+
+    // Pass scroll wheel through so zoom works even over annotations
+    box.addEventListener("wheel", (e) => {
+      console.log("Wheel turned");
+      container.dispatchEvent(new WheelEvent("wheel", e));
+
+    }, { passive: true });
+
     box.dataset.id = a.id;
     annotationLayer.appendChild(box);
   });
