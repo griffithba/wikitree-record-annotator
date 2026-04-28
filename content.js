@@ -37,6 +37,9 @@ let selectedAnnotationId = null;
 
 let lastPageKey = null;
 
+// WT ID from the referring page
+let incomingWtId = null;
+
 // ============================================================
 // MODE CONTROL
 // ============================================================
@@ -335,6 +338,13 @@ function renderAnnotations() {
 
     if (a.wtId) {
       box.title = a.wtId;
+
+      // If this belongs to the WT profile we came from
+      if (String(a.wtId) === String(incomingWtId)) {
+        console.log("Matched incoming WT ID");
+        // highlight the annotation box
+        box.classList.add("wt-ref-highlight");
+      }
     }
 
     box.addEventListener("click", (e) => {
@@ -363,7 +373,7 @@ function renderAnnotations() {
 
     box.dataset.id = a.id;
     annotationLayer.appendChild(box);
-  });
+  });  // end of loop over annotations
 
   updateSelectionStyles();
   updateToolUI();
@@ -384,6 +394,11 @@ function clearSelection() {
   //hideEditor?.();
 }
 
+function getWtIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("wtId");
+}
+
 // ============================================================
 // INITIALIZATION
 // ============================================================
@@ -392,6 +407,10 @@ function initOverlay() {
   container = document.querySelector(".openseadragon-container");
   if (!container) return;
 
+  // If arriving from a WikiTree profile, grab the ID
+  incomingWtId = getWtIdFromUrl();
+  console.log("Incoming WT ID:", incomingWtId);
+  
   // Ensure proper positioning context
   container.style.position = "relative";
 
@@ -516,6 +535,15 @@ function initOverlay() {
       .wt-annotation.wt-selected {
         border: 3px solid orange;
         background: rgba(255,165,0,0.15);
+      }
+      
+      .wt-ref-highlight {
+        animation: wtPulse 1.5s ease-out 5;
+      }
+
+      @keyframes wtPulse {
+        0%   { box-shadow: 0 0 0 0 rgba(0,255,255,0.8); }
+        100% { box-shadow: 0 0 0 12px rgba(0,255,255,0); }
       }
     `;
     document.head.appendChild(style);
