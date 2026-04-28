@@ -37,8 +37,55 @@ let selectedAnnotationId = null;
 
 let lastPageKey = null;
 
-// WT ID from the referring page
+// ID of WikiTree profile we came from (if we came from one)
 let incomingWtId = null;
+
+// Only  once
+let hasTriggeredRefHighlight = false;
+
+// ============================================================
+// COLORS/STYLES
+// ============================================================
+
+function injectStyles() {
+  if (document.getElementById("wt-styles")) return;
+
+  const style = document.createElement("style");
+  style.id = "wt-styles";
+
+  style.textContent = `
+    :root {
+      --wt-draw-overlay-bg: rgba(255,0,0,0.1);
+      --wt-draw-overlay-border: 2px solid red;
+      --wt-draw-bg: rgba(25, 0, 255, 0.1);
+      --wt-draw-border: 2px dashed red;
+      --wt-toolbar-bg: rgba(232,162,30,0.6);
+    }
+  
+    .wt-annotation {
+      border: 2px solid lime;
+      background: rgba(0,255,0,0.1);
+      position: absolute;
+      pointer-events: auto;
+      transition: border 0.05s ease;
+    }
+
+    .wt-annotation.wt-selected {
+      border: 3px solid orange;
+      background: rgba(255,165,0,0.15);
+    }
+      
+    .wt-ref-highlight {
+      animation: wtPulse 1.5s ease-out 5;
+    }
+
+    @keyframes wtPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(0,255,255,0.8); }
+      100% { box-shadow: 0 0 0 12px rgba(0,255,255,0); }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 // ============================================================
 // MODE CONTROL
@@ -62,8 +109,8 @@ function setTool(nextTool) {
   updateToolbarButtons();
 
   // (optional) show overlay tint only in draw mode
-  overlay.style.background = isDraw ? "rgba(255,0,0,0.1)" : "transparent";
-  overlay.style.border = isDraw ? "2px solid red" : "none";
+  overlay.style.background = isDraw ? "var(--wt-draw-overlay-bg)" : "transparent";
+  overlay.style.border = isDraw ? "var(--wt-draw-overlay-border)" : "none";
 
   console.log("Tool:", tool);
 }
@@ -147,8 +194,8 @@ function onMouseDown(e) {
   // Create temporary drag box
   box = document.createElement("div");
   box.style.position = "absolute";
-  box.style.border = "2px dashed red";
-  box.style.background = "rgba(25, 0, 255, 0.1)";
+  box.style.border = "var(--wt-draw-border)";
+  box.style.background = "var(--wt-draw-background)";
   box.style.pointerEvents = "none";
 
   annotationLayer.appendChild(box);
@@ -343,7 +390,7 @@ function renderAnnotations() {
       if (String(a.wtId) === String(incomingWtId)) {
         console.log("Matched incoming WT ID");
         // highlight the annotation box
-        box.classList.add("wt-ref-highlight");
+        triggerRefHighlight(box);
       }
     }
 
@@ -397,6 +444,28 @@ function clearSelection() {
 function getWtIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get("wtId");
+}
+
+// If we came from a profile that has an annotation on this page then highlight the annotation
+function triggerRefHighlight(el) {
+  // only highlight it one time, not on every re-render
+  if (hasTriggeredRefHighlight) return; 
+
+  function start() {
+    hasTriggeredRefHighlight = true;
+    el.classList.add("wt-ref-highlight");
+  }
+
+  if (document.visibilityState === "visible") {
+    start();
+  } else {  // If tab was brought up in the background then wait to highlight
+    const onVisible = () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      start();
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+  }
 }
 
 // ============================================================
@@ -466,7 +535,7 @@ function initOverlay() {
       display: "flex",
       gap: "6px",
       padding: "6px",
-      background: "rgba(0,0,0,0.7)",
+      background: "var(--wt-toolbar-bg)",
       borderRadius: "8px"
     });
 
@@ -520,33 +589,9 @@ function initOverlay() {
   })();
 
   window.addEventListener("popstate", renderAnnotations);
-//clearAnnotations();  // nuclear option to remove all annotations on a page on reload
 
-  const style = document.createElement("style");
-    style.textContent = `
-      .wt-annotation {
-        border: 2px solid lime;
-        background: rgba(0,255,0,0.1);
-        position: absolute;
-        pointer-events: auto;
-        transition: border 0.05s ease;
-      }
-
-      .wt-annotation.wt-selected {
-        border: 3px solid orange;
-        background: rgba(255,165,0,0.15);
-      }
-      
-      .wt-ref-highlight {
-        animation: wtPulse 1.5s ease-out 5;
-      }
-
-      @keyframes wtPulse {
-        0%   { box-shadow: 0 0 0 0 rgba(0,255,255,0.8); }
-        100% { box-shadow: 0 0 0 12px rgba(0,255,255,0); }
-      }
-    `;
-    document.head.appendChild(style);
+  // Set border and background colors
+  injectStyles();
 
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Delete") return;
