@@ -40,8 +40,10 @@ let lastPageKey = null;
 // ID of WikiTree profile we came from (if we came from one)
 let incomingWtId = null;
 
-// Only  once
+// Only highlight the referring WT ID person once
 let hasTriggeredRefHighlight = false;
+
+let wtEditor = null;
 
 // ============================================================
 // COLORS/STYLES
@@ -83,8 +85,26 @@ function injectStyles() {
       0%   { box-shadow: 0 0 0 0 rgba(0,255,255,0.8); }
       100% { box-shadow: 0 0 0 12px rgba(0,255,255,0); }
     }
+
+    .annotation-toolbar button {
+      font-size: 18px;
+    }
   `;
   document.head.appendChild(style);
+}
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+function getAnnotationById(id) {
+  const a = annotations.find(x => x.id === id);
+  if (!a) console.warn("Annotation not found:", id);
+  return a || null;
+}
+
+function isValidWtId(id) {
+  return /^\p{L}+-\d+$/u.test(id);
 }
 
 // ============================================================
@@ -111,8 +131,6 @@ function setTool(nextTool) {
   // (optional) show overlay tint only in draw mode
   overlay.style.background = isDraw ? "var(--wt-draw-overlay-bg)" : "transparent";
   overlay.style.border = isDraw ? "var(--wt-draw-overlay-border)" : "none";
-
-  console.log("Tool:", tool);
 }
 
 function makeToolButton(label, toolName) {
@@ -162,15 +180,132 @@ function updateToolbarButtons() {
 }
 
 function updateSelectionStyles() {
-  document.querySelectorAll(".wt-annotation").forEach(el => {
-    const id = el.dataset.id;
+  document.querySelectorAll(".wt-annotation").forEach(box => {
+    const id = box.dataset.id;
 
+    let toolbar = box.querySelector(".annotation-toolbar");
+    
     if (String(id) === String(selectedAnnotationId)) {
-      el.classList.add("wt-selected");
+      box.classList.add("wt-selected");
+      if (!toolbar) {
+        toolbar = createAnnotationToolbar(id);
+        box.appendChild(toolbar);
+      }
     } else {
-      el.classList.remove("wt-selected");
+      box.classList.remove("wt-selected");
+      toolbar?.remove();
     }
   });
+}
+
+function createAnnotationToolbar(id) {
+  const toolbar = document.createElement("div");
+  toolbar.className = "annotation-toolbar";
+
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "✏️";
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "🗑️";
+
+  editBtn.onclick = (e) => {
+    e.stopPropagation();
+    const box = document.querySelector(`[data-id="${selectedAnnotationId}"]`);
+    const rect = box.getBoundingClientRect();
+    editAnnotation
+      (id, 
+       rect.left + rect.width, 
+       rect.top + rect.height);
+  };
+
+  deleteBtn.onclick = (e) => {
+    e.stopPropagation();
+    deleteAnnotation(id);
+  };
+
+  toolbar.append(editBtn, deleteBtn);
+  return toolbar;
+}
+
+function createWtEditor() {
+  wtEditor = document.createElement("div");
+
+  Object.assign(wtEditor.style, {
+    position: "absolute",
+    zIndex: 100001,
+    background: "black",
+    color: "white",
+    padding: "6px",
+    borderRadius: "6px",
+    display: "none",
+    gap: "4px"
+  });
+
+  wtEditor.innerHTML = `
+    <input type="text" id="wt-input" style="width:120px;" />
+    <button id="wt-save">✔</button>
+    <button id="wt-cancel">✖</button>
+    <div id="wt-error" style="color:red; font-size:11px;"></div>
+  `;
+  
+  document.body.appendChild(wtEditor);
+
+  const input = wtEditor.querySelector("#wt-input");
+  const saveBtn = wtEditor.querySelector("#wt-save");
+  const cancelBtn = wtEditor.querySelector("#wt-cancel");
+  const errorEl = wtEditor.querySelector("#wt-error");
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") saveBtn.click();
+    if (e.key === "Escape") cancelBtn.click();
+  });
+
+  wtEditor.addEventListener("mousedown", e => e.stopPropagation()); 
+}
+
+
+function openWtEditor({ x, y, initialValue = "", onSave, onCancel }) {
+  const input = wtEditor.querySelector("#wt-input");
+  const saveBtn = wtEditor.querySelector("#wt-save");
+  const cancelBtn = wtEditor.querySelector("#wt-cancel");
+
+  wtEditor.style.left = x + "px";
+  wtEditor.style.top = y + "px";
+  wtEditor.style.display = "flex";
+
+  input.value = initialValue;
+  input.focus();
+
+  function cleanup() {
+    wtEditor.style.display = "none";
+    saveBtn.onclick = null;
+    cancelBtn.onclick = null;
+  }
+
+  const errorEl = wtEditor.querySelector("#wt-error");
+  
+  saveBtn.onclick = () => {
+    const value = input.value.trim();
+      
+    if (!value) {
+      errorEl.textContent = "ID required";
+      return;
+    }
+
+    if (!isValidWtId(value)) {
+      errorEl.textContent = "Invalid format (e.g., Smith-123)";
+      return;
+    }
+
+    errorEl.textContent = "";
+    cleanup();
+    onSave?.(value);
+  };
+
+  cancelBtn.onclick = () => {
+    cleanup();
+    onCancel?.();
+  };
 }
 
 // ============================================================
@@ -254,35 +389,28 @@ async function onMouseUp(e) {
     wtId: null,
     name: null,
     birth: null,
-    death: null
+    death: null,
+    status: "unknown"
   };
-  
-  // 🔥 Prompt immediately
-  const wtId = prompt("Enter WikiTree ID (e.g., Smith-123):");
 
-  // ❌ If user cancels or leaves blank → discard
-  if (!wtId || !wtId.trim()) {
-    box.remove();
-    box = null;
-    return;
-  }
-
-  if (!isValidWtId(wtId)) {
-    alert("Invalid WikiTree ID format (e.g., Smith-123)");
-    box.remove();
-    box = null;
-    return;
-  }
-
-  // ✅ Save only if valid
-  annotation.wtId = wtId.trim();
-
-  annotations.push(annotation);
-  await saveAnnotationsForPage(annotations);
-  renderAnnotations();
-
-  box.remove();
-  box = null;
+  // prompt for WT ID
+  openWtEditor({
+    x: e.clientX,
+    y: e.clientY,
+    initialValue: "",
+    onSave: async (wtId) => {
+      annotation.wtId = wtId;
+      annotations.push(annotation);
+      await saveAnnotationsForPage(annotations);
+      renderAnnotations();
+      box.remove();
+      box = null;
+    },
+    onCancel: () => {
+      box.remove();
+      box = null;
+    }
+  });
 }
 
 
@@ -345,28 +473,21 @@ async function loadAnnotationsIfNeeded() {
 
   let all = await storageAPI.getAnnotations();
 
-  let changed = false;
-
-  // 🔥 migrate old annotations (no page → assume current page)
-  all = all.map(a => {
-    if (!a.page) {
-      changed = true;
-      return { ...a, page: key };
-    }
-    return a;
-  });
-
-  // save back if we modified anything
-  if (changed) {
-    await storageAPI.saveAnnotations(all);
-  }
-
   annotations = all.filter(a => a.page === key);
 }
 
-function isValidWtId(id) {
-  return /^\p{L}+-\d+$/u.test(id);
+async function deleteAnnotation(id, {confirmDelete = true} = {}) {
+  if (confirmDelete) {
+    const ok = confirm("Delete this annotation?");
+    if (!ok) return;
+  }
+  
+  annotations = annotations.filter(a => a.id !== selectedAnnotationId);
+  selectedAnnotationId = null;
+  await saveAnnotationsForPage(annotations);
+  renderAnnotations(); // rebuild geometry
 }
+
 // ============================================================
 // RENDERING
 // ============================================================
@@ -416,7 +537,6 @@ function renderAnnotations() {
 
       // If this belongs to the WT profile we came from
       if (String(a.wtId) === String(incomingWtId)) {
-        console.log("Matched incoming WT ID");
         // highlight the annotation box
         triggerRefHighlight(box);
       }
@@ -448,20 +568,36 @@ function renderAnnotations() {
 }
 
 function selectAnnotation(id) {
-  //selectedAnnotationId = selectedAnnotationId === id ? null : id;
   selectedAnnotationId = id;
-  console.log("select:", id);
   updateSelectionStyles();
+}
+
+function editAnnotation(id, screenX, screenY) {
+  const annotation = getAnnotationById(id);
+  if (!annotation) return;
+  
+  openWtEditor({
+    x: screenX,
+    y: screenY,
+    initialValue: annotation.wtId || "oops",
+
+    onSave: async (wtId) => {
+      annotation.wtId = wtId;
+
+      await saveAnnotationsForPage(annotations);
+      renderAnnotations();
+    }
+  });
 }
 
 function clearSelection() {
   //if (!selectedAnnotationId) return;
-  console.log("clear");
   selectedAnnotationId = null;
   updateSelectionStyles();
   //hideEditor?.();
 }
 
+// If coming from a WT profile, the ID will be embedded in the URL
 function getWtIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get("wtId");
@@ -509,8 +645,7 @@ function initOverlay() {
 
   // If arriving from a WikiTree profile, grab the ID
   incomingWtId = getWtIdFromUrl();
-  console.log("Incoming WT ID:", incomingWtId);
-  
+    
   // Ensure proper positioning context
   container.style.position = "relative";
 
@@ -597,6 +732,9 @@ function initOverlay() {
 
   overlay.addEventListener("click", clearSelection());
 
+  // create editor
+  createWtEditor();
+  
   // Keep viewport synced
   syncViewport();
   // Load and render any pre-existing annotations
@@ -624,17 +762,23 @@ function initOverlay() {
   // Set border and background colors
   injectStyles();
 
-  window.addEventListener("keydown", async (e) => {
-    if (e.key !== "Delete") return;
+  window.addEventListener("keydown", (e) => {
     if (!selectedAnnotationId) return;
-
-    annotations = annotations.filter(a => a.id !== selectedAnnotationId);
-    selectedAnnotationId = null;
-    await saveAnnotationsForPage(annotations);
-    renderAnnotations(); // rebuild geometry
+    if (wtEditor?.contains(document.activeElement)) return;
+    if (e.key === "Delete") {
+      deleteAnnotation(selectedAnnotationId);
+    } else if (e.key === "e") {
+      e.preventDefault();  // prevent the 'e' from going to the edit window
+      e.stopPropagation();
+      const box = document.querySelector(`[data-id="${selectedAnnotationId}"]`);
+      const rect = box.getBoundingClientRect();
+      editAnnotation(
+        selectedAnnotationId, 
+        rect.left + rect.width, 
+        rect.top + rect.height);
+    }
   });
 }
-
 
 // ============================================================
 // WAIT FOR VIEWER
