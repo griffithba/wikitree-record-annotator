@@ -5,7 +5,7 @@
 // zoom and pan by storing coordinates in image space (xywh).
 // ============================================================
 
-
+const storageAPI = window.storage;
 // --- DOM ELEMENTS -------------------------------------------------
 
 // Transparent interaction layer (captures mouse input)
@@ -225,7 +225,7 @@ function onMouseMove(e) {
   box.style.height = height + "px";
 }
 
-function onMouseUp(e) {
+async function onMouseUp(e) {
   if (tool !== "draw" || !isDragging || !box) return;
 
   e.preventDefault();
@@ -246,6 +246,7 @@ function onMouseUp(e) {
   // Normalize rectangle in IMAGE SPACE
   const annotation = {
     id: crypto.randomUUID(),
+    page: getPageKey(),
     x: Math.min(x1, x2),
     y: Math.min(y1, y2),
     w: Math.abs(x2 - x1),
@@ -277,7 +278,7 @@ function onMouseUp(e) {
   annotation.wtId = wtId.trim();
 
   annotations.push(annotation);
-  saveAnnotations();
+  await saveAnnotationsForPage(annotations);
   renderAnnotations();
 
   box.remove();
@@ -316,27 +317,51 @@ function getPageKey() {
   return match ? match[1] : "unknown";
 }
 
-function saveAnnotations() {
+async function saveAnnotationsForPage(pageAnnotations) {
   const key = getPageKey();
-  localStorage.setItem(key, JSON.stringify(annotations));
+
+  const all = await storageAPI.getAnnotations();
+
+  // remove old annotations for this page
+  const others = all.filter(a => a.page !== key);
+
+  // add updated ones
+  const updated = [...others, ...pageAnnotations];
+
+  // Use this function wrong and you'll delete all annotations for ALL other pages!
+  await storageAPI.saveAnnotations(updated);
 }
 
-function clearAnnotations() {
-  annotations = [];
-  saveAnnotations();
-  renderAnnotations();
+async function getAnnotationsByPage(pageKey) {
+  const all = await storageAPI.getAnnotations();
+  return all.filter(a => a.page === pageKey);
 }
 
-function loadAnnotationsIfNeeded() {
+async function loadAnnotationsIfNeeded() {
   const key = getPageKey();
 
   if (key === lastPageKey) return;
-
   lastPageKey = key;
 
-  const saved = localStorage.getItem(key);
+  let all = await storageAPI.getAnnotations();
 
-  annotations = saved ? JSON.parse(saved) : [];
+  let changed = false;
+
+  // 🔥 migrate old annotations (no page → assume current page)
+  all = all.map(a => {
+    if (!a.page) {
+      changed = true;
+      return { ...a, page: key };
+    }
+    return a;
+  });
+
+  // save back if we modified anything
+  if (changed) {
+    await storageAPI.saveAnnotations(all);
+  }
+
+  annotations = all.filter(a => a.page === key);
 }
 
 function isValidWtId(id) {
@@ -599,13 +624,13 @@ function initOverlay() {
   // Set border and background colors
   injectStyles();
 
-  window.addEventListener("keydown", (e) => {
+  window.addEventListener("keydown", async (e) => {
     if (e.key !== "Delete") return;
     if (!selectedAnnotationId) return;
 
     annotations = annotations.filter(a => a.id !== selectedAnnotationId);
     selectedAnnotationId = null;
-    saveAnnotations();
+    await saveAnnotationsForPage(annotations);
     renderAnnotations(); // rebuild geometry
   });
 }

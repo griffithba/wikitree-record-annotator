@@ -11,11 +11,11 @@
   "content_scripts": [
     {
       "matches": ["https://www.wikitree.com/*"],
-      "js": ["wikitree.js"]
+      "js": ["storage.js", "wikitree.js"]
     },
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
-      "js": ["content.js"]
+      "js": ["storage.js", "content.js"]
     }
   ]
 }
