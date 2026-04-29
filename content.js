@@ -59,7 +59,7 @@ function injectStyles() {
       --wt-draw-overlay-border: 2px solid red;
       --wt-draw-bg: rgba(25, 0, 255, 0.1);
       --wt-draw-border: 2px dashed red;
-      --wt-toolbar-bg: rgba(232,162,30,0.6);
+      --wt-toolbar-bg: rgba(232,162,30,0.8);
     }
   
     .wt-annotation {
@@ -250,7 +250,10 @@ function onMouseUp(e) {
     y: Math.min(y1, y2),
     w: Math.abs(x2 - x1),
     h: Math.abs(y2 - y1),
-    wtId: null
+    wtId: null,
+    name: null,
+    birth: null,
+    death: null
   };
   
   // 🔥 Prompt immediately
@@ -384,7 +387,7 @@ function renderAnnotations() {
     }
 
     if (a.wtId) {
-      box.title = a.wtId;
+      box.title = buildTooltip(a);
 
       // If this belongs to the WT profile we came from
       if (String(a.wtId) === String(incomingWtId)) {
@@ -410,13 +413,6 @@ function renderAnnotations() {
         );
       }
     });
-
-    // Pass scroll wheel through so zoom works even over annotations
-    box.addEventListener("wheel", (e) => {
-      console.log("Wheel turned");
-      container.dispatchEvent(new WheelEvent("wheel", e));
-
-    }, { passive: true });
 
     box.dataset.id = a.id;
     annotationLayer.appendChild(box);
@@ -444,6 +440,16 @@ function clearSelection() {
 function getWtIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get("wtId");
+}
+
+// display "Name (birth-death)" when hovering over an annotation
+function buildTooltip(a) {
+  if (a.name || a.birth || a.death) {
+    const years = (a.birth || "?") + "-" + (a.death || "?");
+
+    return `${a.name || "Unknown"} (${years})`;
+  }
+  return a.wtId || "Unknown";
 }
 
 // If we came from a profile that has an annotation on this page then highlight the annotation
