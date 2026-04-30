@@ -92,13 +92,13 @@ function injectStyles() {
 
     .annotation-toolbar {
       position: absolute;
-      top: -28px;
+      top: -40px;
       right: 0;
 
       display: flex;
       gap: 4px;
 
-      background: rgba(196, 100, 10, 0.6);
+      background: rgba(38, 35, 32, 0.8);
       padding: 4px 6px;
       border-radius: 6px;
 
@@ -236,9 +236,11 @@ function createAnnotationToolbar(id) {
 
   const editBtn = document.createElement("button");
   editBtn.textContent = "✏️";
+  editBtn.title = "Edit";
 
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "🗑️";
+  deleteBtn.title = "Delete";
 
   editBtn.onclick = (e) => {
     e.stopPropagation();
@@ -252,6 +254,16 @@ function createAnnotationToolbar(id) {
 
   deleteBtn.onclick = (e) => {
     e.stopPropagation();
+
+    if (!deleteBtn.dataset.armed) {
+      deleteBtn.dataset.armed = "true";
+      deleteBtn.textContent = "⚠";
+      deleteBtn.style.color = "yellow";
+      deleteBtn.style.fontsize = "22px";
+      deleteBtn.title = "Click again to delete";
+      return;
+    }
+
     deleteAnnotation(id);
   };
 
@@ -547,12 +559,7 @@ async function loadAnnotationsIfNeeded() {
   annotations = all.filter(a => a.page === key);
 }
 
-async function deleteAnnotation(id, {confirmDelete = true} = {}) {
-  if (confirmDelete) {
-    const ok = confirm("Delete this annotation?");
-    if (!ok) return;
-  }
-  
+async function deleteAnnotation(id) {
   annotations = annotations.filter(a => a.id !== selectedAnnotationId);
   selectedAnnotationId = null;
   await saveAnnotationsForPage(annotations);
