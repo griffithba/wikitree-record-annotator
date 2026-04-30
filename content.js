@@ -30,7 +30,7 @@ let endX = 0, endY = 0;
 let box = null;
 
 // Mode state
-let tool = "nav";  // null | "draw" | "select" 
+let tool = null;  // null | "draw" | "select" 
 
 let showAnnotations = true;
 let selectedAnnotationId = null;
@@ -61,7 +61,7 @@ function injectStyles() {
       --wt-draw-overlay-border: 2px solid red;
       --wt-draw-bg: rgba(25, 0, 255, 0.1);
       --wt-draw-border: 2px dashed red;
-      --wt-toolbar-bg: rgba(232,162,30,0.8);
+      --wt-toolbar-bg: rgba(255, 171, 15, 0.85);
     }
   
     .wt-annotation {
@@ -82,12 +82,38 @@ function injectStyles() {
     }
 
     @keyframes wtPulse {
-      0%   { box-shadow: 0 0 0 0 rgba(0,255,255,0.8); }
+      0%   { box-shadow: 0 0 0 0 rgba(255, 171, 15, 0.85); }
       100% { box-shadow: 0 0 0 12px rgba(0,255,255,0); }
+    }
+
+    .annotation {
+      position: absolute;
+    }
+
+    .annotation-toolbar {
+      position: absolute;
+      top: -28px;
+      right: 0;
+
+      display: flex;
+      gap: 4px;
+
+      background: rgba(196, 100, 10, 0.6);
+      padding: 4px 6px;
+      border-radius: 6px;
+
+      z-index: 10;
+
+      pointer-events: auto;
     }
 
     .annotation-toolbar button {
       font-size: 18px;
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
     }
   `;
   document.head.appendChild(style);
@@ -112,8 +138,14 @@ function isValidWtId(id) {
 // ============================================================
 
 function setTool(nextTool) {
+  const prevTool = tool;
   // toggle behavior
   tool = (tool === nextTool) ? null : nextTool;
+
+  if (prevTool === "select" && tool !== "select") {
+    clearSelection();
+    closeWtEditor?.();
+  }
 
   const isDraw = tool === "draw";
 
@@ -238,19 +270,34 @@ function createWtEditor() {
     padding: "6px",
     borderRadius: "6px",
     display: "none",
+    flexDirection: "column",
     gap: "4px"
   });
 
   wtEditor.innerHTML = `
-    <input type="text" id="wt-input" style="width:120px;" />
-    <button id="wt-save">✔</button>
-    <button id="wt-cancel">✖</button>
+  <div style="display:flex; flex-direction:column; gap:4px;">
+    <div style="display:flex; align-items:center; gap:6px;">
+      <span>WikiTree ID:</span>
+      <input type="text" id="wt-input" style="width:120px;" />
+    </div>
+
+    <div style="display:flex; align-items:center; gap:6px;">
+      <span>Optional note:</span>
+      <input type="text" id="wt-note" style="width:180px;" />
+    </div>
+
+    <div style="display:flex; gap:6px;">
+      <button id="wt-save">✔</button>
+      <button id="wt-cancel">✖</button>
+    </div>
+
     <div id="wt-error" style="color:red; font-size:11px;"></div>
-  `;
+  </div>  `;
   
   document.body.appendChild(wtEditor);
 
   const input = wtEditor.querySelector("#wt-input");
+  const noteInput = wtEditor.querySelector("#wt-note");
   const saveBtn = wtEditor.querySelector("#wt-save");
   const cancelBtn = wtEditor.querySelector("#wt-cancel");
   const errorEl = wtEditor.querySelector("#wt-error");
@@ -259,53 +306,69 @@ function createWtEditor() {
     if (e.key === "Enter") saveBtn.click();
     if (e.key === "Escape") cancelBtn.click();
   });
+  noteInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") saveBtn.click();
+    if (e.key === "Escape") cancelBtn.click();
+  });
 
   wtEditor.addEventListener("mousedown", e => e.stopPropagation()); 
 }
 
 
-function openWtEditor({ x, y, initialValue = "", onSave, onCancel }) {
-  const input = wtEditor.querySelector("#wt-input");
-  const saveBtn = wtEditor.querySelector("#wt-save");
-  const cancelBtn = wtEditor.querySelector("#wt-cancel");
+function openWtEditor(
+  { x, y, initialValue = "", initialNote = "", onSave, onCancel }) 
+  {
+    const input = wtEditor.querySelector("#wt-input");
+    const noteInput = wtEditor.querySelector("#wt-note");
+    const saveBtn = wtEditor.querySelector("#wt-save");
+    const cancelBtn = wtEditor.querySelector("#wt-cancel");
 
-  wtEditor.style.left = x + "px";
-  wtEditor.style.top = y + "px";
-  wtEditor.style.display = "flex";
+    wtEditor.style.left = x + "px";
+    wtEditor.style.top = y + "px";
+    wtEditor.style.display = "flex";
 
-  input.value = initialValue;
-  input.focus();
+    input.value = initialValue;
+    input.focus();
+    noteInput.value = initialNote;
 
-  function cleanup() {
-    wtEditor.style.display = "none";
-    saveBtn.onclick = null;
-    cancelBtn.onclick = null;
-  }
+    function cleanup() {
+      wtEditor.style.display = "none";
+      saveBtn.onclick = null;
+      cancelBtn.onclick = null;
+    }
 
-  const errorEl = wtEditor.querySelector("#wt-error");
+    const errorEl = wtEditor.querySelector("#wt-error");
   
-  saveBtn.onclick = () => {
-    const value = input.value.trim();
+    saveBtn.onclick = () => {
+      const value = input.value.trim();
+      const note = noteInput.value.trim();
       
-    if (!value) {
-      errorEl.textContent = "ID required";
-      return;
-    }
+      if (!value) {
+        errorEl.textContent = "ID required";
+        return;
+      }
 
-    if (!isValidWtId(value)) {
-      errorEl.textContent = "Invalid format (e.g., Smith-123)";
-      return;
-    }
+      if (!isValidWtId(value)) {
+        errorEl.textContent = "Invalid format (e.g., Smith-123)";
+        return;
+      }
 
-    errorEl.textContent = "";
-    cleanup();
-    onSave?.(value);
+      errorEl.textContent = "";
+      cleanup();
+      onSave?.({wtId: value, 
+                note: note});
   };
 
   cancelBtn.onclick = () => {
     cleanup();
     onCancel?.();
   };
+}
+
+function closeWtEditor() {
+  if (wtEditor) {
+    wtEditor.style.display = "none";
+  }
 }
 
 // ============================================================
@@ -390,16 +453,18 @@ async function onMouseUp(e) {
     name: null,
     birth: null,
     death: null,
+    note: null, 
     status: "unknown"
   };
 
-  // prompt for WT ID
+  // prompt for WT ID and optional note
   openWtEditor({
     x: e.clientX,
     y: e.clientY,
     initialValue: "",
-    onSave: async (wtId) => {
+    onSave: async ({wtId, note}) => {
       annotation.wtId = wtId;
+      annotation.note = note;
       annotations.push(annotation);
       await saveAnnotationsForPage(annotations);
       renderAnnotations();
@@ -580,9 +645,13 @@ function editAnnotation(id, screenX, screenY) {
     x: screenX,
     y: screenY,
     initialValue: annotation.wtId || "oops",
+    initialNote: annotation.note || "",
 
-    onSave: async (wtId) => {
+    onSave: async ({wtId, note}) => {
+      console.log("ID", wtId);
+      console.log("Note:", note);
       annotation.wtId = wtId;
+      annotation.note = note;
 
       await saveAnnotationsForPage(annotations);
       renderAnnotations();
@@ -591,10 +660,9 @@ function editAnnotation(id, screenX, screenY) {
 }
 
 function clearSelection() {
-  //if (!selectedAnnotationId) return;
   selectedAnnotationId = null;
   updateSelectionStyles();
-  //hideEditor?.();
+  closeWtEditor?.();
 }
 
 // If coming from a WT profile, the ID will be embedded in the URL
@@ -603,14 +671,20 @@ function getWtIdFromUrl() {
   return params.get("wtId");
 }
 
-// display "Name (birth-death)" when hovering over an annotation
+// display "Name (birth-death)" and note when hovering over an annotation
 function buildTooltip(a) {
+  let text = a.wtId || "Unknown";
   if (a.name || a.birth || a.death) {
     const years = (a.birth || "?") + "-" + (a.death || "?");
 
-    return `${a.name || "Unknown"} (${years})`;
+    text = `${a.name || "Unknown"} (${years})`;
   }
-  return a.wtId || "Unknown";
+    
+  if (a.note) {
+    text += "\n" + a.note;
+  }
+    
+  return text; 
 }
 
 // If we came from a profile that has an annotation on this page then highlight the annotation
