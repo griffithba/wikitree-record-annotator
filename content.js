@@ -115,6 +115,22 @@ function injectStyles() {
       font-size: 18px;
       cursor: pointer;
     }
+
+    .resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: white;
+      border: 2px solid black;
+      border-radius: 50%;
+      z-index: 20;
+    }
+
+    .resize-handle.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+    .resize-handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+    .resize-handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    .resize-handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+    
   `;
   document.head.appendChild(style);
 }
@@ -222,10 +238,12 @@ function updateSelectionStyles() {
       if (!toolbar) {
         toolbar = createAnnotationToolbar(id);
         box.appendChild(toolbar);
+        addResizeHandles(box, id);
       }
     } else {
       box.classList.remove("wt-selected");
       toolbar?.remove();
+      box.querySelectorAll(".resize-handle").forEach(h => h.remove());
     }
   });
 }
@@ -269,6 +287,120 @@ function createAnnotationToolbar(id) {
 
   toolbar.append(editBtn, deleteBtn);
   return toolbar;
+}
+
+// ============================================================
+// RESIZING ANNOTATION BOXES
+// ============================================================
+
+function addResizeHandles(box, id) {
+  const corners = ["nw", "ne", "sw", "se"];
+
+  corners.forEach(corner => {
+    const handle = document.createElement("div");
+    handle.className = `resize-handle ${corner}`;
+    handle.dataset.corner = corner;
+
+    handle.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+      startResize(e, id, corner);
+    });
+
+    box.appendChild(handle);
+  });
+}
+
+let resizing = null;
+
+function startResize(e, id, corner) {
+  const annotation = getAnnotationById(id);
+  if (!annotation) return;
+
+  // STEP 1. get mouse position (overlay space)
+  const rect = overlay.getBoundingClientRect();
+  
+  resizing = {
+    id,
+    corner,
+    startX: e.clientX - rect.left,
+    startY: e.clientY - rect.top,
+    startBox: { ...annotation }
+  };
+
+  document.addEventListener("mousemove", onResizeMove);
+  document.addEventListener("mouseup", stopResize);
+}
+
+function onResizeMove(e) {
+  if (!resizing) return;
+
+  const rect = overlay.getBoundingClientRect();
+  const vp = currentViewport;
+
+  // STEP 2. compute dx/dy (overlay space)
+  const currentX = e.clientX - rect.left;
+  const currentY = e.clientY - rect.top;
+
+  const dx = currentX - resizing.startX;
+  const dy = currentY - resizing.startY;
+
+  // STEP 3. convert dx/dy → image space
+  const scaleX = vp.w / rect.width;
+  const scaleY = vp.h / rect.height;
+
+  const dxImg = dx * scaleX;
+  const dyImg = dy * scaleY;
+
+  // STEP 4. apply to annotation (image space)
+  const annotation = getAnnotationById(resizing.id);
+  if (!annotation) return;
+
+  // copy original
+  let { x, y, w, h } = resizing.startBox;
+  const corner = resizing.corner;
+
+  if (corner.includes("e")) w += dxImg;
+  if (corner.includes("s")) h += dyImg;
+  if (corner.includes("w")) {
+    x += dxImg;
+    w -= dxImg;
+  }
+  if (corner.includes("n")) {
+    y += dyImg;
+    h -= dyImg;
+  }
+
+  // prevent negative sizes
+  if (w < 0) {
+    x = x + w;
+    w = Math.abs(w);
+  }
+
+  if (h < 0) {
+    y = y + h;
+    h = Math.abs(h);
+  }
+
+  w = Math.max(20, w);
+  h = Math.max(20, h);
+
+  annotation.x = x;
+  annotation.y = y;
+  annotation.w = w;
+  annotation.h = h;
+
+  renderAnnotations();
+}
+
+function stopResize() {
+  if (!resizing) return;
+
+  saveAnnotationsForPage(annotations);
+
+  resizing = null;
+
+  document.removeEventListener("mousemove", onResizeMove);
+  document.removeEventListener("mouseup", stopResize);
 }
 
 // ============================================================
