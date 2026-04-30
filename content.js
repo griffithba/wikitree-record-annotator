@@ -5,7 +5,9 @@
 // zoom and pan by storing coordinates in image space (xywh).
 // ============================================================
 
+// Pull in the storage module
 const storageAPI = window.storage;
+
 // --- DOM ELEMENTS -------------------------------------------------
 
 // Transparent interaction layer (captures mouse input)
@@ -23,7 +25,7 @@ let currentViewport = null;    // {x,y,w,h} from URL (image space)
 
 let annotations = [];          // stored in IMAGE SPACE
 
-// Drag state
+// Drag state (for drawing boxes)
 let isDragging = false;
 let startX = 0, startY = 0;
 let endX = 0, endY = 0;
@@ -42,8 +44,6 @@ let incomingWtId = null;
 
 // Only highlight the referring WT ID person once
 let hasTriggeredRefHighlight = false;
-
-let wtEditor = null;
 
 // ============================================================
 // COLORS/STYLES
@@ -129,7 +129,7 @@ function getAnnotationById(id) {
   return a || null;
 }
 
-function isValidWtId(id) {
+function isPlausibleWtId(id) {
   return /^\p{L}+-\d+$/u.test(id);
 }
 
@@ -259,6 +259,12 @@ function createAnnotationToolbar(id) {
   return toolbar;
 }
 
+// ============================================================
+// FUNCTION FOR ENTERING/EDITING WT ID AND NOTE
+// ============================================================
+
+let wtEditor = null;
+
 function createWtEditor() {
   wtEditor = document.createElement("div");
 
@@ -275,7 +281,7 @@ function createWtEditor() {
   });
 
   wtEditor.innerHTML = `
-  <div style="display:flex; flex-direction:column; gap:4px;">
+  <div style="display:flex; flex-direction:column; gap:4px; font-family: Arial, sans-serif;">
     <div style="display:flex; align-items:center; gap:6px;">
       <span>WikiTree ID:</span>
       <input type="text" id="wt-input" style="width:120px;" />
@@ -348,7 +354,7 @@ function openWtEditor(
         return;
       }
 
-      if (!isValidWtId(value)) {
+      if (!isPlausibleWtId(value)) {
         errorEl.textContent = "Invalid format (e.g., Smith-123)";
         return;
       }
