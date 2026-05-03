@@ -32,7 +32,7 @@ let endX = 0, endY = 0;
 let box = null;
 
 // Mode state
-let tool = null;  // null | "draw" | "select" 
+let tool = null;  // null | "draw" | "select" | "addBox"
 
 let showAnnotations = true;
 let selectedAnnotationId = null;
@@ -159,7 +159,7 @@ function setTool(nextTool) {
   tool = (tool === nextTool) ? null : nextTool;
 
   if (prevTool === "select" && tool !== "select") {
-    clearSelection();
+    //clearSelection();
     closeWtEditor?.();
   }
 
@@ -229,10 +229,9 @@ function updateToolbarButtons() {
 
 function updateSelectionStyles() {
   document.querySelectorAll(".wt-annotation").forEach(box => {
-    const id = box.dataset.id;
-
+    const id = box.dataset.annotationId;
     let toolbar = box.querySelector(".annotation-toolbar");
-    
+       
     if (String(id) === String(selectedAnnotationId)) {
       box.classList.add("wt-selected");
       if (!toolbar) {
@@ -321,10 +320,11 @@ function startResize(e, id, corner) {
   
   resizing = {
     id,
+    boxIndex,
     corner,
     startX: e.clientX - rect.left,
     startY: e.clientY - rect.top,
-    startBox: { ...annotation }
+    startBox: { ...box }
   };
 
   document.addEventListener("mousemove", onResizeMove);
@@ -355,6 +355,8 @@ function onResizeMove(e) {
   const annotation = getAnnotationById(resizing.id);
   if (!annotation) return;
 
+  const box = annotation.boxes[resizing.boxIndex];
+
   // copy original
   let { x, y, w, h } = resizing.startBox;
   const corner = resizing.corner;
@@ -384,10 +386,10 @@ function onResizeMove(e) {
   w = Math.max(20, w);
   h = Math.max(20, h);
 
-  annotation.x = x;
-  annotation.y = y;
-  annotation.w = w;
-  annotation.h = h;
+  box.x = x;
+  box.y = y;
+  box.w = w;
+  box.h = h;
 
   renderAnnotations();
 }
@@ -401,6 +403,26 @@ function stopResize() {
 
   document.removeEventListener("mousemove", onResizeMove);
   document.removeEventListener("mouseup", stopResize);
+}
+
+// ============================================================
+// CREATING MULTIPLE BOXES FOR THE SAME ANNOTATION
+// ============================================================
+
+function addBoxToSelected(newBox) {
+  const a = getAnnotationById(selectedAnnotationId);
+  if (!a) return;
+
+  if (!a.boxes) {
+    // migrate old annotation
+    a.boxes = getBoxes(a);
+    delete a.x; delete a.y; delete a.w; delete a.h;
+  }
+
+  a.boxes.push(newBox);
+
+  saveAnnotationsForPage(annotations);
+  renderAnnotations();
 }
 
 // ============================================================
@@ -581,6 +603,8 @@ async function onMouseUp(e) {
 
   isDragging = false;
 
+  const addingToExisting = e.shiftKey && selectedAnnotationId;
+
   const overlayRect = overlay.getBoundingClientRect();
   const vp = currentViewport;
   if (!vp) return;
@@ -592,40 +616,70 @@ async function onMouseUp(e) {
   const y2 = vp.y + (endY / overlayRect.height) * vp.h;
 
   // Normalize rectangle in IMAGE SPACE
-  const annotation = {
-    id: crypto.randomUUID(),
-    page: getPageKey(),
-    x: Math.min(x1, x2),
-    y: Math.min(y1, y2),
-    w: Math.abs(x2 - x1),
-    h: Math.abs(y2 - y1),
-    wtId: null,
-    name: null,
-    birth: null,
-    death: null,
-    note: null, 
-    status: "unknown"
-  };
+  const newBox = {
+      x: Math.min(x1, x2),
+      y: Math.min(y1, y2),
+      w: Math.abs(x2 - x1),
+      h: Math.abs(y2 - y1)
+    };
 
-  // prompt for WT ID and optional note
-  openWtEditor({
-    x: e.clientX,
-    y: e.clientY,
-    initialValue: "",
-    onSave: async ({wtId, note}) => {
-      annotation.wtId = wtId;
-      annotation.note = note;
-      annotations.push(annotation);
-      await saveAnnotationsForPage(annotations);
-      renderAnnotations();
-      box.remove();
-      box = null;
-    },
-    onCancel: () => {
-      box.remove();
-      box = null;
+  if (addingToExisting) {
+    const annotation = getAnnotationById(selectedAnnotationId);
+    if (!annotation) return;
+
+    // migrate old annotation if needed
+    if (!annotation.boxes) {
+      annotation.boxes = getBoxes(annotation);
+      delete annotation.x;
+      delete annotation.y;
+      delete annotation.w;
+      delete annotation.h;
     }
-  });
+
+    annotation.boxes.push(newBox);
+
+    await saveAnnotationsForPage(annotations);
+    renderAnnotations();
+
+    box.remove();
+    box = null;
+    return;
+
+  } else {
+
+    const annotation = {
+      id: crypto.randomUUID(),
+      page: getPageKey(),
+      boxes : [newBox],
+      wtId: null,
+      name: null,
+      birth: null,
+      death: null,
+      note: null, 
+      status: "unknown"
+    };
+
+    // prompt for WT ID and optional note
+    openWtEditor({
+      x: e.clientX,
+      y: e.clientY,
+      initialValue: "",
+      initialNote: "",
+      onSave: async ({wtId, note}) => {
+        annotation.wtId = wtId;
+        annotation.note = note;
+        annotations.push(annotation);
+        await saveAnnotationsForPage(annotations);
+        renderAnnotations();
+        box.remove();
+        box = null;
+      },
+      onCancel: () => {
+        box.remove();
+        box = null;
+      }
+    });
+  }
 }
 
 
@@ -722,59 +776,86 @@ function renderAnnotations() {
   const rect = container.getBoundingClientRect();
 
   annotations.forEach(a => {
-    // IMAGE SPACE → viewport-relative → screen pixels
-    const relX = (a.x - vp.x) / vp.w;
-    const relY = (a.y - vp.y) / vp.h;
-    const relW = a.w / vp.w;
-    const relH = a.h / vp.h;
+    const boxes = getBoxes(a);
 
-    const box = document.createElement("div");
-
-    box.style.position = "absolute";
-    box.style.left = (relX * rect.width) + "px";
-    box.style.top = (relY * rect.height) + "px";
-    box.style.width = (relW * rect.width) + "px";
-    box.style.height = (relH * rect.height) + "px";
-
-    box.className = "wt-annotation";
-    
-    if (a.id === selectedAnnotationId) {
-      box.classList.add("wt-selected");
-    }
-
-    if (a.wtId) {
-      box.title = buildTooltip(a);
-
-      // If this belongs to the WT profile we came from
-      if (String(a.wtId) === String(incomingWtId)) {
-        // highlight the annotation box
-        triggerRefHighlight(box);
-      }
-    }
-
-    box.addEventListener("click", (e) => {
-      if (tool === "select") {
-        e.stopPropagation();
-        selectAnnotation(a.id);
-        return;
-      }
-
-      if (tool === "draw") return; 
-
-      if (a.wtId) {
-        window.open(
-          `https://www.wikitree.com/wiki/${encodeURIComponent(a.wtId)}`,
-          "_blank"
-        );
-      }
+    boxes.forEach((boxData, index) => {
+      renderBox(a, boxData, index);
     });
 
-    box.dataset.id = a.id;
-    annotationLayer.appendChild(box);
-  });  // end of loop over annotations
+  });
 
   updateSelectionStyles();
   updateToolUI();
+}
+
+function renderBox(a, boxData, index) {
+  const vp = currentViewport;
+  const rect = overlay.getBoundingClientRect();
+
+  // IMAGE SPACE → viewport-relative → screen pixels
+  const relX = (boxData.x - vp.x) / vp.w;
+  const relY = (boxData.y - vp.y) / vp.h;
+  const relW = boxData.w / vp.w;
+  const relH = boxData.h / vp.h;
+
+  const box = document.createElement("div");
+
+  box.style.position = "absolute";
+  box.style.left = (relX * rect.width) + "px";
+  box.style.top = (relY * rect.height) + "px";
+  box.style.width = (relW * rect.width) + "px";
+  box.style.height = (relH * rect.height) + "px";
+
+  box.className = "wt-annotation";
+
+  if (a.id === selectedAnnotationId) {
+    box.classList.add("wt-selected");
+    console.log(selectedAnnotationId , " selected");
+  }
+
+  if (a.wtId) {
+    box.title = buildTooltip(a);
+
+    if (String(a.wtId) === String(incomingWtId)) {
+      triggerRefHighlight(box);
+    }
+  }
+
+  box.addEventListener("click", (e) => {
+    if (tool === "select") {
+      e.stopPropagation();
+      const id = box.dataset.annotationId;
+      selectAnnotation(id);
+      return;
+    }
+
+    if (tool === "draw") return;
+
+    if (a.wtId) {
+      window.open(
+        `https://www.wikitree.com/wiki/${encodeURIComponent(a.wtId)}`,
+        "_blank"
+      );
+    }
+  });
+
+  // IMPORTANT: track both annotation + box
+  box.dataset.annotationId = a.id;
+  box.dataset.boxIndex = index;
+
+  annotationLayer.appendChild(box);
+}
+
+function getBoxes(annotation) {
+  if (annotation.boxes) return annotation.boxes;
+
+  // fallback for old data
+  return [{
+    x: annotation.x,
+    y: annotation.y,
+    w: annotation.w,
+    h: annotation.h
+  }];
 }
 
 function selectAnnotation(id) {
@@ -793,8 +874,6 @@ function editAnnotation(id, screenX, screenY) {
     initialNote: annotation.note || "",
 
     onSave: async ({wtId, note}) => {
-      console.log("ID", wtId);
-      console.log("Note:", note);
       annotation.wtId = wtId;
       annotation.note = note;
 
