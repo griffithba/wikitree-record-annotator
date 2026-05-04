@@ -82,8 +82,8 @@ const serverAdapter = {
 // SELECT ACTIVE ADAPTER (AFTER definitions exist)
 // ============================================================
 
-const adapter = localAdapter; 
-//const adapter = chromeAdapter; 
+//const adapter = localAdapter; 
+const adapter = chromeAdapter; 
 //const adapter = serverAdapter; 
 
 // ============================================================

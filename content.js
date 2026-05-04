@@ -39,11 +39,6 @@ let selectedAnnotationId = null;
 
 let lastPageKey = null;
 
-// ID of WikiTree profile we came from (if we came from one)
-let incomingWtId = null;
-
-// Only highlight the referring WT ID person once
-let hasTriggeredRefHighlight = false;
 
 // ============================================================
 // COLORS/STYLES
@@ -302,7 +297,7 @@ function addResizeHandles(box, id) {
 
     handle.addEventListener("mousedown", (e) => {
       e.stopPropagation();
-      startResize(e, id, corner);
+      startResize(e, box, corner);
     });
 
     box.appendChild(handle);
@@ -311,9 +306,13 @@ function addResizeHandles(box, id) {
 
 let resizing = null;
 
-function startResize(e, id, corner) {
+function startResize(e, boxEl, corner) {
+  const id = boxEl.dataset.annotationId;
   const annotation = getAnnotationById(id);
   if (!annotation) return;
+
+  const boxIndex = Number(boxEl.dataset.boxIndex);
+  const box = annotation.boxes[boxIndex];
 
   // STEP 1. get mouse position (overlay space)
   const rect = overlay.getBoundingClientRect();
@@ -817,7 +816,7 @@ function renderBox(a, boxData, index) {
     box.title = buildTooltip(a);
 
     if (String(a.wtId) === String(incomingWtId)) {
-      triggerRefHighlight(box);
+      triggerRefHighlight(a.id);
     }
   }
 
@@ -911,14 +910,24 @@ function buildTooltip(a) {
   return text; 
 }
 
+
 // If we came from a profile that has an annotation on this page then highlight the annotation
-function triggerRefHighlight(el) {
+const highlightedAnnotations = new Set();
+function triggerRefHighlight(annotationId) {
   // only highlight it one time, not on every re-render
-  if (hasTriggeredRefHighlight) return; 
+  if (highlightedAnnotations.has(annotationId)) return; 
 
   function start() {
-    hasTriggeredRefHighlight = true;
-    el.classList.add("wt-ref-highlight");
+    highlightedAnnotations.add(annotationId);
+
+    // highlight ALL boxes for this annotation
+    requestAnimationFrame(() => {
+      document.querySelectorAll(
+        `[data-annotation-id="${annotationId}"]`
+      ).forEach(box => {
+        box.classList.add("wt-ref-highlight");
+      });
+    });
   }
 
   if (document.visibilityState === "visible") {
@@ -936,6 +945,9 @@ function triggerRefHighlight(el) {
 // ============================================================
 // INITIALIZATION
 // ============================================================
+
+// ID of WikiTree profile we came from (if we came from one)
+let incomingWtId = null;
 
 function initOverlay() {
   container = document.querySelector(".openseadragon-container");
