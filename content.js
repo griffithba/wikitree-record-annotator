@@ -1,5 +1,5 @@
 // ============================================================
-// WikiTree Overlay Annotation Tool (IIIF / OpenSeadragon)
+// WikiTree Overlay Annotation Tool
 // ------------------------------------------------------------
 // Allows drawing annotation boxes that stay aligned during
 // zoom and pan by storing coordinates in image space (xywh).
@@ -31,8 +31,12 @@ let startX = 0, startY = 0;
 let endX = 0, endY = 0;
 let box = null;
 
+let didPan = false;
+let previousViewport = null;
+
 // Mode state
-let tool = null;  // null | "draw" | "select" | "addBox"
+let tool = null;  // null | "draw" | "select" 
+let addingBoxToAnnotationId = null;
 
 let showAnnotations = true;
 let selectedAnnotationId = null;
@@ -154,7 +158,7 @@ function setTool(nextTool) {
   tool = (tool === nextTool) ? null : nextTool;
 
   if (prevTool === "select" && tool !== "select") {
-    //clearSelection();
+    clearSelection();
     closeWtEditor?.();
   }
 
@@ -246,6 +250,10 @@ function createAnnotationToolbar(id) {
   const toolbar = document.createElement("div");
   toolbar.className = "annotation-toolbar";
 
+  const addBtn = document.createElement("button");
+  addBtn.textContent = "+";
+  addBtn.title = "Add box";
+
   const editBtn = document.createElement("button");
   editBtn.textContent = "✏️";
   editBtn.title = "Edit";
@@ -254,6 +262,17 @@ function createAnnotationToolbar(id) {
   deleteBtn.textContent = "🗑️";
   deleteBtn.title = "Delete";
 
+  addBtn.onclick = (e) => {
+    e.stopPropagation();
+
+    if (!selectedAnnotationId) return;
+
+    // toggle behavior
+    addingBoxToAnnotationId = addingBoxToAnnotationId ? null : selectedAnnotationId;
+    overlay.style.pointerEvents = addingBoxToAnnotationId ? "auto" : "none";
+    overlay.style.cursor = addingBoxToAnnotationId ? "crosshair" : "default";
+  };
+  
   editBtn.onclick = (e) => {
     e.stopPropagation();
     const box = document.querySelector(`[data-id="${selectedAnnotationId}"]`);
@@ -283,7 +302,7 @@ function createAnnotationToolbar(id) {
     deleteBox(annotationId, boxIndex);
   };
 
-  toolbar.append(editBtn, deleteBtn);
+  toolbar.append(addBtn, editBtn, deleteBtn);
   return toolbar;
 }
 
@@ -412,7 +431,7 @@ function stopResize() {
 // CREATING MULTIPLE BOXES FOR THE SAME ANNOTATION
 // ============================================================
 
-function addBoxToSelected(newBox) {
+async function addBoxToSelected(newBox) {
   const a = getAnnotationById(selectedAnnotationId);
   if (!a) return;
 
@@ -424,7 +443,7 @@ function addBoxToSelected(newBox) {
 
   a.boxes.push(newBox);
 
-  saveAnnotationsForPage(annotations);
+  await saveAnnotationsForPage(annotations);
   renderAnnotations();
 }
 
@@ -551,7 +570,7 @@ function closeWtEditor() {
 // ============================================================
 
 function onMouseDown(e) {
-  if (tool !== "draw" || !container) return;
+  if ((tool !== "draw" && !addingBoxToAnnotationId) || !container) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -575,7 +594,7 @@ function onMouseDown(e) {
 }
 
 function onMouseMove(e) {
-  if (tool !== "draw" || !isDragging || !box) return;
+  if ((tool !== "draw" && !addingBoxToAnnotationId) || !isDragging || !box) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -599,14 +618,12 @@ function onMouseMove(e) {
 }
 
 async function onMouseUp(e) {
-  if (tool !== "draw" || !isDragging || !box) return;
+  if ((tool !== "draw" && !addingBoxToAnnotationId) || !isDragging || !box) return;
 
   e.preventDefault();
   e.stopPropagation();
 
   isDragging = false;
-
-  const addingToExisting = e.shiftKey && selectedAnnotationId;
 
   const overlayRect = overlay.getBoundingClientRect();
   const vp = currentViewport;
@@ -626,7 +643,7 @@ async function onMouseUp(e) {
       h: Math.abs(y2 - y1)
     };
 
-  if (addingToExisting) {
+  if (addingBoxToAnnotationId) {
     const annotation = getAnnotationById(selectedAnnotationId);
     if (!annotation) return;
 
@@ -646,10 +663,18 @@ async function onMouseUp(e) {
 
     box.remove();
     box = null;
+
+    // wait a moment for handlers to finish so we don't clear the selection
+    setTimeout(() => {
+      addingBoxToAnnotationId = null;
+    }, 0);
+    
+    overlay.style.pointerEvents = "none";
+    overlay.style.cursor = "default";
+    
     return;
 
   } else {
-
     const annotation = {
       id: crypto.randomUUID(),
       page: getPageKey(),
@@ -705,6 +730,15 @@ function getViewportFromUrl() {
 
 function syncViewport() {
   currentViewport = getViewportFromUrl();
+
+  if (previousViewport) {
+    didPan = 
+      (currentViewport.x !== previousViewport.x ||
+       currentViewport.y !== previousViewport.y) &&
+      currentViewport.w === previousViewport.w && 
+      currentViewport.h === previousViewport.h
+  }
+  previousViewport = currentViewport;
 }
 
 
@@ -796,7 +830,7 @@ function renderAnnotations() {
 
   if (!showAnnotations) return;
 
-  // 🔥 always ensure correct annotations for current page
+  // always ensure correct annotations for current page
   loadAnnotationsIfNeeded();
 
   const vp = currentViewport;
@@ -810,7 +844,6 @@ function renderAnnotations() {
     boxes.forEach((boxData, index) => {
       renderBox(a, boxData, index);
     });
-
   });
 
   updateSelectionStyles();
@@ -839,7 +872,6 @@ function renderBox(a, boxData, index) {
 
   if (a.id === selectedAnnotationId) {
     box.classList.add("wt-selected");
-    console.log(selectedAnnotationId , " selected");
   }
 
   if (a.wtId) {
@@ -913,7 +945,9 @@ function editAnnotation(id, screenX, screenY) {
 }
 
 function clearSelection() {
+  console.log("Clearing selection");
   selectedAnnotationId = null;
+  addingBoxToAnnotationId = null;
   updateSelectionStyles();
   closeWtEditor?.();
 }
@@ -1033,11 +1067,23 @@ function initOverlay() {
   container.appendChild(overlay);
 
   container.addEventListener("click", (e) => {
-    if (tool !== "select") return;
+    if (tool !== "select" || addingBoxToAnnotationId) return;
 
+    setTimeout(() => {
+      if (!didPan) {
+        syncViewport();
+        if (didPan) console.log("Caught a quick pan");
+      }
+    }, 0);
+    // don't clear selection after pan
+    if (didPan) {
+      didPan = false;
+      return;
+    }
+    
     // If click was on an annotation, ignore
     if (e.target.closest(".wt-annotation")) return;
-
+console.log("Container event listener clearing selection");
     clearSelection();
   });
 
@@ -1082,13 +1128,12 @@ function initOverlay() {
   updateToggleButton();
   toolbar.appendChild(toggleBtn);
 
-  overlay.addEventListener("click", clearSelection());
-
   // create editor
   createWtEditor();
   
   // Keep viewport synced
   syncViewport();
+  
   // Load and render any pre-existing annotations
   loadAnnotationsIfNeeded();
   requestAnimationFrame(() => {
@@ -1101,7 +1146,7 @@ function initOverlay() {
 
     history.replaceState = function (...args) {
       const result = originalReplaceState.apply(this, args);
-
+      
       // trigger re-render whenever viewer updates URL
       renderAnnotations();
 
