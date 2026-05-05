@@ -979,6 +979,18 @@ function triggerRefHighlight(annotationId) {
 // ID of WikiTree profile we came from (if we came from one)
 let incomingWtId = null;
 
+async function seedIfEmpty() {
+  await loadAnnotationsIfNeeded();
+
+  if (!annotations || annotations.length === 0) {
+    const pageKey = getPageKey();
+    annotations = sampleAnnotations.filter(a => a.page === pageKey);
+
+    await saveAnnotationsForPage(annotations);
+    renderAnnotations();
+  }
+}
+
 function initOverlay() {
   container = document.querySelector(".openseadragon-container");
   if (!container) return;
@@ -1101,6 +1113,9 @@ function initOverlay() {
 
   // Set border and background colors
   injectStyles();
+
+  // If this is the first run, start with some seed data
+  seedIfEmpty();
 }
 
 // ============================================================
