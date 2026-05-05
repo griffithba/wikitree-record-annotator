@@ -276,7 +276,11 @@ function createAnnotationToolbar(id) {
       return;
     }
 
-    deleteAnnotation(id);
+    const boxEl = deleteBtn.closest(".wt-annotation");
+    const annotationId = boxEl.dataset.annotationId;
+    const boxIndex = Number(boxEl.dataset.boxIndex);
+
+    deleteBox(annotationId, boxIndex);
   };
 
   toolbar.append(editBtn, deleteBtn);
@@ -744,6 +748,32 @@ async function loadAnnotationsIfNeeded() {
   annotations = all.filter(a => a.page === key);
 }
 
+async function deleteBox(annotationId, boxIndex) {
+  const annotation = getAnnotationById(annotationId);
+  if (!annotation) return;
+
+  // ensure multi-box structure
+  if (!annotation.boxes) {
+    annotation.boxes = getBoxes(annotation);
+    delete annotation.x;
+    delete annotation.y;
+    delete annotation.w;
+    delete annotation.h;
+  }
+
+  if (annotation.boxes.length > 1) {
+    // remove just this box
+    annotation.boxes.splice(boxIndex, 1);
+  } else {
+    // last box → delete entire annotation
+    deleteAnnotation(annotationId);
+    return;
+  }
+
+  await saveAnnotationsForPage(annotations);
+  renderAnnotations();
+}
+
 async function deleteAnnotation(id) {
   annotations = annotations.filter(a => a.id !== selectedAnnotationId);
   selectedAnnotationId = null;
@@ -1071,23 +1101,6 @@ function initOverlay() {
 
   // Set border and background colors
   injectStyles();
-
-  window.addEventListener("keydown", (e) => {
-    if (!selectedAnnotationId) return;
-    if (wtEditor?.contains(document.activeElement)) return;
-    if (e.key === "Delete") {
-      deleteAnnotation(selectedAnnotationId);
-    } else if (e.key === "e") {
-      e.preventDefault();  // prevent the 'e' from going to the edit window
-      e.stopPropagation();
-      const box = document.querySelector(`[data-id="${selectedAnnotationId}"]`);
-      const rect = box.getBoundingClientRect();
-      editAnnotation(
-        selectedAnnotationId, 
-        rect.left + rect.width, 
-        rect.top + rect.height);
-    }
-  });
 }
 
 // ============================================================
