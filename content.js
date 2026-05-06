@@ -184,6 +184,39 @@ function getPageKey() {
 }
 
 /**
+ * Extracts source reference text from page
+ * @returns {string} source reference
+ */
+function getReferenceFromPage() {
+  const items = document.querySelectorAll('.item');
+
+  for (const item of items) {
+    const valueEl = item.querySelector('.value');
+    if (!valueEl) continue;
+
+    const text = valueEl.innerText.trim();
+
+    // Must contain ID label in either language
+    const hasIdLabel =
+      /bildid:/i.test(text) || /image id:/i.test(text);
+
+    if (!hasIdLabel) continue;
+
+    // Exclude simple fields (just ID or URL)
+    const looksLikeCitation =
+      text.includes(",") && text.length > 50;
+
+    if (!looksLikeCitation) continue;
+
+    const clone = valueEl.cloneNode(true);
+    clone.querySelector('a.toggle')?.remove();
+
+    return clone.innerText.trim();
+  }
+  return null;
+}
+
+/**
  * Parses IIIF xywh viewport from URL hash
  * @returns {{x, y, w, h}|null} Viewport in image space or null if not found
  */
@@ -205,6 +238,19 @@ function getViewportFromUrl() {
  */
 function syncViewport() {
   currentViewport = getViewportFromUrl();
+}
+
+/**
+ * Grabs the page URL and strips off everything after the image ID
+ * @returns {string} clean URL
+ */
+function getCleanPageUrl() {
+  const url = new URL(window.location.href);
+
+  // remove everything after the base path
+  url.hash = "";
+
+  return url.origin + url.pathname;
 }
 
 /**
@@ -905,8 +951,8 @@ async function onMouseUp(e) {
       id: crypto.randomUUID(),
       page: getPageKey(),
       source: "riksarkivet",
-      url: null,
-      reference: null,
+      url: getCleanPageUrl(),
+      reference: getReferenceFromPage(),
       boxes: [newBox],
       wtId: null,
       name: null,
