@@ -1,14 +1,11 @@
 // ============================================================
-// WikiTree Overlay Annotation Tool
-// ------------------------------------------------------------
+// SECTION 1: INITIALIZATION & DOM SETUP
+// ============================================================
+// File: WikiTree Overlay Annotation Tool
 // Allows drawing annotation boxes that stay aligned during
 // zoom and pan by storing coordinates in image space (xywh).
-// ============================================================
 
-// Pull in the storage module
 const storageAPI = window.storage;
-
-// --- DOM ELEMENTS -------------------------------------------------
 
 // Transparent interaction layer (captures mouse input)
 const overlay = document.createElement("div");
@@ -18,31 +15,50 @@ overlay.id = "wt-overlay";
 const annotationLayer = document.createElement("div");
 
 
-// --- STATE --------------------------------------------------------
+// ============================================================
+// SECTION 2: STATE MANAGEMENT
+// ============================================================
+// Core state variables organized by purpose
 
-let container = null;          // OSD container element
-let currentViewport = null;    // {x,y,w,h} from URL (image space)
+// OSD viewer and viewport context
+let container = null;                 // OSD container element
+let currentViewport = null;           // {x,y,w,h} from URL hash (IIIF image space)
 
-let annotations = [];          // stored in IMAGE SPACE
+// Annotations array (stored in IMAGE SPACE coordinates)
+let annotations = [];
 
-// Drag state (for drawing boxes)
-let isDragging = false;
-let startX = 0, startY = 0;
-let endX = 0, endY = 0;
-let box = null;
+// Drawing/drag state for box creation
+let isDragging = false;               // Currently drawing a box
+let startX = 0, startY = 0;          // Box start (in overlay pixels)
+let endX = 0, endY = 0;              // Box end (in overlay pixels)
+let box = null;                       // Temporary DOM element while dragging
 
-// Mode state
-let tool = null;  // null | "draw" | "select" 
-let addingBoxToAnnotationId = null;
+// Tool and interaction state
+let tool = null;                      // Active tool: null | "draw" | "select"
+let addingBoxToAnnotationId = null;   // Non-null when adding box to existing annotation
 
-let showAnnotations = true;
-let selectedAnnotationId = null;
+// Display and selection state
+let showAnnotations = true;           // Toggle visibility of all annotations
+let selectedAnnotationId = null;      // Currently selected annotation (for editing/resizing)
 
-let lastPageKey = null;
+// Page tracking for lazy loading
+let lastPageKey = null;               // Track current page to avoid redundant loads
+
+// ID from incoming WikiTree profile (if navigated from one)
+let incomingWtId = null;
+
+// Dialog element for editing annotation WT ID and notes
+let wtEditor = null;
+
+// Track which annotations have been highlighted already
+const highlightedAnnotations = new Set();
+
+// Resize state (when dragging resize handles)
+let resizing = null;
 
 
 // ============================================================
-// COLORS/STYLES
+// SECTION 3: STYLES & CSS INJECTION
 // ============================================================
 
 function injectStyles() {
@@ -131,29 +147,131 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
 
+// ============================================================
+// SECTION 4: UTILITY HELPERS
+// ============================================================
+// Pure helper functions without side effects
+
+/**
+ * Finds annotation by ID
+ * @param {string} id - Annotation ID
+ * @returns {Object|null} Annotation object or null if not found
+ */
 function getAnnotationById(id) {
   const a = annotations.find(x => x.id === id);
   if (!a) console.warn("Annotation not found:", id);
   return a || null;
 }
 
+/**
+ * Validates WikiTree ID format (e.g., "Smith-123")
+ * @param {string} id - Potential WikiTree ID
+ * @returns {boolean} True if format is valid
+ */
 function isPlausibleWtId(id) {
   return /^\p{L}+-\d+$/u.test(id);
 }
 
+/**
+ * Extracts page identifier from current URL
+ * Used as the key for storing/loading annotations per page
+ * @returns {string} Page key (e.g., "P123_456")
+ */
+function getPageKey() {
+  const match = window.location.href.match(/([A-Z]\d+_\d+)/);
+  return match ? match[1] : "unknown";
+}
+
+/**
+ * Parses IIIF xywh viewport from URL hash
+ * @returns {{x, y, w, h}|null} Viewport in image space or null if not found
+ */
+function getViewportFromUrl() {
+  const hash = window.location.hash;
+  const query = hash.startsWith("#") ? hash.slice(1) : hash;
+  const params = new URLSearchParams(query);
+  const xywh = params.get("xywh");
+
+  if (!xywh) return null;
+
+  const [x, y, w, h] = xywh.split(",").map(Number);
+  return { x, y, w, h };
+}
+
+/**
+ * Syncs currentViewport from URL hash
+ * Call before rendering to pick up any viewer pan/zoom changes
+ */
+function syncViewport() {
+  currentViewport = getViewportFromUrl();
+}
+
+/**
+ * Extracts WikiTree ID from URL search params (from incoming profile)
+ * @returns {string|null} WikiTree ID or null
+ */
+function getWtIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("wtId");
+}
+
+/**
+ * Extracts box list from annotation (handles old and new formats)
+ * Old format: {x, y, w, h} at top level
+ * New format: {boxes: [{x, y, w, h}, ...]}
+ * @param {Object} annotation - Annotation object
+ * @returns {Array} Array of box objects
+ */
+function getBoxes(annotation) {
+  if (annotation.boxes) return annotation.boxes;
+
+  // Fallback for old data migration
+  return [{
+    x: annotation.x,
+    y: annotation.y,
+    w: annotation.w,
+    h: annotation.h
+  }];
+}
+
+/**
+ * Builds HTML title/tooltip for an annotation
+ * Format: "Name (birth-death)" or WikiTree ID
+ * @param {Object} a - Annotation object
+ * @returns {string} Tooltip text
+ */
+function buildTooltip(a) {
+  let text = a.wtId || "Unknown";
+  if (a.name || a.birth || a.death) {
+    const years = (a.birth || "?") + "-" + (a.death || "?");
+    text = `${a.name || "Unknown"} (${years})`;
+  }
+    
+  if (a.note) {
+    text += "\n" + a.note;
+  }
+    
+  return text; 
+}
+
+
 // ============================================================
-// MODE CONTROL
+// SECTION 5: TOOL & MODE CONTROL
 // ============================================================
 
+/**
+ * Switch between tools (draw/select) with toggle behavior
+ * When switching away from "select", clears selection
+ * @param {string} nextTool - Tool to switch to: "draw" | "select"
+ */
 function setTool(nextTool) {
   const prevTool = tool;
-  // toggle behavior
+  
+  // Toggle behavior: clicking same tool twice turns it off
   tool = (tool === nextTool) ? null : nextTool;
 
+  // Clean up when leaving select mode
   if (prevTool === "select" && tool !== "select") {
     clearSelection();
     closeWtEditor?.();
@@ -161,9 +279,11 @@ function setTool(nextTool) {
 
   const isDraw = tool === "draw";
 
+  // Update overlay interaction
   overlay.style.pointerEvents = isDraw ? "auto" : "none";
   overlay.style.cursor = isDraw ? "crosshair" : "default";
 
+  // Auto-show annotations when entering draw mode
   if (!showAnnotations && isDraw) {
     showAnnotations = true;
     renderAnnotations();
@@ -172,11 +292,17 @@ function setTool(nextTool) {
   updateToolUI();
   updateToolbarButtons();
 
-  // (optional) show overlay tint only in draw mode
+  // Visual feedback: tint overlay only in draw mode
   overlay.style.background = isDraw ? "var(--wt-draw-overlay-bg)" : "transparent";
   overlay.style.border = isDraw ? "var(--wt-draw-overlay-border)" : "none";
 }
 
+/**
+ * Creates a button for tool selection
+ * @param {string} label - Button label text
+ * @param {string} toolName - Tool identifier ("draw" | "select")
+ * @returns {HTMLElement} Button element
+ */
 function makeToolButton(label, toolName) {
   const btn = document.createElement("button");
 
@@ -194,6 +320,9 @@ function makeToolButton(label, toolName) {
   return btn;
 }
 
+/**
+ * Updates cursor style on annotation boxes based on active tool
+ */
 function updateToolUI() {
   document.querySelectorAll(".wt-annotation").forEach(el => {
     if (tool === "select") {
@@ -209,6 +338,9 @@ function updateToolUI() {
     tool === "draw" ? "crosshair" : "default";
 }
 
+/**
+ * Updates toolbar button highlighting to show active tool
+ */
 function updateToolbarButtons() {
   document.querySelectorAll("#wt-toolbar button").forEach(btn => {
     const btnTool = btn.dataset.tool;
@@ -223,6 +355,37 @@ function updateToolbarButtons() {
   });
 }
 
+
+// ============================================================
+// SECTION 6: ANNOTATION SELECTION & DISPLAY
+// ============================================================
+
+/**
+ * Selects an annotation by ID and updates UI
+ * Shows toolbar and resize handles
+ * @param {string} id - Annotation ID to select
+ */
+function selectAnnotation(id) {
+  selectedAnnotationId = id;
+  updateSelectionStyles();
+}
+
+/**
+ * Clears current selection and closes any open dialogs
+ * Counterpart to selectAnnotation()
+ */
+function clearSelection() {
+  console.log("Clearing selection");
+  selectedAnnotationId = null;
+  addingBoxToAnnotationId = null;
+  updateSelectionStyles();
+  closeWtEditor?.();
+}
+
+/**
+ * Updates visual styles for all annotation boxes based on selection state
+ * Shows/hides toolbar and resize handles as needed
+ */
 function updateSelectionStyles() {
   document.querySelectorAll(".wt-annotation").forEach(box => {
     const id = box.dataset.annotationId;
@@ -243,6 +406,11 @@ function updateSelectionStyles() {
   });
 }
 
+/**
+ * Creates toolbar with +, ✏️, 🗑️ buttons for selected annotation
+ * @param {string} id - Annotation ID
+ * @returns {HTMLElement} Toolbar div
+ */
 function createAnnotationToolbar(id) {
   const toolbar = document.createElement("div");
   toolbar.className = "annotation-toolbar";
@@ -259,31 +427,32 @@ function createAnnotationToolbar(id) {
   deleteBtn.textContent = "🗑️";
   deleteBtn.title = "Delete";
 
+  // "+" button: toggle "add box to annotation" mode
   addBtn.onclick = (e) => {
     e.stopPropagation();
 
     if (!selectedAnnotationId) return;
 
-    // toggle behavior
+    // Toggle behavior
     addingBoxToAnnotationId = addingBoxToAnnotationId ? null : selectedAnnotationId;
     overlay.style.pointerEvents = addingBoxToAnnotationId ? "auto" : "none";
     overlay.style.cursor = addingBoxToAnnotationId ? "crosshair" : "default";
   };
   
+  // "✏️" button: open WT ID editor
   editBtn.onclick = (e) => {
     e.stopPropagation();
     const box = document.querySelector(`[data-id="${selectedAnnotationId}"]`);
     const rect = box.getBoundingClientRect();
-    editAnnotation
-      (id, 
-       rect.left + rect.width, 
-       rect.top + rect.height);
+    editAnnotation(id, rect.left + rect.width, rect.top + rect.height);
   };
 
+  // "🗑️" button: delete with confirmation
   deleteBtn.onclick = (e) => {
     e.stopPropagation();
 
     if (!deleteBtn.dataset.armed) {
+      // First click: arm for deletion
       deleteBtn.dataset.armed = "true";
       deleteBtn.textContent = "⚠";
       deleteBtn.style.color = "yellow";
@@ -292,6 +461,7 @@ function createAnnotationToolbar(id) {
       return;
     }
 
+    // Second click: execute deletion
     const boxEl = deleteBtn.closest(".wt-annotation");
     const annotationId = boxEl.dataset.annotationId;
     const boxIndex = Number(boxEl.dataset.boxIndex);
@@ -303,153 +473,15 @@ function createAnnotationToolbar(id) {
   return toolbar;
 }
 
-// ============================================================
-// RESIZING ANNOTATION BOXES
-// ============================================================
-
-function addResizeHandles(box, id) {
-  const corners = ["nw", "ne", "sw", "se"];
-
-  corners.forEach(corner => {
-    const handle = document.createElement("div");
-    handle.className = `resize-handle ${corner}`;
-    handle.dataset.corner = corner;
-
-    handle.addEventListener("mousedown", (e) => {
-      e.stopPropagation();
-      startResize(e, box, corner);
-    });
-
-    box.appendChild(handle);
-  });
-}
-
-let resizing = null;
-
-function startResize(e, boxEl, corner) {
-  const id = boxEl.dataset.annotationId;
-  const annotation = getAnnotationById(id);
-  if (!annotation) return;
-
-  const boxIndex = Number(boxEl.dataset.boxIndex);
-  const box = annotation.boxes[boxIndex];
-
-  // STEP 1. get mouse position (overlay space)
-  const rect = overlay.getBoundingClientRect();
-  
-  resizing = {
-    id,
-    boxIndex,
-    corner,
-    startX: e.clientX - rect.left,
-    startY: e.clientY - rect.top,
-    startBox: { ...box }
-  };
-
-  document.addEventListener("mousemove", onResizeMove);
-  document.addEventListener("mouseup", stopResize);
-}
-
-function onResizeMove(e) {
-  if (!resizing) return;
-
-  const rect = overlay.getBoundingClientRect();
-  const vp = currentViewport;
-
-  // STEP 2. compute dx/dy (overlay space)
-  const currentX = e.clientX - rect.left;
-  const currentY = e.clientY - rect.top;
-
-  const dx = currentX - resizing.startX;
-  const dy = currentY - resizing.startY;
-
-  // STEP 3. convert dx/dy → image space
-  const scaleX = vp.w / rect.width;
-  const scaleY = vp.h / rect.height;
-
-  const dxImg = dx * scaleX;
-  const dyImg = dy * scaleY;
-
-  // STEP 4. apply to annotation (image space)
-  const annotation = getAnnotationById(resizing.id);
-  if (!annotation) return;
-
-  const box = annotation.boxes[resizing.boxIndex];
-
-  // copy original
-  let { x, y, w, h } = resizing.startBox;
-  const corner = resizing.corner;
-
-  if (corner.includes("e")) w += dxImg;
-  if (corner.includes("s")) h += dyImg;
-  if (corner.includes("w")) {
-    x += dxImg;
-    w -= dxImg;
-  }
-  if (corner.includes("n")) {
-    y += dyImg;
-    h -= dyImg;
-  }
-
-  // prevent negative sizes
-  if (w < 0) {
-    x = x + w;
-    w = Math.abs(w);
-  }
-
-  if (h < 0) {
-    y = y + h;
-    h = Math.abs(h);
-  }
-
-  w = Math.max(20, w);
-  h = Math.max(20, h);
-
-  box.x = x;
-  box.y = y;
-  box.w = w;
-  box.h = h;
-
-  renderAnnotations();
-}
-
-function stopResize() {
-  if (!resizing) return;
-
-  saveAnnotationsForPage(annotations);
-
-  resizing = null;
-
-  document.removeEventListener("mousemove", onResizeMove);
-  document.removeEventListener("mouseup", stopResize);
-}
 
 // ============================================================
-// CREATING MULTIPLE BOXES FOR THE SAME ANNOTATION
+// SECTION 7: ANNOTATION EDITOR (WT ID & NOTES)
 // ============================================================
 
-async function addBoxToSelected(newBox) {
-  const a = getAnnotationById(selectedAnnotationId);
-  if (!a) return;
-
-  if (!a.boxes) {
-    // migrate old annotation
-    a.boxes = getBoxes(a);
-    delete a.x; delete a.y; delete a.w; delete a.h;
-  }
-
-  a.boxes.push(newBox);
-
-  await saveAnnotationsForPage(annotations);
-  renderAnnotations();
-}
-
-// ============================================================
-// FUNCTION FOR ENTERING/EDITING WT ID AND NOTE
-// ============================================================
-
-let wtEditor = null;
-
+/**
+ * Creates the modal dialog for editing WT ID and notes
+ * Dialog is hidden by default and shown via openWtEditor()
+ */
 function createWtEditor() {
   wtEditor = document.createElement("div");
 
@@ -491,8 +523,8 @@ function createWtEditor() {
   const noteInput = wtEditor.querySelector("#wt-note");
   const saveBtn = wtEditor.querySelector("#wt-save");
   const cancelBtn = wtEditor.querySelector("#wt-cancel");
-  const errorEl = wtEditor.querySelector("#wt-error");
 
+  // Handle Enter/Escape in input fields
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") saveBtn.click();
     if (e.key === "Escape") cancelBtn.click();
@@ -502,10 +534,20 @@ function createWtEditor() {
     if (e.key === "Escape") cancelBtn.click();
   });
 
+  // Prevent dialog from being dragged away
   wtEditor.addEventListener("mousedown", e => e.stopPropagation()); 
 }
 
-
+/**
+ * Opens the WT ID/note editor dialog at specified position
+ * @param {Object} options
+ * @param {number} options.x - Screen X position
+ * @param {number} options.y - Screen Y position
+ * @param {string} [options.initialValue=""] - Initial WT ID
+ * @param {string} [options.initialNote=""] - Initial note
+ * @param {Function} [options.onSave] - Callback with {wtId, note}
+ * @param {Function} [options.onCancel] - Callback on cancel
+ */
 function openWtEditor(
   { x, y, initialValue = "", initialNote = "", onSave, onCancel }) 
   {
@@ -513,6 +555,7 @@ function openWtEditor(
     const noteInput = wtEditor.querySelector("#wt-note");
     const saveBtn = wtEditor.querySelector("#wt-save");
     const cancelBtn = wtEditor.querySelector("#wt-cancel");
+    const errorEl = wtEditor.querySelector("#wt-error");
 
     wtEditor.style.left = x + "px";
     wtEditor.style.top = y + "px";
@@ -522,13 +565,12 @@ function openWtEditor(
     input.focus();
     noteInput.value = initialNote;
 
+    // Cleanup helper
     function cleanup() {
       wtEditor.style.display = "none";
       saveBtn.onclick = null;
       cancelBtn.onclick = null;
     }
-
-    const errorEl = wtEditor.querySelector("#wt-error");
   
     saveBtn.onclick = () => {
       const value = input.value.trim();
@@ -546,8 +588,7 @@ function openWtEditor(
 
       errorEl.textContent = "";
       cleanup();
-      onSave?.({wtId: value, 
-                note: note});
+      onSave?.({wtId: value, note: note});
   };
 
   cancelBtn.onclick = () => {
@@ -556,16 +597,193 @@ function openWtEditor(
   };
 }
 
+/**
+ * Closes the WT ID/note editor dialog
+ */
 function closeWtEditor() {
   if (wtEditor) {
     wtEditor.style.display = "none";
   }
 }
 
+/**
+ * Opens editor to modify WT ID and note for an existing annotation
+ * @param {string} id - Annotation ID
+ * @param {number} screenX - Screen X position for dialog
+ * @param {number} screenY - Screen Y position for dialog
+ */
+function editAnnotation(id, screenX, screenY) {
+  const annotation = getAnnotationById(id);
+  if (!annotation) return;
+  
+  openWtEditor({
+    x: screenX,
+    y: screenY,
+    initialValue: annotation.wtId || "oops",
+    initialNote: annotation.note || "",
+
+    onSave: async ({wtId, note}) => {
+      annotation.wtId = wtId;
+      annotation.note = note;
+
+      await saveAnnotationsForPage(annotations);
+      renderAnnotations();
+    }
+  });
+}
+
+
 // ============================================================
-// MOUSE HANDLERS (DRAWING)
+// SECTION 8: RESIZING ANNOTATION BOXES
 // ============================================================
 
+/**
+ * Creates corner resize handles (nw, ne, sw, se) on selected box
+ * @param {HTMLElement} box - Annotation box DOM element
+ * @param {string} id - Annotation ID
+ */
+function addResizeHandles(box, id) {
+  const corners = ["nw", "ne", "sw", "se"];
+
+  corners.forEach(corner => {
+    const handle = document.createElement("div");
+    handle.className = `resize-handle ${corner}`;
+    handle.dataset.corner = corner;
+
+    handle.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+      startResize(e, box, corner);
+    });
+
+    box.appendChild(handle);
+  });
+}
+
+/**
+ * Initiates resize drag from a handle
+ * Saves initial state and sets up event listeners
+ * @param {MouseEvent} e - mousedown event
+ * @param {HTMLElement} boxEl - Annotation box element
+ * @param {string} corner - Corner identifier (nw|ne|sw|se)
+ */
+function startResize(e, boxEl, corner) {
+  const id = boxEl.dataset.annotationId;
+  const annotation = getAnnotationById(id);
+  if (!annotation) return;
+
+  const boxIndex = Number(boxEl.dataset.boxIndex);
+  const box = annotation.boxes[boxIndex];
+
+  const rect = overlay.getBoundingClientRect();
+  
+  resizing = {
+    id,
+    boxIndex,
+    corner,
+    startX: e.clientX - rect.left,
+    startY: e.clientY - rect.top,
+    startBox: { ...box }  // Save original for delta calculations
+  };
+
+  document.addEventListener("mousemove", onResizeMove);
+  document.addEventListener("mouseup", stopResize);
+}
+
+/**
+ * Handles mousemove during resize drag
+ * Converts screen deltas to image space and updates box dimensions
+ * @param {MouseEvent} e - mousemove event
+ */
+function onResizeMove(e) {
+  if (!resizing) return;
+
+  const rect = overlay.getBoundingClientRect();
+  const vp = currentViewport;
+
+  // STEP 1: Compute mouse delta in overlay (screen) space
+  const currentX = e.clientX - rect.left;
+  const currentY = e.clientY - rect.top;
+
+  const dx = currentX - resizing.startX;
+  const dy = currentY - resizing.startY;
+
+  // STEP 2: Convert delta to image space
+  // The scale factor relates overlay pixels to image coordinates
+  const scaleX = vp.w / rect.width;
+  const scaleY = vp.h / rect.height;
+
+  const dxImg = dx * scaleX;
+  const dyImg = dy * scaleY;
+
+  // STEP 3: Apply delta to annotation box in image space
+  const annotation = getAnnotationById(resizing.id);
+  if (!annotation) return;
+
+  const box = annotation.boxes[resizing.boxIndex];
+
+  // Start from original coordinates
+  let { x, y, w, h } = resizing.startBox;
+  const corner = resizing.corner;
+
+  // Apply resize based on which corner is being dragged
+  if (corner.includes("e")) w += dxImg;      // East: expand width
+  if (corner.includes("s")) h += dyImg;      // South: expand height
+  if (corner.includes("w")) {                // West: move left edge
+    x += dxImg;
+    w -= dxImg;
+  }
+  if (corner.includes("n")) {                // North: move top edge
+    y += dyImg;
+    h -= dyImg;
+  }
+
+  // Normalize negative sizes (when dragging past opposite corner)
+  if (w < 0) {
+    x = x + w;
+    w = Math.abs(w);
+  }
+
+  if (h < 0) {
+    y = y + h;
+    h = Math.abs(h);
+  }
+
+  // Enforce minimum box size
+  w = Math.max(20, w);
+  h = Math.max(20, h);
+
+  // Update box coordinates
+  box.x = x;
+  box.y = y;
+  box.w = w;
+  box.h = h;
+
+  renderAnnotations();
+}
+
+/**
+ * Finalizes resize drag and saves changes
+ */
+function stopResize() {
+  if (!resizing) return;
+
+  saveAnnotationsForPage(annotations);
+
+  resizing = null;
+
+  document.removeEventListener("mousemove", onResizeMove);
+  document.removeEventListener("mouseup", stopResize);
+}
+
+
+// ============================================================
+// SECTION 9: MOUSE HANDLERS (DRAWING BOXES)
+// ============================================================
+
+/**
+ * Handles mousedown to start drawing a new box
+ * Creates temporary DOM element that follows mouse
+ */
 function onMouseDown(e) {
   if ((tool !== "draw" && !addingBoxToAnnotationId) || !container) return;
 
@@ -576,11 +794,11 @@ function onMouseDown(e) {
 
   const rect = overlay.getBoundingClientRect();
 
-  // Starting point in overlay pixel space
+  // Record starting point in overlay pixel space
   startX = e.clientX - rect.left;
   startY = e.clientY - rect.top;
 
-  // Create temporary drag box
+  // Create temporary visual feedback box
   box = document.createElement("div");
   box.style.position = "absolute";
   box.style.border = "var(--wt-draw-border)";
@@ -590,6 +808,10 @@ function onMouseDown(e) {
   annotationLayer.appendChild(box);
 }
 
+/**
+ * Handles mousemove during box drawing
+ * Updates temporary box dimensions to follow cursor
+ */
 function onMouseMove(e) {
   if ((tool !== "draw" && !addingBoxToAnnotationId) || !isDragging || !box) return;
 
@@ -602,7 +824,7 @@ function onMouseMove(e) {
   endX = e.clientX - rect.left;
   endY = e.clientY - rect.top;
 
-  // Normalize for drawing direction (works in all directions)
+  // Normalize for drawing in any direction
   const left = Math.min(startX, endX);
   const top = Math.min(startY, endY);
   const width = Math.abs(endX - startX);
@@ -614,6 +836,10 @@ function onMouseMove(e) {
   box.style.height = height + "px";
 }
 
+/**
+ * Handles mouseup to finish drawing box
+ * Either adds box to new annotation (prompts for WT ID) or existing annotation
+ */
 async function onMouseUp(e) {
   if ((tool !== "draw" && !addingBoxToAnnotationId) || !isDragging || !box) return;
 
@@ -626,13 +852,14 @@ async function onMouseUp(e) {
   const vp = currentViewport;
   if (!vp) return;
 
-  // Convert overlay pixels → normalized → IMAGE SPACE
+  // STEP 1: Convert overlay pixels to image space
+  // Formula: imageCoord = viewport.origin + (screenPixel / screenSize) * viewport.size
   const x1 = vp.x + (startX / overlayRect.width) * vp.w;
   const y1 = vp.y + (startY / overlayRect.height) * vp.h;
   const x2 = vp.x + (endX / overlayRect.width) * vp.w;
   const y2 = vp.y + (endY / overlayRect.height) * vp.h;
 
-  // Normalize rectangle in IMAGE SPACE
+  // STEP 2: Normalize rectangle in image space
   const newBox = {
       x: Math.min(x1, x2),
       y: Math.min(y1, y2),
@@ -641,10 +868,11 @@ async function onMouseUp(e) {
     };
 
   if (addingBoxToAnnotationId) {
+    // Case 1: Adding box to existing annotation
     const annotation = getAnnotationById(selectedAnnotationId);
     if (!annotation) return;
 
-    // migrate old annotation if needed
+    // Ensure multi-box structure
     if (!annotation.boxes) {
       annotation.boxes = getBoxes(annotation);
       delete annotation.x;
@@ -661,7 +889,7 @@ async function onMouseUp(e) {
     box.remove();
     box = null;
 
-    // wait a moment for handlers to finish so we don't clear the selection
+    // Clear add-box mode after handlers finish
     setTimeout(() => {
       addingBoxToAnnotationId = null;
     }, 0);
@@ -672,6 +900,7 @@ async function onMouseUp(e) {
     return;
 
   } else {
+    // Case 2: Creating new annotation
     const annotation = {
       id: crypto.randomUUID(),
       page: getPageKey(),
@@ -684,7 +913,7 @@ async function onMouseUp(e) {
       status: "unknown"
     };
 
-    // prompt for WT ID and optional note
+    // Prompt user for WikiTree ID
     openWtEditor({
       x: e.clientX,
       y: e.clientY,
@@ -709,60 +938,47 @@ async function onMouseUp(e) {
 
 
 // ============================================================
-// VIEWPORT (IIIF xywh FROM URL HASH)
+// SECTION 10: STORAGE & PERSISTENCE
 // ============================================================
 
-function getViewportFromUrl() {
-  const hash = window.location.hash;
-  const query = hash.startsWith("#") ? hash.slice(1) : hash;
-
-  const params = new URLSearchParams(query);
-  const xywh = params.get("xywh");
-
-  if (!xywh) return null;
-
-  const [x, y, w, h] = xywh.split(",").map(Number);
-  return { x, y, w, h };
-}
-
-function syncViewport() {
-  currentViewport = getViewportFromUrl();
-}
-
-
-// ============================================================
-// SAVING/CLEARING ANNOTATIONS
-// ============================================================
-
-function getPageKey() {
-  const match = window.location.href.match(/([A-Z]\d+_\d+)/);
-  return match ? match[1] : "unknown";
-}
-
+/**
+ * Saves annotations for current page to storage
+ * Preserves annotations for other pages
+ * @param {Array} pageAnnotations - Annotations to save for this page
+ */
 async function saveAnnotationsForPage(pageAnnotations) {
   const key = getPageKey();
 
   const all = await storageAPI.getAnnotations();
 
-  // remove old annotations for this page
+  // Remove old annotations for this page
   const others = all.filter(a => a.page !== key);
 
-  // add updated ones
+  // Add updated ones
   const updated = [...others, ...pageAnnotations];
 
-  // Use this function wrong and you'll delete all annotations for ALL other pages!
+  // WARNING: Using this function incorrectly will delete all annotations!
   await storageAPI.saveAnnotations(updated);
 }
 
+/**
+ * Gets all annotations for a specific page
+ * @param {string} pageKey - Page identifier
+ * @returns {Array} Annotations for that page
+ */
 async function getAnnotationsByPage(pageKey) {
   const all = await storageAPI.getAnnotations();
   return all.filter(a => a.page === pageKey);
 }
 
+/**
+ * Loads annotations for current page if not already loaded
+ * Lazy loads to avoid loading every page's annotations at startup
+ */
 async function loadAnnotationsIfNeeded() {
   const key = getPageKey();
 
-  if (key === lastPageKey) return;
+  if (key === lastPageKey) return;  // Already loaded
   lastPageKey = key;
 
   let all = await storageAPI.getAnnotations();
@@ -770,11 +986,43 @@ async function loadAnnotationsIfNeeded() {
   annotations = all.filter(a => a.page === key);
 }
 
+
+// ============================================================
+// SECTION 11: ANNOTATION OPERATIONS (ADD/DELETE)
+// ============================================================
+
+/**
+ * Adds a new box to an existing annotation
+ * (Also called via toolbar "+" button)
+ * @param {Object} newBox - Box coordinates {x, y, w, h} in image space
+ */
+async function addBoxToSelected(newBox) {
+  const a = getAnnotationById(selectedAnnotationId);
+  if (!a) return;
+
+  if (!a.boxes) {
+    // Migrate old single-box format
+    a.boxes = getBoxes(a);
+    delete a.x; delete a.y; delete a.w; delete a.h;
+  }
+
+  a.boxes.push(newBox);
+
+  await saveAnnotationsForPage(annotations);
+  renderAnnotations();
+}
+
+/**
+ * Deletes a specific box from an annotation
+ * If last box, deletes entire annotation
+ * @param {string} annotationId - Annotation ID
+ * @param {number} boxIndex - Index of box to delete
+ */
 async function deleteBox(annotationId, boxIndex) {
   const annotation = getAnnotationById(annotationId);
   if (!annotation) return;
 
-  // ensure multi-box structure
+  // Ensure multi-box structure
   if (!annotation.boxes) {
     annotation.boxes = getBoxes(annotation);
     delete annotation.x;
@@ -784,10 +1032,10 @@ async function deleteBox(annotationId, boxIndex) {
   }
 
   if (annotation.boxes.length > 1) {
-    // remove just this box
+    // Remove just this box
     annotation.boxes.splice(boxIndex, 1);
   } else {
-    // last box → delete entire annotation
+    // Last box → delete entire annotation
     deleteAnnotation(annotationId);
     return;
   }
@@ -796,21 +1044,30 @@ async function deleteBox(annotationId, boxIndex) {
   renderAnnotations();
 }
 
+/**
+ * Deletes entire annotation and clears selection
+ * @param {string} id - Annotation ID
+ */
 async function deleteAnnotation(id) {
   annotations = annotations.filter(a => a.id !== selectedAnnotationId);
   selectedAnnotationId = null;
   await saveAnnotationsForPage(annotations);
-  renderAnnotations(); // rebuild geometry
+  renderAnnotations();
 }
 
+
 // ============================================================
-// RENDERING
+// SECTION 12: RENDERING ANNOTATIONS
 // ============================================================
 
+/**
+ * Main render loop for all annotations
+ * Syncs viewport, clears previous render, renders all boxes
+ */
 function renderAnnotations() {
   if (!container) return;
 
-  // Always sync before rendering (prevents lag)
+  // Always sync viewport first (prevents lag when zooming)
   syncViewport();
 
   // Clear previous render
@@ -818,7 +1075,7 @@ function renderAnnotations() {
 
   if (!showAnnotations) return;
 
-  // always ensure correct annotations for current page
+  // Load annotations for current page if not yet loaded
   loadAnnotationsIfNeeded();
 
   const vp = currentViewport;
@@ -826,6 +1083,7 @@ function renderAnnotations() {
 
   const rect = container.getBoundingClientRect();
 
+  // Render each annotation's boxes
   annotations.forEach(a => {
     const boxes = getBoxes(a);
 
@@ -838,11 +1096,19 @@ function renderAnnotations() {
   updateToolUI();
 }
 
+/**
+ * Renders a single annotation box on screen
+ * Converts image space coordinates to screen pixels
+ * @param {Object} a - Annotation object
+ * @param {Object} boxData - Box coordinates {x, y, w, h} in image space
+ * @param {number} index - Box index within annotation
+ */
 function renderBox(a, boxData, index) {
   const vp = currentViewport;
   const rect = overlay.getBoundingClientRect();
 
-  // IMAGE SPACE → viewport-relative → screen pixels
+  // STEP 1: Convert image space → viewport-relative → screen pixels
+  // viewport-relative: how far through the viewport is this coordinate?
   const relX = (boxData.x - vp.x) / vp.w;
   const relY = (boxData.y - vp.y) / vp.h;
   const relW = boxData.w / vp.w;
@@ -850,6 +1116,7 @@ function renderBox(a, boxData, index) {
 
   const box = document.createElement("div");
 
+  // STEP 2: Convert viewport-relative to screen pixels
   box.style.position = "absolute";
   box.style.left = (relX * rect.width) + "px";
   box.style.top = (relY * rect.height) + "px";
@@ -858,18 +1125,22 @@ function renderBox(a, boxData, index) {
 
   box.className = "wt-annotation";
 
+  // Add selection styling if needed
   if (a.id === selectedAnnotationId) {
     box.classList.add("wt-selected");
   }
 
+  // Set tooltip
   if (a.wtId) {
     box.title = buildTooltip(a);
 
+    // Highlight if this annotation matches incoming profile
     if (String(a.wtId) === String(incomingWtId)) {
       triggerRefHighlight(a.id);
     }
   }
 
+  // Click handler: select in select mode, or open WikiTree profile
   box.addEventListener("click", (e) => {
     if (tool === "select") {
       e.stopPropagation();
@@ -880,6 +1151,7 @@ function renderBox(a, boxData, index) {
 
     if (tool === "draw") return;
 
+    // Default: click to open WikiTree profile
     if (a.wtId) {
       window.open(
         `https://www.wikitree.com/wiki/${encodeURIComponent(a.wtId)}`,
@@ -888,91 +1160,31 @@ function renderBox(a, boxData, index) {
     }
   });
 
-  // IMPORTANT: track both annotation + box
+  // Track annotation ID and box index for toolbar/resize operations
   box.dataset.annotationId = a.id;
   box.dataset.boxIndex = index;
 
   annotationLayer.appendChild(box);
 }
 
-function getBoxes(annotation) {
-  if (annotation.boxes) return annotation.boxes;
 
-  // fallback for old data
-  return [{
-    x: annotation.x,
-    y: annotation.y,
-    w: annotation.w,
-    h: annotation.h
-  }];
-}
+// ============================================================
+// SECTION 13: REFERENCE HIGHLIGHTING
+// ============================================================
 
-function selectAnnotation(id) {
-  selectedAnnotationId = id;
-  updateSelectionStyles();
-}
-
-function editAnnotation(id, screenX, screenY) {
-  const annotation = getAnnotationById(id);
-  if (!annotation) return;
-  
-  openWtEditor({
-    x: screenX,
-    y: screenY,
-    initialValue: annotation.wtId || "oops",
-    initialNote: annotation.note || "",
-
-    onSave: async ({wtId, note}) => {
-      annotation.wtId = wtId;
-      annotation.note = note;
-
-      await saveAnnotationsForPage(annotations);
-      renderAnnotations();
-    }
-  });
-}
-
-function clearSelection() {
-  console.log("Clearing selection");
-  selectedAnnotationId = null;
-  addingBoxToAnnotationId = null;
-  updateSelectionStyles();
-  closeWtEditor?.();
-}
-
-// If coming from a WT profile, the ID will be embedded in the URL
-function getWtIdFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("wtId");
-}
-
-// display "Name (birth-death)" and note when hovering over an annotation
-function buildTooltip(a) {
-  let text = a.wtId || "Unknown";
-  if (a.name || a.birth || a.death) {
-    const years = (a.birth || "?") + "-" + (a.death || "?");
-
-    text = `${a.name || "Unknown"} (${years})`;
-  }
-    
-  if (a.note) {
-    text += "\n" + a.note;
-  }
-    
-  return text; 
-}
-
-
-// If we came from a profile that has an annotation on this page then highlight the annotation
-const highlightedAnnotations = new Set();
+/**
+ * Triggers pulse animation on annotation if it matches incoming WT profile
+ * Only highlights each annotation once, not on every re-render
+ * @param {string} annotationId - Annotation ID
+ */
 function triggerRefHighlight(annotationId) {
-  // only highlight it one time, not on every re-render
+  // Only highlight once per session
   if (highlightedAnnotations.has(annotationId)) return; 
 
   function start() {
     highlightedAnnotations.add(annotationId);
 
-    // highlight ALL boxes for this annotation
+    // Highlight ALL boxes for this annotation
     requestAnimationFrame(() => {
       document.querySelectorAll(
         `[data-annotation-id="${annotationId}"]`
@@ -982,9 +1194,11 @@ function triggerRefHighlight(annotationId) {
     });
   }
 
+  // If tab is visible, highlight immediately
   if (document.visibilityState === "visible") {
     start();
-  } else {  // If tab was brought up in the background then wait to highlight
+  } else {
+    // Tab in background: wait for it to become visible
     const onVisible = () => {
       document.removeEventListener("visibilitychange", onVisible);
       start();
@@ -994,36 +1208,26 @@ function triggerRefHighlight(annotationId) {
   }
 }
 
+
 // ============================================================
-// INITIALIZATION
+// SECTION 14: INITIALIZATION & STARTUP
 // ============================================================
 
-// ID of WikiTree profile we came from (if we came from one)
-let incomingWtId = null;
-
-async function seedIfEmpty() {
-  await loadAnnotationsIfNeeded();
-
-  if (!annotations || annotations.length === 0) {
-    const pageKey = getPageKey();
-    annotations = sampleAnnotations.filter(a => a.page === pageKey);
-
-    await saveAnnotationsForPage(annotations);
-    renderAnnotations();
-  }
-}
-
+/**
+ * Initializes annotation overlay on page load
+ * Sets up DOM, event listeners, toolbar, etc.
+ */
 function initOverlay() {
   container = document.querySelector(".openseadragon-container");
   if (!container) return;
 
-  // If arriving from a WikiTree profile, grab the ID
+  // Get incoming WikiTree profile ID if present
   incomingWtId = getWtIdFromUrl();
     
-  // Ensure proper positioning context
+  // Set up positioning context for overlay
   container.style.position = "relative";
 
-  // Annotation layer (visual only)
+  // Annotation layer: visual only, no interaction
   Object.assign(annotationLayer.style, {
     position: "absolute",
     top: "0",
@@ -1033,7 +1237,7 @@ function initOverlay() {
     pointerEvents: "none"
   });
 
-  // Overlay (interaction layer)
+  // Overlay layer: interaction capture, no visuals
   Object.assign(overlay.style, {
     position: "absolute",
     top: "0",
@@ -1045,15 +1249,16 @@ function initOverlay() {
     pointerEvents: "none"
   });
 
-  // Attach mouse events
+  // Attach mouse event handlers
   overlay.addEventListener("mousedown", onMouseDown);
   overlay.addEventListener("mousemove", onMouseMove);
   overlay.addEventListener("mouseup", onMouseUp);
 
-  // Insert layers (order matters)
+  // Insert layers in order (annotation below overlay)
   container.appendChild(annotationLayer);
   container.appendChild(overlay);
 
+  // Container click: clear selection when clicking empty space
   container.addEventListener("click", (e) => {
     if (tool !== "select" || addingBoxToAnnotationId) return;
     
@@ -1063,6 +1268,7 @@ function initOverlay() {
     clearSelection();
   });
 
+  // Create toolbar
   function createToolbar() {
     const bar = document.createElement("div");
     bar.id = "wt-toolbar";
@@ -1086,9 +1292,11 @@ function initOverlay() {
 
   const toolbar = createToolbar();
 
+  // Add tool buttons
   toolbar.appendChild(makeToolButton("Draw", "draw"));
   toolbar.appendChild(makeToolButton("Select", "select"));
 
+  // Add show/hide toggle
   const toggleBtn = document.createElement("button");
 
   function updateToggleButton() {
@@ -1104,26 +1312,27 @@ function initOverlay() {
   updateToggleButton();
   toolbar.appendChild(toggleBtn);
 
-  // create editor
+  // Create editor dialog
   createWtEditor();
   
-  // Keep viewport synced
+  // Initial viewport sync
   syncViewport();
   
-  // Load and render any pre-existing annotations
+  // Load and render pre-existing annotations
   loadAnnotationsIfNeeded();
   requestAnimationFrame(() => {
     renderAnnotations();
     updateToolUI();
   });
   
+  // Re-render whenever viewer updates URL (pan/zoom)
   (function () {
     const originalReplaceState = history.replaceState;
 
     history.replaceState = function (...args) {
       const result = originalReplaceState.apply(this, args);
       
-      // trigger re-render whenever viewer updates URL
+      // Trigger re-render when viewer changes viewport
       renderAnnotations();
 
       return result;
@@ -1132,17 +1341,33 @@ function initOverlay() {
 
   window.addEventListener("popstate", renderAnnotations);
 
-  // Set border and background colors
+  // Inject CSS styles
   injectStyles();
 
-  // If this is the first run, start with some seed data
+  // Load seed data if empty
   seedIfEmpty();
 }
 
-// ============================================================
-// WAIT FOR VIEWER
-// ============================================================
+/**
+ * Seeds page with sample annotations on first visit
+ * Only does this if annotations array is empty
+ */
+async function seedIfEmpty() {
+  await loadAnnotationsIfNeeded();
 
+  if (!annotations || annotations.length === 0) {
+    const pageKey = getPageKey();
+    annotations = sampleAnnotations.filter(a => a.page === pageKey);
+
+    await saveAnnotationsForPage(annotations);
+    renderAnnotations();
+  }
+}
+
+/**
+ * Waits for OpenSeadragon container to load, then initializes overlay
+ * Polls every 200ms until container is found
+ */
 function waitForOSDContainer() {
   const el = document.querySelector(".openseadragon-canvas");
 
@@ -1154,5 +1379,5 @@ function waitForOSDContainer() {
   setTimeout(waitForOSDContainer, 200);
 }
 
+// Start polling for OSD container
 waitForOSDContainer();
-
