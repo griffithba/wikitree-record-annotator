@@ -15,7 +15,7 @@
     },
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
-      "js": ["storage.js", "content.js", "sampleAnnotations.js"]
+      "js": ["storage.js", "content.js", "sampleAnnotations.js", "code/riksarkivet.js"]
     }
   ]
 }
