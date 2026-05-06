@@ -1,10 +1,10 @@
-// ============================================================
-// SECTION 1: INITIALIZATION & DOM SETUP
-// ============================================================
 // File: WikiTree Overlay Annotation Tool
 // Allows drawing annotation boxes that stay aligned during
 // zoom and pan by storing coordinates in image space (xywh).
 
+// ============================================================
+// SECTION 1: INITIALIZATION & DOM SETUP
+// ============================================================
 const storageAPI = window.storage;
 
 // Transparent interaction layer (captures mouse input)
@@ -904,7 +904,10 @@ async function onMouseUp(e) {
     const annotation = {
       id: crypto.randomUUID(),
       page: getPageKey(),
-      boxes : [newBox],
+      source: "riksarkivet",
+      url: null,
+      reference: null,
+      boxes: [newBox],
       wtId: null,
       name: null,
       birth: null,

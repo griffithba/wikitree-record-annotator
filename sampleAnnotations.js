@@ -21,7 +21,10 @@ const sampleAnnotations = [
     "name": "Anders Andersson",
     "note": "Father's cousin-in-law",
     "page": "C0012293_00425",
+    "reference": null,
+    "source": "riksarkivet",
     "status": "unknown",
+    "url": null,
     "wtId": "Andersson-8563"
   },
   {
@@ -39,7 +42,10 @@ const sampleAnnotations = [
     "name": "Stina Larsdotter",
     "note": "Father's cousin",
     "page": "C0012293_00425",
+    "reference": null,
+    "source": "riksarkivet",
     "status": "unknown",
+    "url": null,
     "wtId": "Larsdotter-2942"
   },
   {
@@ -57,7 +63,10 @@ const sampleAnnotations = [
     "name": "Eric Olsson",
     "note": "",
     "page": "C0012293_00425",
+    "reference": null,
+    "source": "riksarkivet",
     "status": "unknown",
+    "url": null,
     "wtId": "Olsson-2483"
   },
   {
@@ -75,7 +84,10 @@ const sampleAnnotations = [
     "name": "Anna Persdotter",
     "note": "",
     "page": "C0012293_00425",
+    "reference": null,
+    "source": "riksarkivet",
     "status": "unknown",
+    "url": null,
     "wtId": "Persdotter-3351"
   },
   {
@@ -93,7 +105,10 @@ const sampleAnnotations = [
     "name": "Helena Persdotter",
     "note": "Mother's sister",
     "page": "C0012293_00425",
+    "reference": null,
+    "source": "riksarkivet",
     "status": "unknown",
+    "url": null,
     "wtId": "Persdotter-3356"
   },
   {
@@ -111,7 +126,10 @@ const sampleAnnotations = [
     "name": "Per Eric Eriksson",
     "note": "",
     "page": "C0012293_00425",
+    "reference": null,
+    "source": "riksarkivet",
     "status": "unknown",
+    "url": null,
     "wtId": "Eriksson-3876"
   },
   {
@@ -129,7 +147,10 @@ const sampleAnnotations = [
     "name": "Anders Persson",
     "note": "Father's 1c1r",
     "page": "C0012293_00425",
+    "reference": null,
+    "source": "riksarkivet",
     "status": "unknown",
+    "url": null,
     "wtId": "Persson-10374"
   }
 ]
