@@ -31,9 +31,6 @@ let startX = 0, startY = 0;
 let endX = 0, endY = 0;
 let box = null;
 
-let didPan = false;
-let previousViewport = null;
-
 // Mode state
 let tool = null;  // null | "draw" | "select" 
 let addingBoxToAnnotationId = null;
@@ -730,15 +727,6 @@ function getViewportFromUrl() {
 
 function syncViewport() {
   currentViewport = getViewportFromUrl();
-
-  if (previousViewport) {
-    didPan = 
-      (currentViewport.x !== previousViewport.x ||
-       currentViewport.y !== previousViewport.y) &&
-      currentViewport.w === previousViewport.w && 
-      currentViewport.h === previousViewport.h
-  }
-  previousViewport = currentViewport;
 }
 
 
@@ -1068,22 +1056,10 @@ function initOverlay() {
 
   container.addEventListener("click", (e) => {
     if (tool !== "select" || addingBoxToAnnotationId) return;
-
-    setTimeout(() => {
-      if (!didPan) {
-        syncViewport();
-        if (didPan) console.log("Caught a quick pan");
-      }
-    }, 0);
-    // don't clear selection after pan
-    if (didPan) {
-      didPan = false;
-      return;
-    }
     
     // If click was on an annotation, ignore
     if (e.target.closest(".wt-annotation")) return;
-console.log("Container event listener clearing selection");
+
     clearSelection();
   });
 
