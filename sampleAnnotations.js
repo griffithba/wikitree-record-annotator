@@ -16,15 +16,15 @@ const sampleAnnotations = [
         "y": 1793.938432835821
       }
     ],
-    "death": null,
+    "death": "1898",
     "id": "fa16268f-9043-4c49-8b59-28858baec674",
     "name": "Anders Andersson",
     "note": "Father's cousin-in-law",
     "page": "C0012293_00425",
-    "reference": null,
+    "reference": "By kyrkoarkiv, Dalarnas län, Födelse- och dopböcker, SE/ULA/10148/C/6 (1813-1865), bildid: C0012293_00425",
     "source": "riksarkivet",
     "status": "unknown",
-    "url": null,
+    "url": "https://sok.riksarkivet.se/bildvisning/C0012293_00425",
     "wtId": "Andersson-8563"
   },
   {
@@ -37,15 +37,15 @@ const sampleAnnotations = [
         "y": 1931.0365853658536
       }
     ],
-    "death": null,
+    "death": "1880",
     "id": "5c2f2896-4925-46b1-b9ab-1bc01c9db0a3",
     "name": "Stina Larsdotter",
     "note": "Father's cousin",
     "page": "C0012293_00425",
-    "reference": null,
+    "reference": "By kyrkoarkiv, Dalarnas län, Födelse- och dopböcker, SE/ULA/10148/C/6 (1813-1865), bildid: C0012293_00425",
     "source": "riksarkivet",
     "status": "unknown",
-    "url": null,
+    "url": "https://sok.riksarkivet.se/bildvisning/C0012293_00425",
     "wtId": "Larsdotter-2942"
   },
   {
@@ -63,10 +63,10 @@ const sampleAnnotations = [
     "name": "Eric Olsson",
     "note": "",
     "page": "C0012293_00425",
-    "reference": null,
+    "reference": "By kyrkoarkiv, Dalarnas län, Födelse- och dopböcker, SE/ULA/10148/C/6 (1813-1865), bildid: C0012293_00425",
     "source": "riksarkivet",
     "status": "unknown",
-    "url": null,
+    "url": "https://sok.riksarkivet.se/bildvisning/C0012293_00425",
     "wtId": "Olsson-2483"
   },
   {
@@ -84,10 +84,10 @@ const sampleAnnotations = [
     "name": "Anna Persdotter",
     "note": "",
     "page": "C0012293_00425",
-    "reference": null,
+    "reference": "By kyrkoarkiv, Dalarnas län, Födelse- och dopböcker, SE/ULA/10148/C/6 (1813-1865), bildid: C0012293_00425",
     "source": "riksarkivet",
     "status": "unknown",
-    "url": null,
+    "url": "https://sok.riksarkivet.se/bildvisning/C0012293_00425",
     "wtId": "Persdotter-3351"
   },
   {
@@ -105,10 +105,10 @@ const sampleAnnotations = [
     "name": "Helena Persdotter",
     "note": "Mother's sister",
     "page": "C0012293_00425",
-    "reference": null,
+    "reference": "By kyrkoarkiv, Dalarnas län, Födelse- och dopböcker, SE/ULA/10148/C/6 (1813-1865), bildid: C0012293_00425",
     "source": "riksarkivet",
     "status": "unknown",
-    "url": null,
+    "url": "https://sok.riksarkivet.se/bildvisning/C0012293_00425",
     "wtId": "Persdotter-3356"
   },
   {
@@ -126,10 +126,10 @@ const sampleAnnotations = [
     "name": "Per Eric Eriksson",
     "note": "",
     "page": "C0012293_00425",
-    "reference": null,
+    "reference": "By kyrkoarkiv, Dalarnas län, Födelse- och dopböcker, SE/ULA/10148/C/6 (1813-1865), bildid: C0012293_00425",
     "source": "riksarkivet",
     "status": "unknown",
-    "url": null,
+    "url": "https://sok.riksarkivet.se/bildvisning/C0012293_00425",
     "wtId": "Eriksson-3876"
   },
   {
@@ -142,15 +142,15 @@ const sampleAnnotations = [
         "y": 2234.987804878049
       }
     ],
-    "death": null,
+    "death": "1927",
     "id": "439885ca-0cb1-4837-8c4b-0a6b27735c64",
     "name": "Anders Persson",
     "note": "Father's 1c1r",
     "page": "C0012293_00425",
-    "reference": null,
+    "reference": "By kyrkoarkiv, Dalarnas län, Födelse- och dopböcker, SE/ULA/10148/C/6 (1813-1865), bildid: C0012293_00425",
     "source": "riksarkivet",
     "status": "unknown",
-    "url": null,
+    "url": "https://sok.riksarkivet.se/bildvisning/C0012293_00425",
     "wtId": "Persson-10374"
   }
 ]
