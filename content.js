@@ -448,8 +448,9 @@ function createAnnotationToolbar(id) {
 // ============================================================
 
 /**
- * Creates the modal dialog for editing WT ID and notes
- * Dialog is hidden by default and shown via openWtEditor()
+ * Creates the modal dialog for editing WT ID and notes.
+ * Dialog is hidden by default and shown via openWtEditor().
+ * Only called at init.
  */
 function createWtEditor() {
   wtEditor = document.createElement("div");
@@ -1193,7 +1194,7 @@ function triggerRefHighlight(annotationId) {
  * Sets up DOM, event listeners, toolbar, etc.
  */
 function initOverlay() {
-  container = document.querySelector(".openseadragon-container");
+  container = getViewerContainer();
   if (!container) return;
 
   // Get incoming WikiTree profile ID if present
@@ -1205,53 +1206,85 @@ function initOverlay() {
   // Set up positioning context for overlay
   container.style.position = "relative";
 
-  // Annotation layer: visual only, no interaction
-  Object.assign(annotationLayer.style, {
-    position: "absolute",
-    top: "0",
-    left: "0",
-    width: "100%",
-    height: "100%",
-    pointerEvents: "none"
+  createOverlayLayers();
+  attachOverlayEvents();
+  
+  // Create the WikiTree annotation toolbar
+  createToolbar();
+  
+  // Create editor dialog
+  createWtEditor();
+  
+  // Align viewport and initialize tracking 
+  initializeViewportTracking();
+
+  // Inject CSS styles
+  injectStyles();
+
+  // Load seed data if empty, then render
+  seedCurrentPageIfEmpty().then(() => {
+    requestAnimationFrame(() => {
+      renderAnnotations();
+      updateToolUI();
+    });
   });
 
-  // Overlay layer: interaction capture, no visuals
-  Object.assign(overlay.style, {
-    position: "absolute",
-    top: "0",
-    left: "0",
-    width: "100%",
-    height: "100%",
-    zIndex: "99999",
-    cursor: "default",
-    pointerEvents: "none"
-  });
+  
+  /**
+   *  Local init functions
+   */
 
-  // Attach mouse event handlers
-  overlay.addEventListener("mousedown", onMouseDown);
-  overlay.addEventListener("mousemove", onMouseMove);
-  overlay.addEventListener("mouseup", onMouseUp);
+  function createOverlayLayers() {
+    // Annotation layer: visual only, no interaction
+    Object.assign(annotationLayer.style, {
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      pointerEvents: "none"
+    });
 
-  // Insert layers in order (annotation below overlay)
-  container.appendChild(annotationLayer);
-  container.appendChild(overlay);
+    // Overlay layer: interaction capture, no visuals
+    Object.assign(overlay.style, {
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      zIndex: "99999",
+      cursor: "default",
+      pointerEvents: "none"
+    });
 
-  // Container click: clear selection when clicking empty space
-  container.addEventListener("click", (e) => {
-    if (tool !== "select" || addingBoxToAnnotationId) return;
+    // Insert layers in order (annotation below overlay)
+    container.appendChild(annotationLayer);
+    container.appendChild(overlay);
+  }
+
+  function attachOverlayEvents() {
+    // Attach mouse event handlers
+    overlay.addEventListener("mousedown", onMouseDown);
+    overlay.addEventListener("mousemove", onMouseMove);
+    overlay.addEventListener("mouseup", onMouseUp);
+
+    // Container click: clear selection when clicking empty space
+    container.addEventListener("click", (e) => {
+      if (tool !== "select" || addingBoxToAnnotationId) return;
     
-    // If click was on an annotation, ignore
-    if (e.target.closest(".wt-annotation")) return;
+      // If click was on an annotation, ignore
+      if (e.target.closest(".wt-annotation")) return;
 
-    clearSelection();
-  });
-
-  // Create toolbar
+      clearSelection();
+    });
+  }
+  
+  // create toolbar
   function createToolbar() {
-    const bar = document.createElement("div");
-    bar.id = "wt-toolbar";
+    const toolbar = document.createElement("div");
+    toolbar.id = "wt-toolbar";
 
-    Object.assign(bar.style, {
+    Object.assign(toolbar.style, {
       position: "fixed",
       top: "10px",
       right: "40px",
@@ -1262,75 +1295,35 @@ function initOverlay() {
       background: "var(--wt-toolbar-bg)",
       borderRadius: "8px"
     });
+    
+    // Add tool buttons to toolbar
+    toolbar.appendChild(makeToolButton("Draw", "draw"));
+    toolbar.appendChild(makeToolButton("Select", "select"));
 
-    document.body.appendChild(bar);
-
-    return bar;
-  }
-
-  const toolbar = createToolbar();
-
-  // Add tool buttons
-  toolbar.appendChild(makeToolButton("Draw", "draw"));
-  toolbar.appendChild(makeToolButton("Select", "select"));
-
-  // Add show/hide toggle
-  const toggleBtn = document.createElement("button");
-
-  function updateToggleButton() {
+    // Button for toggling show/hide annotations
+    const toggleBtn = document.createElement("button");
+    // initial button label
     toggleBtn.textContent = showAnnotations ? "Hide" : "Show";
-  }
 
-  toggleBtn.addEventListener("click", () => {
-    showAnnotations = !showAnnotations;
-    updateToggleButton();
-    renderAnnotations();
-  });
-
-  updateToggleButton();
-  toolbar.appendChild(toggleBtn);
-
-  // Create editor dialog
-  createWtEditor();
-  
-  // Initial viewport sync
-  syncViewport();
-  
-  // Load and render pre-existing annotations
-  loadAnnotationsIfNeeded();
-  requestAnimationFrame(() => {
-    renderAnnotations();
-    updateToolUI();
-  });
-  
-  // Re-render whenever viewer updates URL (pan/zoom)
-  (function () {
-    const originalReplaceState = history.replaceState;
-
-    history.replaceState = function (...args) {
-      const result = originalReplaceState.apply(this, args);
-      
-      // Trigger re-render when viewer changes viewport
+    toggleBtn.addEventListener("click", () => {
+      showAnnotations = !showAnnotations;
+      toggleBtn.textContent = showAnnotations ? "Hide" : "Show";
       renderAnnotations();
+    });
 
-      return result;
-    };
-  })();
+    // Add toggle button to toolbar
+    toolbar.appendChild(toggleBtn);
 
-  window.addEventListener("popstate", renderAnnotations);
-
-  // Inject CSS styles
-  injectStyles();
-
-  // Load seed data if empty
-  seedIfEmpty();
+    // attach the toolbar
+    document.body.appendChild(toolbar);
+  }
 }
 
 /**
  * Seeds page with sample annotations on first visit
  * Only does this if annotations array is empty
  */
-async function seedIfEmpty() {
+async function seedCurrentPageIfEmpty() {
   await loadAnnotationsIfNeeded();
 
   if (!annotations || annotations.length === 0) {
@@ -1338,24 +1331,10 @@ async function seedIfEmpty() {
     annotations = sampleAnnotations.filter(a => a.page === pageKey);
 
     await saveAnnotationsForPage(annotations);
-    renderAnnotations();
   }
 }
 
-/**
- * Waits for OpenSeadragon container to load, then initializes overlay
- * Polls every 200ms until container is found
- */
-function waitForOSDContainer() {
-  const el = document.querySelector(".openseadragon-canvas");
 
-  if (el) {
-    initOverlay();
-    return;
-  }
 
-  setTimeout(waitForOSDContainer, 200);
-}
 
-// Start polling for OSD container
-waitForOSDContainer();
+waitForViewerReady();
