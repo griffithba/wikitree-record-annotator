@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "WikiTree Riksarkivet Linker",
+  "name": "WikiTree Record Annotator",
   "version": "0.1",
-  "description": "Annotate Riksarkivet images with WikiTree profiles",
+  "description": "Annotate record images with WikiTree profiles. Supports Riksarkivet.",
   "permissions": ["storage"],
   "host_permissions": [
     "https://sok.riksarkivet.se/*",
