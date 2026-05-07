@@ -2,6 +2,26 @@
 let sourceSite = "riksarkivet";
 
 /**
+ * Waits for OpenSeadragon container to load, then initializes overlay
+ * Polls every 200ms until container is found
+ */
+function waitForViewerReady() {
+  const el = document.querySelector(".openseadragon-canvas");
+
+  if (el) {
+    initOverlay();
+    return;
+  }
+
+  setTimeout(waitForOSDContainer, 200);
+}
+
+// get the OpenSeadragon container (the element the overlay should attach to)
+function getViewerContainer() {
+  return document.querySelector(".openseadragon-container");
+}
+
+/**
  * Extracts page identifier from current URL
  * Used as the key for storing/loading annotations per page
  * @returns {string} Page key (e.g., "P123_456")
@@ -79,5 +99,22 @@ function getCleanPageUrl() {
   url.hash = "";
 
   return url.origin + url.pathname;
+}
+
+// Tracks viewport changes (pan/zoom) and re-renders annotations to maintain alignment
+function initializeViewportTracking() {
+  const originalReplaceState = history.replaceState;
+
+  history.replaceState = function (...args) {
+    const result = originalReplaceState.apply(this, args);
+
+    requestAnimationFrame(() => {
+      renderAnnotations();
+    });
+
+    return result;
+  };
+
+  window.addEventListener("popstate", renderAnnotations);
 }
 
