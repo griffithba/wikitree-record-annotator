@@ -47,6 +47,9 @@ let lastPageKey = null;               // Track current page to avoid redundant l
 // ID from incoming WikiTree profile (if navigated from one)
 let incomingWtId = null;
 
+// Whether to pre-fill the WtId editor with the incoming WtId on creation
+let preFillWtIdOnCreate = false;
+
 // Dialog element for editing annotation WT ID and notes
 let wtEditor = null;
 
@@ -886,7 +889,7 @@ async function onMouseUp(e) {
     openWtEditor({
       x: e.clientX,
       y: e.clientY,
-      initialValue: "",
+      initialValue: preFillWtIdOnCreate ? incomingWtId : "",
       initialNote: "",
       onSave: async ({wtId, note}) => {
         annotation.wtId = wtId;
@@ -1106,6 +1109,9 @@ function renderBox(a, boxData, index) {
     // Highlight if this annotation matches incoming profile
     if (String(a.wtId) === String(incomingWtId)) {
       triggerRefHighlight(a.id);
+      // don't assume new annotations are for the incomig WikiTree ID if there's
+      // already one for that ID
+      preFillWtIdOnCreate = false;
     }
   }
 
@@ -1192,6 +1198,9 @@ function initOverlay() {
 
   // Get incoming WikiTree profile ID if present
   incomingWtId = getWtIdFromUrl();
+
+  // Set flag to pre-fill the editor with the incoming WikiTree profile ID
+  if (incomingWtId) preFillWtIdOnCreate = true;
     
   // Set up positioning context for overlay
   container.style.position = "relative";
