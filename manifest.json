@@ -2,25 +2,25 @@
   "manifest_version": 3,
   "name": "WikiTree Record Annotator",
   "version": "0.1",
-  "description": "Annotate record images with WikiTree profiles. Supports Riksarkivet.",
+  "description": "Annotate record images with WikiTree profiles",
+  "action": {"default_title": "WikiTree Record Annotator"}
   "permissions": ["storage"],
   "host_permissions": [
-    "https://sok.riksarkivet.se/*",
     "https://api.wikitree.com/*"
   ],
 
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background.js"
   },
   
   "content_scripts": [
     {
-      "matches": ["https://www.wikitree.com/*"],
-      "js": ["storage.js", "wikitree.js"]
+      "matches": ["https://www.wikitree.com/wiki/*"],
+      "js": ["src/storage.js", "src/wikitree.js"]
     },
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
-      "js": ["storage.js", "sampleAnnotations.js", "sites/riksarkivet.js", "content.js"]
+      "js": ["src/storage.js", "src/sampleAnnotations.js", "src/sites/riksarkivet.js", "src/content.js"]
     }
   ]
 }
