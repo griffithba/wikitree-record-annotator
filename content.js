@@ -1056,6 +1056,7 @@ async function renderAnnotations() {
 
   // Render each annotation's boxes
   annotations.forEach(a => {
+    if (a.status === "unknown") enrichAnnotation(a);
     a.boxes.forEach((boxData, index) => {
       renderBox(a, boxData, index);
     });
