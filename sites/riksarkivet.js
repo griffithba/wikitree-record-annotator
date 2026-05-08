@@ -13,7 +13,7 @@ function waitForViewerReady() {
     return;
   }
 
-  setTimeout(waitForOSDContainer, 200);
+  setTimeout(waitForViewerReady, 200);
 }
 
 // get the OpenSeadragon container (the element the overlay should attach to)
