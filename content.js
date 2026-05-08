@@ -20,8 +20,7 @@ const annotationLayer = document.createElement("div");
 // ============================================================
 // Core state variables organized by purpose
 
-// OSD viewer and viewport context
-let container = null;                 // OSD container element
+// viewport context
 let currentViewport = null;           // {x,y,w,h} from URL hash (IIIF image space)
 
 // Annotations array (stored in IMAGE SPACE coordinates)
@@ -59,6 +58,7 @@ const highlightedAnnotations = new Set();
 // Resize state (when dragging resize handles)
 let resizing = null;
 
+const enrichmentInProgress = new Set();
 
 // ============================================================
 // SECTION 3: STYLES & CSS INJECTION
@@ -185,24 +185,6 @@ function getWtIdFromUrl() {
   return params.get("wtId");
 }
 
-/**
- * Extracts box list from annotation (handles old and new formats)
- * Old format: {x, y, w, h} at top level
- * New format: {boxes: [{x, y, w, h}, ...]}
- * @param {Object} annotation - Annotation object
- * @returns {Array} Array of box objects
- */
-function getBoxes(annotation) {
-  if (annotation.boxes) return annotation.boxes;
-
-  // Fallback for old data migration
-  return [{
-    x: annotation.x,
-    y: annotation.y,
-    w: annotation.w,
-    h: annotation.h
-  }];
-}
 
 /**
  * Builds HTML title/tooltip for an annotation
@@ -213,7 +195,7 @@ function getBoxes(annotation) {
 function buildTooltip(a) {
   let text = a.wtId || "Unknown";
   if (a.name || a.birth || a.death) {
-    const years = (a.birth || "?") + "-" + (a.death || "?");
+    const years = (a.birth || "") + "-" + (a.death || "");
     text = `${a.name || "Unknown"} (${years})`;
   }
     
@@ -411,7 +393,8 @@ function createAnnotationToolbar(id) {
   // "✏️" button: open WT ID editor
   editBtn.onclick = (e) => {
     e.stopPropagation();
-    const box = document.querySelector(`[data-id="${selectedAnnotationId}"]`);
+    const box = e.target.closest(".wt-annotation");
+    if (!box) return;
     const rect = box.getBoundingClientRect();
     editAnnotation(id, rect.left + rect.width, rect.top + rect.height);
   };
@@ -755,7 +738,7 @@ function stopResize() {
  * Creates temporary DOM element that follows mouse
  */
 function onMouseDown(e) {
-  if ((tool !== "draw" && !addingBoxToAnnotationId) || !container) return;
+  if (tool !== "draw" && !addingBoxToAnnotationId) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -842,15 +825,6 @@ async function onMouseUp(e) {
     const annotation = getAnnotationById(selectedAnnotationId);
     if (!annotation) return;
 
-    // Ensure multi-box structure
-    if (!annotation.boxes) {
-      annotation.boxes = getBoxes(annotation);
-      delete annotation.x;
-      delete annotation.y;
-      delete annotation.w;
-      delete annotation.h;
-    }
-
     annotation.boxes.push(newBox);
 
     await saveAnnotationsForPage(annotations);
@@ -898,6 +872,7 @@ async function onMouseUp(e) {
         annotations.push(annotation);
         await saveAnnotationsForPage(annotations);
         renderAnnotations();
+        enrichAnnotation(annotation);
         box.remove();
         box = null;
       },
@@ -973,12 +948,6 @@ async function addBoxToSelected(newBox) {
   const a = getAnnotationById(selectedAnnotationId);
   if (!a) return;
 
-  if (!a.boxes) {
-    // Migrate old single-box format
-    a.boxes = getBoxes(a);
-    delete a.x; delete a.y; delete a.w; delete a.h;
-  }
-
   a.boxes.push(newBox);
 
   await saveAnnotationsForPage(annotations);
@@ -994,15 +963,6 @@ async function addBoxToSelected(newBox) {
 async function deleteBox(annotationId, boxIndex) {
   const annotation = getAnnotationById(annotationId);
   if (!annotation) return;
-
-  // Ensure multi-box structure
-  if (!annotation.boxes) {
-    annotation.boxes = getBoxes(annotation);
-    delete annotation.x;
-    delete annotation.y;
-    delete annotation.w;
-    delete annotation.h;
-  }
 
   if (annotation.boxes.length > 1) {
     // Remove just this box
@@ -1029,6 +989,43 @@ async function deleteAnnotation(id) {
 }
 
 
+/**
+ * Requests WikiTree enrichment from background script
+ * and applies returned data to the annotation.
+ */
+function enrichAnnotation(annotation) {
+  if (enrichmentInProgress.has(annotation.id)) return;
+
+  enrichmentInProgress.add(annotation.id);
+
+  chrome.runtime.sendMessage(
+    {
+      type: "ENRICH_ANNOTATION",
+      annotation
+    },
+    (response) => {
+      enrichmentInProgress.delete(annotation.id);
+
+      if (!response || response.error) return;
+
+      applyEnrichment(annotation.id, response);
+    }
+  );
+}
+
+function applyEnrichment(annotationId, data) {
+  const annotation = annotations.find(a => a.id === annotationId);
+  if (!annotation) return;
+
+  annotation.name = data.name;
+  annotation.birth = data.birth;
+  annotation.death = data.death;
+  annotation.status = data.status;
+
+  saveAnnotationsForPage(annotations);
+  renderAnnotations();
+}
+
 // ============================================================
 // SECTION 12: RENDERING ANNOTATIONS
 // ============================================================
@@ -1037,7 +1034,8 @@ async function deleteAnnotation(id) {
  * Main render loop for all annotations
  * Syncs viewport, clears previous render, renders all boxes
  */
-function renderAnnotations() {
+async function renderAnnotations() {
+  const container = getViewerContainer();
   if (!container) return;
 
   // Always sync viewport first (prevents lag when zooming)
@@ -1049,7 +1047,7 @@ function renderAnnotations() {
   if (!showAnnotations) return;
 
   // Load annotations for current page if not yet loaded
-  loadAnnotationsIfNeeded();
+  await loadAnnotationsIfNeeded();
 
   const vp = currentViewport;
   if (!vp) return;
@@ -1058,9 +1056,7 @@ function renderAnnotations() {
 
   // Render each annotation's boxes
   annotations.forEach(a => {
-    const boxes = getBoxes(a);
-
-    boxes.forEach((boxData, index) => {
+    a.boxes.forEach((boxData, index) => {
       renderBox(a, boxData, index);
     });
   });
@@ -1140,9 +1136,30 @@ function renderBox(a, boxData, index) {
   box.dataset.annotationId = a.id;
   box.dataset.boxIndex = index;
 
+  if (a.status === "invalid") {
+    addInvalidBadge(box);
+  }
+
   annotationLayer.appendChild(box);
 }
 
+function addInvalidBadge(boxEl) {
+  const badge = document.createElement("div");
+
+  badge.textContent = "⛓️‍💥";
+
+  Object.assign(badge.style, {
+    position: "absolute",
+    top: "2px",
+    right: "2px",
+    fontSize: "18px",
+    lineHeight: "14px",
+    pointerEvents: "none",
+    zIndex: "2"
+  });
+
+  boxEl.appendChild(badge);
+}
 
 // ============================================================
 // SECTION 13: REFERENCE HIGHLIGHTING
@@ -1194,7 +1211,7 @@ function triggerRefHighlight(annotationId) {
  * Sets up DOM, event listeners, toolbar, etc.
  */
 function initOverlay() {
-  container = getViewerContainer();
+  const container = getViewerContainer();
   if (!container) return;
 
   // Get incoming WikiTree profile ID if present

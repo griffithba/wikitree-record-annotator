@@ -8,6 +8,11 @@
     "https://sok.riksarkivet.se/*",
     "https://api.wikitree.com/*"
   ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+  
   "content_scripts": [
     {
       "matches": ["https://www.wikitree.com/*"],
@@ -15,7 +20,7 @@
     },
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
-      "js": ["storage.js", "content.js", "sampleAnnotations.js", "sites/riksarkivet.js"]
+      "js": ["storage.js", "sampleAnnotations.js", "sites/riksarkivet.js", "content.js"]
     }
   ]
 }
