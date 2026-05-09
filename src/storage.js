@@ -5,6 +5,7 @@
 // ============================================================
 
 const LOCAL_KEY = "wt-annotations";
+const LOCAL_PEOPLE_KEY = "wt-people";
 
 const localAdapter = {
   async getAnnotations() {
@@ -24,10 +25,31 @@ const localAdapter = {
     );
 
     await this.saveAnnotations(updated);
+  },
+
+  async getPeople() {
+    const raw = localStorage.getItem(LOCAL_PEOPLE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  },
+
+  async savePeople(data) {
+    localStorage.setItem(LOCAL_PEOPLE_KEY, JSON.stringify(data));
+  },
+
+  async getPerson(wtId) {
+    const all = await this.getPeople();
+    return all[wtId] || null;
+  },
+
+  async savePerson(wtId, data) {
+    const all = await this.getPeople();
+    all[wtId] = data;
+    await this.savePeople(all);
   }
 };
 
 const CHROME_KEY = "wt-annotations";
+const CHROME_PEOPLE_KEY = "wt-people";
 
 const chromeAdapter = {
   async getAnnotations() {
@@ -52,6 +74,31 @@ const chromeAdapter = {
     );
 
     await this.saveAnnotations(updated);
+  },
+
+  async getPeople() {
+    return new Promise(resolve => {
+      chrome.storage.local.get([CHROME_PEOPLE_KEY], result => {
+        resolve(result[CHROME_PEOPLE_KEY] || {});
+      });
+    });
+  },
+
+  async savePeople(data) {
+    return new Promise(resolve => {
+      chrome.storage.local.set({ [CHROME_PEOPLE_KEY]: data }, resolve);
+    });
+  },
+
+  async getPerson(wtId) {
+    const all = await this.getPeople();
+    return all[wtId] || null;
+  },
+
+  async savePerson(wtId, data) {
+    const all = await this.getPeople();
+    all[wtId] = data;
+    await this.savePeople(all);
   }
 };
 
@@ -74,6 +121,32 @@ const serverAdapter = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch)
+    });
+  },
+
+  async getPeople() {
+    const res = await fetch("/api/people");
+    return res.json();
+  },
+
+  async savePeople(data) {
+    await fetch("/api/people", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getPerson(wtId) {
+    const res = await fetch(`/api/people/${wtId}`);
+    return res.ok ? res.json() : null;
+  },
+
+  async savePerson(wtId, data) {
+    await fetch(`/api/people/${wtId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
     });
   }
 };
@@ -101,6 +174,22 @@ const storage = {
 
   updateAnnotation(id, patch) {
     return adapter.updateAnnotation(id, patch);
+  },
+
+  getPeople() {
+    return adapter.getPeople();
+  },
+
+  savePeople(data) {
+    return adapter.savePeople(data);
+  },
+
+  getPerson(wtId) {
+    return adapter.getPerson(wtId);
+  },
+
+  savePerson(wtId, data) {
+    return adapter.savePerson(wtId, data);
   }
 };
 
