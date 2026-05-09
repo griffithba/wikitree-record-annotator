@@ -33,89 +33,22 @@ async function handleEnrichment(annotation) {
     return { status: "invalid", reason: "missing_wt_id" };
   }
 
-  // Check cache first
-  const cached = await getCachedPerson(wtId);
-  if (cached) {
-    console.log("Using cached person data for:", wtId);
-    return cached;
-  }
-
-  // Not in cache or expired, fetch fresh
   const profile = await fetchWikiTreeProfile(wtId);
 
   if (!profile) {
-    // Cache the failure so we don't keep retrying
-    const invalid = {
+    return {
       status: "invalid",
       wtId
     };
-    await saveCachedPerson(wtId, invalid);
-    return invalid;
   }
 
-  const result = {
+  return {
     wtId,
     status: "verified",
     name: profile.name || null,
     birth: profile.birthYear || null,
     death: profile.deathYear || null
   };
-
-  // Cache the success
-  await saveCachedPerson(wtId, result);
-  return result;
-}
-
-/**
- * Retrieves cached person data if it exists and is not expired
- * @param {string} wtId - WikiTree ID
- * @returns {Object|null} Cached person data or null if not found/expired
- */
-async function getCachedPerson(wtId) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(["wt-people"], (result) => {
-      const people = result["wt-people"] || {};
-      const cached = people[wtId];
-
-      if (!cached) {
-        resolve(null);
-        return;
-      }
-
-      // Check if cache has expired
-      if (cached.cachedAt) {
-        const age = Date.now() - cached.cachedAt;
-        if (age > PERSON_CACHE_MAX_AGE_MS) {
-          console.log("Cache expired for:", wtId);
-          resolve(null);
-          return;
-        }
-      }
-
-      resolve(cached);
-    });
-  });
-}
-
-/**
- * Saves person data to cache with timestamp
- * @param {string} wtId - WikiTree ID
- * @param {Object} data - Person data to cache
- */
-async function saveCachedPerson(wtId, data) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(["wt-people"], (result) => {
-      const people = result["wt-people"] || {};
-      
-      // Add timestamp to cached data
-      people[wtId] = {
-        ...data,
-        cachedAt: Date.now()
-      };
-
-      chrome.storage.local.set({ "wt-people": people }, resolve);
-    });
-  });
 }
 
 
