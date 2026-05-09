@@ -1,6 +1,7 @@
 # wikitree-ref-overlays
+<img src="icons/icon128.png" align="left" width="128" height="128" style="margin-right: 15px;">
 
-This Chrome/Chromium browser extension overlays annotations linked to WikiTree profiles on top of online historical record images. It currently supports records hosted by the Swedish National Archives (Riksarkivet), but is designed to be expandable to other archive sites in the future. 
+This Chrome/Chromium browser extension overlays annotations linked to WikiTree profiles on top of online historical record images. It currently supports records hosted by the Swedish National Archives (Riksarkivet), but is designed to be expandable to other archive sites. 
 
 Annotations appear as shaded boxes over the record image, and their size and position are tied to the image itself so they stay locked to the same place on the image through zooming and panning. Hovering the mouse over a box displays information about the linked WikiTree profile, and an optional note (see Lena Persdotter in the screenshot), and clicking on the box will open the profile in a new tab. A toolbar enables the user to draw new annotations, select existing annotations (to edit or delete), and toggle between hiding or showing all annotations. 
 
