@@ -4,9 +4,6 @@
 // CONFIGURATION
 // ============================================================
 
-// Cache expiration time (in milliseconds)
-// Set to 14 days: 14 * 24 * 60 * 60 * 1000
-const PERSON_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
  * Handles messages from content scripts (RA + WT pages)
@@ -14,8 +11,8 @@ const PERSON_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // We may respond asynchronously
-  if (message?.type === "ENRICH_ANNOTATION") {
-    handleEnrichment(message.annotation)
+  if (message?.type === "ENRICH_PERSON") {
+    handleEnrichment(message.wtId)
       .then(sendResponse)
       .catch(err => {
         console.error("Enrichment failed:", err);
@@ -27,11 +24,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 
-async function handleEnrichment(annotation) {
-  const wtId = annotation?.wtId;
-  if (!wtId) {
-    return { status: "invalid", reason: "missing_wt_id" };
-  }
+async function handleEnrichment(wtId) {
 
   const profile = await fetchWikiTreeProfile(wtId);
 

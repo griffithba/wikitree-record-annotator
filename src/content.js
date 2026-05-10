@@ -2,6 +2,14 @@
 // Allows drawing annotation boxes that stay aligned during
 // zoom and pan by storing coordinates in image space (xywh).
 
+if (window.__wtOverlayInitialized) {
+  console.log("WikiTree overlay already initialized");
+} else {
+  window.__wtOverlayInitialized = true;
+
+  waitForViewerReady();
+}
+
 // ============================================================
 // SECTION 1: INITIALIZATION & DOM SETUP
 // ============================================================
@@ -13,6 +21,12 @@ overlay.id = "wt-overlay";
 
 // Visual layer for rendered annotations
 const annotationLayer = document.createElement("div");
+annotationLayer.id = "wt-annotation-layer";
+
+// Cache expiration time (in milliseconds)
+// Set to 14 days: 14 * 24 * 60 * 60 * 1000
+const days = 14;
+const PERSON_CACHE_MAX_AGE_MS = days * 24 * 60 * 60 * 1000;
 
 
 // ============================================================
@@ -25,6 +39,10 @@ let currentViewport = null;           // {x,y,w,h} from URL hash (IIIF image spa
 
 // Annotations array (stored in IMAGE SPACE coordinates)
 let annotations = [];
+let people = {};
+let peopleLoaded = false;
+
+let renderInProgress = false;
 
 // Drawing/drag state for box creation
 let isDragging = false;               // Currently drawing a box
@@ -123,7 +141,6 @@ function injectStyles() {
     }
 
     .annotation-toolbar button {
-      font-size: 18px;
       background: transparent;
       border: none;
       color: white;
@@ -193,10 +210,13 @@ function getWtIdFromUrl() {
  * @returns {string} Tooltip text
  */
 function buildTooltip(a) {
-  let text = a.wtId || "Unknown";
-  if (a.name || a.birth || a.death) {
-    const years = (a.birth || "") + "-" + (a.death || "");
-    text = `${a.name || "Unknown"} (${years})`;
+
+  let person = people[a.wtId];
+  let text = a.wtId;
+
+  if (person && (person.name || person.birth || person.death)) {
+    const years = (person.birth || "") + "-" + (person.death || "");
+    text = `${person.name || a.wtId} (${years})`;
   }
     
   if (a.note) {
@@ -225,7 +245,7 @@ function setTool(nextTool) {
   // Clean up when leaving select mode
   if (prevTool === "select" && tool !== "select") {
     clearSelection();
-    closeWtEditor?.();
+    closeWtEditor();
   }
 
   const isDraw = tool === "draw";
@@ -330,7 +350,7 @@ function clearSelection() {
   selectedAnnotationId = null;
   addingBoxToAnnotationId = null;
   updateSelectionStyles();
-  closeWtEditor?.();
+  closeWtEditor();
 }
 
 /**
@@ -417,6 +437,8 @@ function createAnnotationToolbar(id) {
     const boxEl = deleteBtn.closest(".wt-annotation");
     const annotationId = boxEl.dataset.annotationId;
     const boxIndex = Number(boxEl.dataset.boxIndex);
+
+    const annotation = getAnnotationById(annotationId);
 
     deleteBox(annotationId, boxIndex);
   };
@@ -755,7 +777,7 @@ function onMouseDown(e) {
   box = document.createElement("div");
   box.style.position = "absolute";
   box.style.border = "var(--wt-draw-border)";
-  box.style.background = "var(--wt-draw-background)";
+  box.style.background = "var(--wt-draw-bg)";
   box.style.pointerEvents = "none";
 
   annotationLayer.appendChild(box);
@@ -853,9 +875,6 @@ async function onMouseUp(e) {
       reference: getReferenceFromPage(),
       boxes: [newBox],
       wtId: null,
-      name: null,
-      birth: null,
-      death: null,
       note: null, 
       status: "unknown"
     };
@@ -871,8 +890,8 @@ async function onMouseUp(e) {
         annotation.note = note;
         annotations.push(annotation);
         await saveAnnotationsForPage(annotations);
+        enrichPersonData(wtId);
         renderAnnotations();
-        enrichAnnotation(annotation);
         box.remove();
         box = null;
       },
@@ -929,9 +948,31 @@ async function loadAnnotationsIfNeeded() {
   if (key === lastPageKey) return;  // Already loaded
   lastPageKey = key;
 
-  let all = await storageAPI.getAnnotations();
+  const all = await storageAPI.getAnnotations();
 
+  // only store annotations specific to this page
   annotations = all.filter(a => a.page === key);
+
+  people = await storageAPI.getPeople();
+
+  let saveNeeded = false;
+
+  // loop through annotations making sure their people are fresh
+  annotations.forEach(a => {
+    // clean up from old format
+    if (a.name) {delete a.name; saveNeeded = true;}
+    if (a.birth) {delete a.birth; saveNeeded = true;}
+    if (a.death) {delete a.death; saveNeeded = true;}
+    if (a.status) {delete a.status; saveNeeded = true;}
+
+    let person = people[a.wtId];
+    if (!person || (person.status === "unknown") || (Date.now() - person.cachedAt > PERSON_CACHE_MAX_AGE_MS)) {
+      enrichPersonData(a.wtId);
+    }
+  });
+
+  if (saveNeeded) await saveAnnotationsForPage();
+
 }
 
 
@@ -944,6 +985,7 @@ async function loadAnnotationsIfNeeded() {
  * (Also called via toolbar "+" button)
  * @param {Object} newBox - Box coordinates {x, y, w, h} in image space
  */
+/*
 async function addBoxToSelected(newBox) {
   const a = getAnnotationById(selectedAnnotationId);
   if (!a) return;
@@ -953,6 +995,7 @@ async function addBoxToSelected(newBox) {
   await saveAnnotationsForPage(annotations);
   renderAnnotations();
 }
+  */
 
 /**
  * Deletes a specific box from an annotation
@@ -982,9 +1025,9 @@ async function deleteBox(annotationId, boxIndex) {
  * @param {string} id - Annotation ID
  */
 async function deleteAnnotation(id) {
-  annotations = annotations.filter(a => a.id !== selectedAnnotationId);
-  selectedAnnotationId = null;
+  annotations = annotations.filter(a => a.id !== id);
   await saveAnnotationsForPage(annotations);
+  if (selectedAnnotationId === id) clearSelection();
   renderAnnotations();
 }
 
@@ -993,38 +1036,34 @@ async function deleteAnnotation(id) {
  * Requests WikiTree enrichment from background script
  * and applies returned data to the annotation.
  */
-function enrichAnnotation(annotation) {
-  if (enrichmentInProgress.has(annotation.id)) return;
+async function enrichPersonData(wtId) {
 
-  enrichmentInProgress.add(annotation.id);
+  if (enrichmentInProgress.has(wtId)) return;
+
+  enrichmentInProgress.add(wtId);
 
   chrome.runtime.sendMessage(
     {
-      type: "ENRICH_ANNOTATION",
-      annotation
+      type: "ENRICH_PERSON",
+      wtId
     },
-    (response) => {
-      enrichmentInProgress.delete(annotation.id);
-
-      if (!response || response.error) return;
-
-      applyEnrichment(annotation.id, response);
+    async (response) => {
+      try {
+        if (!response || response.error) return;
+        // add a timestamp so we know when it needs to be re-fetched
+        response.cachedAt = Date.now();
+        // store locally for this session
+        people[wtId] = response;
+        // store in person DB
+        await storageAPI.savePerson(wtId, response);
+        renderAnnotations();
+      } finally {
+        enrichmentInProgress.delete(wtId);
+      }
     }
   );
 }
 
-function applyEnrichment(annotationId, data) {
-  const annotation = annotations.find(a => a.id === annotationId);
-  if (!annotation) return;
-
-  annotation.name = data.name;
-  annotation.birth = data.birth;
-  annotation.death = data.death;
-  annotation.status = data.status;
-
-  saveAnnotationsForPage(annotations);
-  renderAnnotations();
-}
 
 // ============================================================
 // SECTION 12: RENDERING ANNOTATIONS
@@ -1035,35 +1074,42 @@ function applyEnrichment(annotationId, data) {
  * Syncs viewport, clears previous render, renders all boxes
  */
 async function renderAnnotations() {
-  const container = getViewerContainer();
-  if (!container) return;
+  if (renderInProgress) return;
+  renderInProgress = true;
 
-  // Always sync viewport first (prevents lag when zooming)
-  syncViewport();
+  try {
+    const container = getViewerContainer();
+    if (!container) return;
 
-  // Clear previous render
-  annotationLayer.innerHTML = "";
+    // Always sync viewport first (prevents lag when zooming)
+    syncViewport();
 
-  if (!showAnnotations) return;
+    // Clear previous render
+    annotationLayer.innerHTML = "";
 
-  // Load annotations for current page if not yet loaded
-  await loadAnnotationsIfNeeded();
+    if (!showAnnotations) return;
 
-  const vp = currentViewport;
-  if (!vp) return;
+    // Load annotations for current page if not yet loaded
+    await loadAnnotationsIfNeeded();
 
-  const rect = container.getBoundingClientRect();
+    const vp = currentViewport;
+    if (!vp) return;
 
-  // Render each annotation's boxes
-  annotations.forEach(a => {
-    if (a.status === "unknown") enrichAnnotation(a);
-    a.boxes.forEach((boxData, index) => {
-      renderBox(a, boxData, index);
+    //const rect = container.getBoundingClientRect();
+
+    // Render each annotation's boxes
+    annotations.forEach(a => {
+      a.boxes.forEach((boxData, index) => {
+        renderBox(a, boxData, index);
+      });
     });
-  });
 
-  updateSelectionStyles();
-  updateToolUI();
+    updateSelectionStyles();
+    updateToolUI();
+  
+  } finally {
+    renderInProgress = false;
+  }
 }
 
 /**
@@ -1107,7 +1153,7 @@ function renderBox(a, boxData, index) {
     // Highlight if this annotation matches incoming profile
     if (String(a.wtId) === String(incomingWtId)) {
       triggerRefHighlight(a.id);
-      // don't assume new annotations are for the incomig WikiTree ID if there's
+      // don't assume new annotations are for the incoming WikiTree ID if there's
       // already one for that ID
       preFillWtIdOnCreate = false;
     }
@@ -1137,7 +1183,7 @@ function renderBox(a, boxData, index) {
   box.dataset.annotationId = a.id;
   box.dataset.boxIndex = index;
 
-  if (a.status === "invalid") {
+  if (people[a.wtId]?.status === "invalid") {
     addInvalidBadge(box);
   }
 
@@ -1212,6 +1258,13 @@ function triggerRefHighlight(annotationId) {
  * Sets up DOM, event listeners, toolbar, etc.
  */
 function initOverlay() {
+  if (window.__wtOverlayDomInitialized) {
+    console.log("Overlay DOM already initialized");
+    return;
+  }
+
+  window.__wtOverlayDomInitialized = true;
+
   const container = getViewerContainer();
   if (!container) return;
 
@@ -1253,6 +1306,10 @@ function initOverlay() {
    */
 
   function createOverlayLayers() {
+    // remove any stale overlays first
+    document.getElementById("wt-toolbar")?.remove();
+    document.getElementById("wt-overlay")?.remove();
+    
     // Annotation layer: visual only, no interaction
     Object.assign(annotationLayer.style, {
       position: "absolute",
@@ -1351,8 +1408,3 @@ async function seedCurrentPageIfEmpty() {
     await saveAnnotationsForPage(annotations);
   }
 }
-
-
-
-
-waitForViewerReady();
