@@ -17,6 +17,7 @@ const localAdapter = {
     localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
   },
 
+  /*
   async updateAnnotation(id, patch) {
     const list = await this.getAnnotations();
 
@@ -26,6 +27,7 @@ const localAdapter = {
 
     await this.saveAnnotations(updated);
   },
+  */
 
   async getPeople() {
     const raw = localStorage.getItem(LOCAL_PEOPLE_KEY);
@@ -66,6 +68,7 @@ const chromeAdapter = {
     });
   },
 
+  /*
   async updateAnnotation(id, patch) {
     const list = await this.getAnnotations();
 
@@ -75,6 +78,7 @@ const chromeAdapter = {
 
     await this.saveAnnotations(updated);
   },
+  */
 
   async getPeople() {
     return new Promise(resolve => {
@@ -116,6 +120,7 @@ const serverAdapter = {
     });
   },
 
+  /*
   async updateAnnotation(id, patch) {
     await fetch(`/api/annotations/${id}`, {
       method: "PATCH",
@@ -123,6 +128,7 @@ const serverAdapter = {
       body: JSON.stringify(patch)
     });
   },
+  */
 
   async getPeople() {
     const res = await fetch("/api/people");
@@ -172,9 +178,11 @@ const storage = {
     return adapter.saveAnnotations(data);
   },
 
+  /*
   updateAnnotation(id, patch) {
     return adapter.updateAnnotation(id, patch);
   },
+  */
 
   getPeople() {
     return adapter.getPeople();

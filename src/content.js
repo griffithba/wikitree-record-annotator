@@ -890,7 +890,11 @@ async function onMouseUp(e) {
         annotation.note = note;
         annotations.push(annotation);
         await saveAnnotationsForPage(annotations);
-        enrichPersonData(wtId);
+        if (!people[wtId] || 
+            (people[wtId].status === "unknown") || 
+            (Date.now() - people[wtId].cachedAt > PERSON_CACHE_MAX_AGE_MS)) {
+          enrichPersonData(wtId);
+        }
         renderAnnotations();
         box.remove();
         box = null;
@@ -971,7 +975,7 @@ async function loadAnnotationsIfNeeded() {
     }
   });
 
-  if (saveNeeded) await saveAnnotationsForPage();
+  if (saveNeeded) await saveAnnotationsForPage(annotations);
 
 }
 
