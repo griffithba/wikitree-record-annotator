@@ -19,17 +19,18 @@ An annotation record consists of the following fields:
  * url:       // URL of the record, populated at creation
  * reference: // description of the record, pulled from page at creation
  * boxes:     // 1 to n boxes, described as {x, y, w, h} in image space, populated at creation
- * wtId:      // WikiTree ID of linked profile, input by user at creation, validated in background after creation
- * name:      // name of person, populated in the background after creation
- * birth:     // birth year, populated in the background after creation
- * death:     // death year, populated in the background after creation
+ * wtId:      // WikiTree ID of linked profile, input by user at creation
  * note:      // optional note to be displayed on mouse-over, input by user at creation
- * status:    // "unknown | verified | invalid" set to unknown at creation, updated in background
 ```
-
+Person records are stored separately, indexed by WikiTree ID, and consist of the following fields. All of the fields are populated in the background after the first linked annotation is created, and updated by the Riksarkivet side of the extension (soon WikiTree also) if older than 2 weeks. 
+```
+ * name:      // name of person
+ * birth:     // birth year
+ * death:     // death year
+ * status:    // "unknown | verified | invalid"
+ * cachedAt:  // timestamp when last fetched from WikiTree
+```
 ## Planned features
-The name, birth, and death fields will be periodically checked/updated by the Riksarkivet and WikiTree sides of the extension.
-
 The ability to save and restore the entire annotation database to/from a file.
 
 The url and reference fields could be used to suggest a source citation for an annotated record if one does not already exist in the WikiTree profile.
