@@ -26,8 +26,11 @@ function getViewerContainer() {
  * Used as the key for storing/loading annotations per page
  * @returns {string} Page key (e.g., "P123_456")
  */
-function getPageKey() {
-  const match = window.location.href.match(/([A-Z]\d+_\d+)/);
+function getCurrentPageKey() {
+  return getPageKey(window.location.href)
+}
+function getPageKey(href) {
+  const match = href.match(/([A-Z]\d+_\d+)/);
   return match ? match[1] : "unknown";
 }
 

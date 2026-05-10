@@ -869,7 +869,7 @@ async function onMouseUp(e) {
     // Case 2: Creating new annotation
     const annotation = {
       id: crypto.randomUUID(),
-      page: getPageKey(),
+      page: getCurrentPageKey(),
       source: sourceSite,
       url: getCleanPageUrl(),
       reference: getReferenceFromPage(),
@@ -918,7 +918,7 @@ async function onMouseUp(e) {
  * @param {Array} pageAnnotations - Annotations to save for this page
  */
 async function saveAnnotationsForPage(pageAnnotations) {
-  const key = getPageKey();
+  const key = getCurrentPageKey();
 
   const all = await storageAPI.getAnnotations();
 
@@ -947,7 +947,7 @@ async function getAnnotationsByPage(pageKey) {
  * Lazy loads to avoid loading every page's annotations at startup
  */
 async function loadAnnotationsIfNeeded() {
-  const key = getPageKey();
+  const key = getCurrentPageKey();
 
   if (key === lastPageKey) return;  // Already loaded
   lastPageKey = key;
@@ -1406,7 +1406,7 @@ async function seedCurrentPageIfEmpty() {
   await loadAnnotationsIfNeeded();
 
   if (!annotations || annotations.length === 0) {
-    const pageKey = getPageKey();
+    const pageKey = getCurrentPageKey();
     annotations = sampleAnnotations.filter(a => a.page === pageKey);
 
     await saveAnnotationsForPage(annotations);
