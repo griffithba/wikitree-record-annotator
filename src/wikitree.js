@@ -4,21 +4,29 @@ const archiveProviders = [
 
 const wtId = getCurrentWtId();
 
-async function markCitations(){
+async function processCitationLinks() {
   const annotations = await storage.getAnnotations();
 
+  const profileAnnotations =
+    annotations.filter(a => a.wtId === wtId);
+
   const annotatedPages = new Set(
-    annotations
-    .filter(a => a.wtId === wtId)
-    .map(a => a.page)
+    profileAnnotations.map(a => a.page)
   );
 
+  const citedPages = new Set();
+
   archiveProviders.forEach(provider => {
-    const links = 
-      [...document.querySelectorAll(`a[href*="${provider.id}"]`)];
+    const links = [
+      ...document.querySelectorAll(
+        `a[href*="${provider.id}"]`
+      )
+    ];
 
     for (const link of links) {
       const key = provider.getPageKey(link.href);
+
+      citedPages.add(key);
 
       if (annotatedPages.has(key)) {
         addAnnotationMarker(link);
@@ -27,6 +35,32 @@ async function markCitations(){
       injectWtIdIntoCitationLink(link);
     }
   });
+
+  const missingAnnotations =
+    profileAnnotations.filter(a =>
+      !citedPages.has(a.page)
+    );
+
+  recommendMissingCitations(missingAnnotations);
+}
+
+
+function recommendMissingCitations(missingAnnotations) {
+  if (!missingAnnotations.length) return;
+
+  const button = document.createElement("button");
+
+  button.textContent =
+    `${missingAnnotations.length} citation suggestions`;
+
+  button.addEventListener("click", () => {
+    chrome.runtime.sendMessage({
+      type: "OPEN_SUGGESTION_WINDOW",
+      suggestions: missingAnnotations
+    });
+  });
+
+  document.body.append(button);
 }
 
 function injectWtIdIntoCitationLink(link) {
@@ -56,4 +90,4 @@ function getCurrentWtId() {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-markCitations();
+processCitationLinks();

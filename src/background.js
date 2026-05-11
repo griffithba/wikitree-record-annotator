@@ -21,6 +21,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true; // IMPORTANT: keeps message channel open
   }
+
+  if (message?.type === "OPEN_SUGGESTION_WINDOW") {
+
+    currentSuggestions = message.suggestions || [];
+
+    chrome.windows.create({
+      url: chrome.runtime.getURL("src/suggestions.html"),
+      type: "popup",
+      width: 450,
+      height: 700
+    });
+
+    return;
+  }
+
+  if (message?.type === "GET_SUGGESTIONS") {
+    sendResponse(currentSuggestions);
+    return;
+  }
+
 });
 
 

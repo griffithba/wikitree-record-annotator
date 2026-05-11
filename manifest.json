@@ -29,11 +29,29 @@
   "content_scripts": [
     {
       "matches": ["https://www.wikitree.com/wiki/*"],
-      "js": ["src/storage.js", "src/sites/riksarkivet.js", "src/wikitree.js"]
+      "js": [
+        "src/storage.js", 
+        "src/sites/riksarkivet.js", 
+        "src/wikitree.js"]
     },
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
-      "js": ["src/storage.js", "src/sampleAnnotations.js", "src/sites/riksarkivet.js", "src/content.js"]
+      "js": [
+        "src/storage.js", 
+        "src/sampleAnnotations.js", 
+        "src/sites/riksarkivet.js", 
+        "src/content.js"]
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/suggestions.html",
+        "src/suggestions.js"
+      ],
+      "matches": ["<all_urls>"]
     }
   ]
+
 }
