@@ -1,8 +1,10 @@
-const links = [...document.querySelectorAll('a[href*="riksarkivet"]')];
+const archiveProviders = [
+  riksarkivetProvider
+];
+
+const wtId = getCurrentWtId();
 
 async function markCitations(){
-  const wtId = getCurrentWtId();
-
   const annotations = await storage.getAnnotations();
 
   const annotatedPages = new Set(
@@ -11,14 +13,31 @@ async function markCitations(){
     .map(a => a.page)
   );
 
-  for (const link of links) {
-    const key = getPageKey(link.href);
+  archiveProviders.forEach(provider => {
+    const links = 
+      [...document.querySelectorAll(`a[href*="${provider.id}"]`)];
 
-    if (annotatedPages.has(key)) {
-      addAnnotationMarker(link);
+    for (const link of links) {
+      const key = provider.getPageKey(link.href);
+
+      if (annotatedPages.has(key)) {
+        addAnnotationMarker(link);
+      }
+
+      injectWtIdIntoCitationLink(link);
     }
-  }
+  });
 }
+
+function injectWtIdIntoCitationLink(link) {
+
+    const url = new URL(link.href);
+
+    url.searchParams.set("wtId", wtId);
+
+    link.href = url.toString();
+}
+
 
 function addAnnotationMarker(link) {
   const icon = document.createElement("span");
@@ -37,19 +56,4 @@ function getCurrentWtId() {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-
-function injectWtIdsIntoCitationLinks() {
-  const wtId = getCurrentWtId();
-  if (!wtId) return;
-
-  links.forEach(link => {
-    const url = new URL(link.href);
-
-    url.searchParams.set("wtId", wtId);
-
-    link.href = url.toString();
-  });
-}
-
-injectWtIdsIntoCitationLinks();
 markCitations();

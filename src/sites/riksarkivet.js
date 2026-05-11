@@ -1,5 +1,16 @@
 
-let sourceSite = "riksarkivet";
+const sourceSite = "riksarkivet";
+
+const riksarkivetProvider = {
+  id: sourceSite,
+
+  matchesUrl(url) {
+    return url.includes(sourceSite);
+  },
+  
+  getPageKey
+};
+
 
 /**
  * Waits for OpenSeadragon container to load, then initializes overlay
