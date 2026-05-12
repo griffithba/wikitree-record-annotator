@@ -49,7 +49,7 @@ function getPageKey(href) {
  * Extracts source reference text from page
  * @returns {string} source reference
  */
-function getReferenceFromPage() {
+async function getReferenceFromPage() {
   const items = document.querySelectorAll('.item');
 
   for (const item of items) {
@@ -69,6 +69,19 @@ function getReferenceFromPage() {
       text.includes(",") && text.length > 50;
 
     if (!looksLikeCitation) continue;
+
+    // Expand the text so we don't get a truncated version
+    const expandLink =
+      valueEl.querySelector('a.toggle.less');
+
+    if (expandLink) {
+
+      expandLink.click();
+
+      await new Promise(r =>
+        setTimeout(r, 50)
+      );
+    }
 
     const clone = valueEl.cloneNode(true);
     clone.querySelector('a.toggle')?.remove();
