@@ -48,19 +48,38 @@ async function processCitationLinks() {
 function recommendMissingCitations(missingAnnotations) {
   if (!missingAnnotations.length) return;
 
-  const button = document.createElement("button");
+  const sourcesHeader =
+    [...document.querySelectorAll("h2")]
+      .find(h =>
+        h.textContent.includes("Sources")
+      );
 
-  button.textContent =
-    `${missingAnnotations.length} citation suggestions`;
+  if (!sourcesHeader) return;  // do something else here
 
-  button.addEventListener("click", () => {
+  const icon = document.createElement("img");
+
+  icon.src = chrome.runtime.getURL("icons/icon32.png");
+
+  icon.title =
+    `${missingAnnotations.length} citation suggestions available`;
+
+  Object.assign(icon.style, {
+    width: "32px",
+    height: "32px",
+    marginLeft: "6px",
+    cursor: "pointer",
+    verticalAlign: "middle"
+  });
+  
+
+  icon.addEventListener("click", () => {
     chrome.runtime.sendMessage({
       type: "OPEN_SUGGESTION_WINDOW",
       suggestions: missingAnnotations
     });
   });
 
-  document.body.append(button);
+  sourcesHeader.appendChild(icon);
 }
 
 function injectWtIdIntoCitationLink(link) {
