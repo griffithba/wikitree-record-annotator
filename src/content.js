@@ -57,6 +57,7 @@ let addingBoxToAnnotationId = null;   // Non-null when adding box to existing an
 // Display and selection state
 let showAnnotations = true;           // Toggle visibility of all annotations
 let selectedAnnotationId = null;      // Currently selected annotation (for editing/resizing)
+let activeBoxIndex = null;            // Index of selected box
 
 // Page tracking for lazy loading
 let lastPageKey = null;               // Track current page to avoid redundant loads
@@ -335,9 +336,11 @@ function updateToolbarButtons() {
  * Selects an annotation by ID and updates UI
  * Shows toolbar and resize handles
  * @param {string} id - Annotation ID to select
+ * @param {number} index - Index of the box within the annotation
  */
-function selectAnnotation(id) {
+function selectAnnotation(id, index) {
   selectedAnnotationId = id;
+  activeBoxIndex = index;
   updateSelectionStyles();
 }
 
@@ -346,8 +349,8 @@ function selectAnnotation(id) {
  * Counterpart to selectAnnotation()
  */
 function clearSelection() {
-  console.log("Clearing selection");
   selectedAnnotationId = null;
+  activeBoxIndex = null;
   addingBoxToAnnotationId = null;
   updateSelectionStyles();
   closeWtEditor();
@@ -365,9 +368,13 @@ function updateSelectionStyles() {
     if (String(id) === String(selectedAnnotationId)) {
       box.classList.add("wt-selected");
       if (!toolbar) {
-        toolbar = createAnnotationToolbar(id);
-        box.appendChild(toolbar);
+        if (activeBoxIndex === Number(box.dataset.boxIndex)) {
+          toolbar = createAnnotationToolbar(id);
+          box.appendChild(toolbar);
+        } 
         addResizeHandles(box, id);
+      } else if (activeBoxIndex !== Number(box.dataset.boxIndex)) {
+          toolbar?.remove();
       }
     } else {
       box.classList.remove("wt-selected");
@@ -1163,12 +1170,17 @@ function renderBox(a, boxData, index) {
     }
   }
 
+  // Track annotation ID and box index for toolbar/resize operations
+  box.dataset.annotationId = a.id;
+  box.dataset.boxIndex = index;
+
   // Click handler: select in select mode, or open WikiTree profile
   box.addEventListener("click", (e) => {
     if (tool === "select") {
       e.stopPropagation();
       const id = box.dataset.annotationId;
-      selectAnnotation(id);
+      const boxIndex = Number(box.dataset.boxIndex);
+      selectAnnotation(id, boxIndex);
       return;
     }
 
@@ -1182,10 +1194,6 @@ function renderBox(a, boxData, index) {
       );
     }
   });
-
-  // Track annotation ID and box index for toolbar/resize operations
-  box.dataset.annotationId = a.id;
-  box.dataset.boxIndex = index;
 
   if (people[a.wtId]?.status === "invalid") {
     addInvalidBadge(box);
