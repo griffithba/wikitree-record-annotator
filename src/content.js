@@ -77,8 +77,6 @@ const highlightedAnnotations = new Set();
 // Resize state (when dragging resize handles)
 let resizing = null;
 
-const enrichmentInProgress = new Set();
-
 // ============================================================
 // SECTION 3: STYLES & CSS INJECTION
 // ============================================================
@@ -1057,29 +1055,21 @@ async function deleteAnnotation(id) {
  */
 async function enrichPersonData(wtId) {
 
-  if (enrichmentInProgress.has(wtId)) return;
-
-  enrichmentInProgress.add(wtId);
-
   chrome.runtime.sendMessage(
     {
       type: "ENRICH_PERSON",
       wtId
     },
     async (response) => {
-      try {
-        if (!response || response.error) return;
-        // add a timestamp so we know when it needs to be re-fetched
-        response.cachedAt = Date.now();
-        // store locally for this session
-        people[wtId] = response;
-        // store in person DB
-        await storageAPI.savePerson(wtId, response);
-        renderAnnotations();
-      } finally {
-        enrichmentInProgress.delete(wtId);
-      }
-    }
+      if (!response || response.error) return;
+      // add a timestamp so we know when it needs to be re-fetched
+      response.cachedAt = Date.now();
+      // store locally for this session
+      people[wtId] = response;
+      // store in person DB
+      await storageAPI.savePerson(wtId, response);
+      renderAnnotations();
+    } 
   );
 }
 

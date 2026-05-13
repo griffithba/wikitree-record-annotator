@@ -1,5 +1,7 @@
 // background.js (MV3 service worker)
 
+const enrichmentInProgress = new Map();
+
 // ============================================================
 // CONFIGURATION
 // ============================================================
@@ -45,25 +47,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
 async function handleEnrichment(wtId) {
-
-  const profile = await fetchWikiTreeProfile(wtId);
-
-  if (!profile) {
-    return {
-      status: "invalid",
-      wtId
-    };
+  if (enrichmentInProgress.has(wtId)) {
+    return enrichmentInProgress.get(wtId);
   }
 
-  return {
-    wtId,
-    status: "verified",
-    name: profile.name || null,
-    birth: profile.birthYear || null,
-    death: profile.deathYear || null
-  };
-}
+  const promise = (async () => {
+    try {
+      const profile = await fetchWikiTreeProfile(wtId);
 
+      if (!profile) {
+        return {
+          status: "invalid",
+          wtId
+        };
+      }
+
+      return {
+        wtId,
+        status: "verified",
+        name: profile.name || null,
+        birth: profile.birthYear || null,
+        death: profile.deathYear || null
+      };
+  } finally {
+      enrichmentInProgress.delete(wtId);
+    }
+  })();
+  
+  enrichmentInProgress.set(wtId, promise);
+  return promise;
+}
 
 async function fetchWikiTreeProfile(wtId) {
   try {
