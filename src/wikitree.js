@@ -93,13 +93,18 @@ function injectWtIdIntoCitationLink(link) {
 
 
 function addAnnotationMarker(link) {
-  const icon = document.createElement("span");
+  const icon = document.createElement("img");
 
-  icon.textContent = "✎";
-  icon.style.color = "limegreen";
-  icon.style.fontSize = "1.0em";
+  icon.src = chrome.runtime.getURL("icons/highlighter32.png");
+  icon.alt = "Annotated source";
   icon.title = "Source is annotated";
 
+  Object.assign(icon.style, {
+    width: "24px",
+    height: "24px",
+    marginLeft: "4px",
+    verticalAlign: "middle"
+  });
 
   link.after(icon);
 }
