@@ -1,4 +1,4 @@
-# wikitree-ref-overlays
+# WikiTree Record Annotator
 <img src="icons/icon128.png" align="left" width="128" height="128" style="margin-right: 15px;">
 
 This Chrome/Chromium browser extension overlays WikiTree-linked annotations directly onto online historical record images. It currently supports records hosted by the Swedish National Archives (Riksarkivet), but is designed to be expandable to other archive sites. Annotations are stored locally using Chrome storage, but the design could be extended to a future shared or collaborative storage model.<br clear="left"/>
@@ -8,10 +8,10 @@ Annotations appear as shaded boxes over the record image. Their size and positio
 
 A single annotation can have several highlighted boxes, which is useful if a person appears more than once on a record page, or if their name spans two lines. (See Anders Andersson in the screenshot.)
 
-![Screen shot](screenshots/screenshot.png)
+![Screen shot](screenshots/RA-screenshot.png)
 
 ## WikiTree integration
-On the WikiTree side, sources in a profile page are marked with a highlighter icon if that source has an annotation which is linked to the profile. Conversely, if an annotation exists in a source which is not cited in the profile, an icon next to the Sources header will serve as an indicator of that. Clicking the icon will bring up a list of the missing citations in a format that can be copied and pasted into the profile's edit page.  
+On the WikiTree side, sources in a profile page are marked with an icon <img src="icons/highlighter16.png"> if the source has an annotation which is linked to the profile. Conversely, if an annotation exists in a source which is not cited in the profile, an icon <img src="icons/icon16.png"> next to the Sources header will serve as an indicator of that. Clicking the icon will bring up a list of the missing citations in a format that can be copied and pasted into the profile's edit page.  
 
 ## Installation
 The extension currently requires manual installation and is not yet published in the Chrome Web Store.
