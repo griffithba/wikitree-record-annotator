@@ -106,6 +106,14 @@ function injectStyles() {
       transition: border 0.05s ease;
     }
 
+    .wt-annotation.wt-hover {
+      border: 4px solid lime;
+      background: rgba(0,255,0,0.1);
+      position: absolute;
+      pointer-events: auto;
+      transition: border 0.05s ease;
+    }
+
     .wt-annotation.wt-selected {
       border: 3px solid orange;
       background: rgba(255,165,0,0.15);
@@ -1193,6 +1201,34 @@ function renderBox(a, boxData, index) {
         "_blank"
       );
     }
+  });
+
+  box.addEventListener("mouseenter", () => {
+    if (tool === "draw" || tool === "select") return;
+
+    const id = box.dataset.annotationId;
+
+    document
+      .querySelectorAll(
+        `[data-annotation-id="${id}"]`
+      )
+      .forEach(el => {
+        el.classList.add("wt-hover");
+      });
+  });
+
+  box.addEventListener("mouseleave", () => {
+    if (tool === "draw" || tool === "select") return;
+
+    const id = box.dataset.annotationId;
+
+    document
+      .querySelectorAll(
+        `[data-annotation-id="${id}"]`
+      )
+      .forEach(el => {
+        el.classList.remove("wt-hover");
+      });
   });
 
   if (people[a.wtId]?.status === "invalid") {
