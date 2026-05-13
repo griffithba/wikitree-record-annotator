@@ -885,7 +885,7 @@ async function onMouseUp(e) {
       page: getCurrentPageKey(),
       source: sourceSite,
       url: getCleanPageUrl(),
-      reference: getReferenceFromPage(),
+      reference: await getReferenceFromPage(),
       boxes: [newBox],
       wtId: null,
       note: null, 

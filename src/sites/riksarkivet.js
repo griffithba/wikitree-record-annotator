@@ -41,7 +41,7 @@ function getCurrentPageKey() {
   return getPageKey(window.location.href)
 }
 function getPageKey(href) {
-  const match = href.match(/([A-Z]\d+_\d+)/);
+  const match = href.match(/\/bildvisning\/([^/?#]+)/i);
   return match ? match[1] : "unknown";
 }
 

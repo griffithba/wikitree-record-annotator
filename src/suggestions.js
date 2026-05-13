@@ -14,7 +14,7 @@ chrome.runtime.sendMessage(
     const header = document.createElement("h2");
 
     header.textContent = 
-    `${suggestions[1].wtId} is annotated in the following sources which are not cited in their profile:`;
+    `${suggestions[0].wtId} is annotated in the following sources which are not cited in their profile:`;
 
     container.appendChild(header);
 
