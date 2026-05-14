@@ -388,7 +388,7 @@ function updateSelectionStyles() {
 }
 
 /**
- * Creates toolbar with +, ✏️, 🗑️ buttons for selected annotation
+ * Creates toolbar with ➕, ✏️, 🗑️ buttons for selected annotation
  * @param {string} id - Annotation ID
  * @returns {HTMLElement} Toolbar div
  */
@@ -397,7 +397,7 @@ function createAnnotationToolbar(id) {
   toolbar.className = "annotation-toolbar";
 
   const addBtn = document.createElement("button");
-  addBtn.textContent = "+";
+  addBtn.textContent = "➕";
   addBtn.title = "Add box";
 
   const editBtn = document.createElement("button");
@@ -408,7 +408,7 @@ function createAnnotationToolbar(id) {
   deleteBtn.textContent = "🗑️";
   deleteBtn.title = "Delete";
 
-  // "+" button: toggle "add box to annotation" mode
+  // "➕" button: toggle "add box to annotation" mode
   addBtn.onclick = (e) => {
     e.stopPropagation();
 
