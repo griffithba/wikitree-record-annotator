@@ -13,11 +13,11 @@ const enrichmentInProgress = new Map();
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // We may respond asynchronously
-  if (message?.type === "ENRICH_PERSON") {
+  if (message?.type === "FETCH_PERSON") {
     handleEnrichment(message.wtId)
       .then(sendResponse)
       .catch(err => {
-        console.error("Enrichment failed:", err);
+        console.error("WT API fetch failed:", err);
         sendResponse({ error: true });
       });
 
