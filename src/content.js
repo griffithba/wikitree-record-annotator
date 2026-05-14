@@ -13,7 +13,8 @@ if (window.__wtOverlayInitialized) {
 // ============================================================
 // SECTION 1: INITIALIZATION & DOM SETUP
 // ============================================================
-const storageAPI = window.storage;
+//const storageAPI = window.storage;
+//const personAPI = window.personAPI;
 
 // Transparent interaction layer (captures mouse input)
 const overlay = document.createElement("div");
@@ -22,12 +23,6 @@ overlay.id = "wt-overlay";
 // Visual layer for rendered annotations
 const annotationLayer = document.createElement("div");
 annotationLayer.id = "wt-annotation-layer";
-
-// Cache expiration time (in milliseconds)
-// Set to 14 days: 14 * 24 * 60 * 60 * 1000
-const days = 14;
-const PERSON_CACHE_MAX_AGE_MS = days * 24 * 60 * 60 * 1000;
-
 
 // ============================================================
 // SECTION 2: STATE MANAGEMENT
@@ -39,8 +34,7 @@ let currentViewport = null;           // {x,y,w,h} from URL hash (IIIF image spa
 
 // Annotations array (stored in IMAGE SPACE coordinates)
 let annotations = [];
-let people = {};
-let peopleLoaded = false;
+//let people = {};
 
 let renderInProgress = false;
 
@@ -218,7 +212,7 @@ function getWtIdFromUrl() {
  */
 function buildTooltip(a) {
 
-  let person = people[a.wtId];
+  const person = personAPI.getCachedPerson(a.wtId);
   let text = a.wtId;
 
   if (person && (person.name || person.birth || person.death)) {
@@ -903,11 +897,7 @@ async function onMouseUp(e) {
         annotation.note = note;
         annotations.push(annotation);
         await saveAnnotationsForPage(annotations);
-        if (!people[wtId] || 
-            (people[wtId].status === "unknown") || 
-            (Date.now() - people[wtId].cachedAt > PERSON_CACHE_MAX_AGE_MS)) {
-          enrichPersonData(wtId);
-        }
+        await personAPI.prefetchPerson(wtId); // pre-fetch person data for this ID
         renderAnnotations();
         box.remove();
         box = null;
@@ -970,8 +960,6 @@ async function loadAnnotationsIfNeeded() {
   // only store annotations specific to this page
   annotations = all.filter(a => a.page === key);
 
-  people = await storageAPI.getPeople();
-
   let saveNeeded = false;
 
   // loop through annotations making sure their people are fresh
@@ -981,14 +969,14 @@ async function loadAnnotationsIfNeeded() {
     if (a.birth) {delete a.birth; saveNeeded = true;}
     if (a.death) {delete a.death; saveNeeded = true;}
     if (a.status) {delete a.status; saveNeeded = true;}
-
-    let person = people[a.wtId];
-    if (!person || (person.status === "unknown") || (Date.now() - person.cachedAt > PERSON_CACHE_MAX_AGE_MS)) {
-      enrichPersonData(a.wtId);
-    }
   });
+    
+  // pre-fetch person data for all IDs simultaneously
+  const tasks = annotations.map(a => personAPI.prefetchPerson(a.wtId)); 
+    
+  if (saveNeeded) tasks.push(saveAnnotationsForPage(annotations));
 
-  if (saveNeeded) await saveAnnotationsForPage(annotations);
+  await Promise.all(tasks);
 
 }
 
@@ -996,23 +984,6 @@ async function loadAnnotationsIfNeeded() {
 // ============================================================
 // SECTION 11: ANNOTATION OPERATIONS (ADD/DELETE)
 // ============================================================
-
-/**
- * Adds a new box to an existing annotation
- * (Also called via toolbar "+" button)
- * @param {Object} newBox - Box coordinates {x, y, w, h} in image space
- */
-/*
-async function addBoxToSelected(newBox) {
-  const a = getAnnotationById(selectedAnnotationId);
-  if (!a) return;
-
-  a.boxes.push(newBox);
-
-  await saveAnnotationsForPage(annotations);
-  renderAnnotations();
-}
-  */
 
 /**
  * Deletes a specific box from an annotation
@@ -1046,31 +1017,6 @@ async function deleteAnnotation(id) {
   await saveAnnotationsForPage(annotations);
   if (selectedAnnotationId === id) clearSelection();
   renderAnnotations();
-}
-
-
-/**
- * Requests WikiTree enrichment from background script
- * and applies returned data to the annotation.
- */
-async function enrichPersonData(wtId) {
-
-  chrome.runtime.sendMessage(
-    {
-      type: "ENRICH_PERSON",
-      wtId
-    },
-    async (response) => {
-      if (!response || response.error) return;
-      // add a timestamp so we know when it needs to be re-fetched
-      response.cachedAt = Date.now();
-      // store locally for this session
-      people[wtId] = response;
-      // store in person DB
-      await storageAPI.savePerson(wtId, response);
-      renderAnnotations();
-    } 
-  );
 }
 
 
@@ -1221,9 +1167,10 @@ function renderBox(a, boxData, index) {
       });
   });
 
-  if (people[a.wtId]?.status === "invalid") {
+  
+  if (personAPI.getCachedPerson(a.wtId)?.status === "invalid") {
     addInvalidBadge(box);
-  }
+  } 
 
   annotationLayer.appendChild(box);
 }

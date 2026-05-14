@@ -5,43 +5,28 @@ const people = new Map();
 const days = 14;
 const PERSON_CACHE_MAX_AGE_MS = days * 24 * 60 * 60 * 1000;
 
-async function initialize() {
-  // this should probably be done differently if we're using server based vs. local storage
+const storageAPI = window.storage;
 
-  // Fetch ALL of the people, not just ones with annotations on this page
-  const storedPeople = await storageAPI.getPeople();
-  people = new Map(Object.entries(storedPeople));
-}
 
 // get person data
-async function getPersonData(wtId) {
-  // retrieve person from in-memory cache
-  let person = people.get(wtId);
-
-  // if they aren't there
-  if (!person) {
-    // grab them from storage
-    person = await storageAPI.getPerson(wtId);
-    // if they were there then save them in cache
-    if (person) {
-      people.set(wtId, person);
-    }
+async function prefetchPerson(wtId) {
+  // fetch them from storage
+  person = await storageAPI.getPerson(wtId);
+  // if they were there then save them in cache
+  if (person) {
+    people.set(wtId, person);
   }
-
+  
   const stale =
     !person ||
     person.status !== "verified" ||
     Date.now() - person.cachedAt > PERSON_CACHE_MAX_AGE_MS;
 
-  if (!stale) {
-    return person;
-  }
-
-  const updatedPerson = await fetchPersonRecord(wtId);
-
-  people.set(wtId, updatedPerson);
-  
-  return updatedPerson;
+  if (stale) {
+    const updatedPerson = await fetchPersonRecord(wtId);
+    people.set(wtId, updatedPerson);
+    console.log("Person cache miss or stale - fetched from API:", wtId);
+  } else console.log("Person cache hit (verified & fresh):", wtId);
 }
 
 // Request that the person data be fetched from the WikiTree API
@@ -76,3 +61,15 @@ async function fetchPersonRecord(wtId) {
     );
   });
 }
+
+function getCachedPerson(wtId) {
+  return people.get(wtId);
+}
+
+
+const personAPI = {
+  prefetchPerson,
+  getCachedPerson
+}
+
+window.personAPI = personAPI;

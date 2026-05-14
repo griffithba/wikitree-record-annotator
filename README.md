@@ -43,7 +43,7 @@ An annotation record consists of the following fields:
 | `note`      | Optional annotation note                   |
 
 ## Person cache
-Person records are stored separately from annotations to avoid repeatedly fetching WikiTree data for profiles linked from multiple annotations. They are indexed by WikiTree ID, and consist of the fields below. All of the fields are populated in the background after the first linked annotation is created, and updated by the Riksarkivet side of the extension (soon WikiTree also) if older than 2 weeks. 
+Person records are stored separately from annotations to avoid repeatedly fetching WikiTree data for profiles linked from multiple annotations. They are indexed by WikiTree ID, and consist of the fields below. All of the fields are populated in the background after the first linked annotation is created, and updated by the archive and WikiTree sides of the extension if older than 2 weeks. 
 | Field      | Description                               |
 | ---------- | ----------------------------------------- |
 | `name`     | name of person                            |
