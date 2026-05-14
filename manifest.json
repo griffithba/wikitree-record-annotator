@@ -31,7 +31,6 @@
       "matches": ["https://www.wikitree.com/wiki/*"],
       "js": [
         "src/storage.js", 
-        "src/person.js",
         "src/sites/riksarkivet.js", 
         "src/wikitree.js"]
     },
