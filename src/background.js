@@ -1,6 +1,6 @@
 // background.js (MV3 service worker)
 
-const enrichmentInProgress = new Map();
+const fetchInProgress = new Map();
 
 // ============================================================
 // CONFIGURATION
@@ -9,12 +9,12 @@ const enrichmentInProgress = new Map();
 
 /**
  * Handles messages from content scripts (RA + WT pages)
- * and performs WikiTree enrichment operations.
+ * and performs WikiTree fetch operations.
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // We may respond asynchronously
   if (message?.type === "FETCH_PERSON") {
-    handleEnrichment(message.wtId)
+    handleApiFetch(message.wtId)
       .then(sendResponse)
       .catch(err => {
         console.error("WT API fetch failed:", err);
@@ -46,9 +46,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 
-async function handleEnrichment(wtId) {
-  if (enrichmentInProgress.has(wtId)) {
-    return enrichmentInProgress.get(wtId);
+async function handleApiFetch(wtId) {
+  if (fetchInProgress.has(wtId)) {
+    // return the earlier promise so all requests for the same wtId are awaiting the same promise
+    return fetchInProgress.get(wtId);
   }
 
   const promise = (async () => {
@@ -57,24 +58,26 @@ async function handleEnrichment(wtId) {
 
       if (!profile) {
         return {
-          status: "invalid",
-          wtId
+          ok: false, 
+          reason: "not_found"
         };
       }
 
       return {
-        wtId,
-        status: "verified",
-        name: profile.name || null,
-        birth: profile.birthYear || null,
-        death: profile.deathYear || null
+        ok: true, 
+        person: {
+          wtId,
+          name: profile.name || null,
+          birth: profile.birthYear || null,
+          death: profile.deathYear || null
+        }
       };
-  } finally {
-      enrichmentInProgress.delete(wtId);
+    } finally {
+      fetchInProgress.delete(wtId);
     }
   })();
   
-  enrichmentInProgress.set(wtId, promise);
+  fetchInProgress.set(wtId, promise);
   return promise;
 }
 
@@ -105,7 +108,7 @@ async function fetchWikiTreeProfile(wtId) {
     };
   } catch (e) {
     console.error("WT fetch error:", e);
-    return null;
+    throw e;
   }
 }
 
