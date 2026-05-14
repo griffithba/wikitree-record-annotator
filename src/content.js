@@ -961,23 +961,20 @@ async function loadAnnotationsIfNeeded() {
   if (key === lastPageKey) return;  // Already loaded
   lastPageKey = key;
 
-  const all = await storageAPI.getAnnotations();
-
   // only store annotations specific to this page
-  annotations = all.filter(a => a.page === key);
+  annotations = getAnnotationsByPage(key);
 
   let saveNeeded = false;
 
-  // loop through annotations making sure their people are fresh
+  // loop through annotations cleaning up from old format
   annotations.forEach(a => {
-    // clean up from old format
     if (a.name) {delete a.name; saveNeeded = true;}
     if (a.birth) {delete a.birth; saveNeeded = true;}
     if (a.death) {delete a.death; saveNeeded = true;}
     if (a.status) {delete a.status; saveNeeded = true;}
   });
     
-  // pre-fetch person data for all IDs simultaneously
+  // pre-fetch person data for all annotations simultaneously
   const tasks = annotations.map(a => {
     a.wtIdFound = personAPI.prefetchPerson(a.wtId); 
   });
@@ -985,7 +982,6 @@ async function loadAnnotationsIfNeeded() {
   if (saveNeeded) tasks.push(saveAnnotationsForPage(annotations));
 
   await Promise.all(tasks);
-
 }
 
 
