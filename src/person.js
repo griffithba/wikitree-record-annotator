@@ -14,18 +14,16 @@ async function prefetchPerson(wtId) {
         type: "FETCH_PERSON",
         wtId
       },
-
-      (response) => {
-        resolve(response);
+      resolve
       }
     );
   });
   
-  if (!response || response.error) {
+  if (!response?.ok) {
     return false;
   }
   
-  people.set(wtId, person);
+  people.set(wtId, response.person);
   return true;
 }
 
