@@ -2,7 +2,6 @@ const archiveProviders = [
   riksarkivetProvider
 ];
 
-let hasAnnotations = false;
 const wtId = getCurrentWtId();
 
 async function processCitationLinks() {
@@ -35,7 +34,6 @@ async function processCitationLinks() {
 
       if (annotatedPages.has(key)) {
         addAnnotationMarker(link);
-        hasAnnotations = true;
       }
 
       injectWtIdIntoCitationLink(link);
@@ -48,12 +46,6 @@ async function processCitationLinks() {
     );
 
   recommendMissingCitations(missingAnnotations);
-
-  if (hasAnnotations) {
-    console.log("This profile has annotated sources.");
-    // Force a prefetch to ensure the stored data is up-to-date
-    personAPI.prefetchPerson(wtId);
-  } else console.log("None of this profile's sources are annotated.");
 }
 
 
