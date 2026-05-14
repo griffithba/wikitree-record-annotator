@@ -13,7 +13,7 @@ if (window.__wtOverlayInitialized) {
 // ============================================================
 // SECTION 1: INITIALIZATION & DOM SETUP
 // ============================================================
-//const storageAPI = window.storage;
+const storageAPI = window.storage;
 //const personAPI = window.personAPI;
 
 // Transparent interaction layer (captures mouse input)
@@ -34,7 +34,6 @@ let currentViewport = null;           // {x,y,w,h} from URL hash (IIIF image spa
 
 // Annotations array (stored in IMAGE SPACE coordinates)
 let annotations = [];
-//let people = {};
 
 let renderInProgress = false;
 
@@ -211,13 +210,17 @@ function getWtIdFromUrl() {
  * @returns {string} Tooltip text
  */
 function buildTooltip(a) {
-
-  const person = personAPI.getCachedPerson(a.wtId);
   let text = a.wtId;
 
-  if (person && (person.name || person.birth || person.death)) {
-    const years = (person.birth || "") + "-" + (person.death || "");
-    text = `${person.name || a.wtId} (${years})`;
+  if (a.wtIdFound) {
+    const person = personAPI.getCachedPerson(a.wtId);
+
+    if (person && (person.name || person.birth || person.death)) {
+      const years = (person.birth || "") + "-" + (person.death || "");
+      text = `${person.name || a.wtId} (${years})`;
+    }
+  } else {
+    text += " not found";
   }
     
   if (a.note) {
@@ -601,11 +604,14 @@ function editAnnotation(id, screenX, screenY) {
   openWtEditor({
     x: screenX,
     y: screenY,
-    initialValue: annotation.wtId || "oops",
+    initialValue: annotation.wtId || "",
     initialNote: annotation.note || "",
 
     onSave: async ({wtId, note}) => {
-      annotation.wtId = wtId;
+      if (wtId !== annotation.wtId) {
+        annotation.wtId = wtId;
+        annotation.wtIdFound = await personAPI.prefetchPerson(annotation.wtId);
+      }
       annotation.note = note;
 
       await saveAnnotationsForPage(annotations);
@@ -883,7 +889,7 @@ async function onMouseUp(e) {
       boxes: [newBox],
       wtId: null,
       note: null, 
-      status: "unknown"
+      wtIdFound: null
     };
 
     // Prompt user for WikiTree ID
@@ -895,9 +901,9 @@ async function onMouseUp(e) {
       onSave: async ({wtId, note}) => {
         annotation.wtId = wtId;
         annotation.note = note;
+        annotation.wtIdFound = await personAPI.prefetchPerson(wtId); // pre-fetch person data for this ID
         annotations.push(annotation);
         await saveAnnotationsForPage(annotations);
-        await personAPI.prefetchPerson(wtId); // pre-fetch person data for this ID
         renderAnnotations();
         box.remove();
         box = null;
@@ -972,8 +978,10 @@ async function loadAnnotationsIfNeeded() {
   });
     
   // pre-fetch person data for all IDs simultaneously
-  const tasks = annotations.map(a => personAPI.prefetchPerson(a.wtId)); 
-    
+  const tasks = annotations.map(a => {
+    a.wtIdFound = personAPI.prefetchPerson(a.wtId); 
+  });
+
   if (saveNeeded) tasks.push(saveAnnotationsForPage(annotations));
 
   await Promise.all(tasks);
@@ -1049,8 +1057,6 @@ async function renderAnnotations() {
 
     const vp = currentViewport;
     if (!vp) return;
-
-    //const rect = container.getBoundingClientRect();
 
     // Render each annotation's boxes
     annotations.forEach(a => {
@@ -1166,9 +1172,8 @@ function renderBox(a, boxData, index) {
         el.classList.remove("wt-hover");
       });
   });
-
   
-  if (personAPI.getCachedPerson(a.wtId)?.status === "invalid") {
+  if (a.status === "invalid") {
     addInvalidBadge(box);
   } 
 
