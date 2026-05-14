@@ -40,5 +40,6 @@ An annotation record consists of the following fields:
 | `reference` | Citation/reference text                    |
 | `boxes`     | Annotation rectangles in image coordinates |
 | `wtId`      | Linked WikiTree ID                         |
+| `wtIdFound` | Prefetch success indicator (per session)   |
 | `note`      | Optional annotation note                   |
 
