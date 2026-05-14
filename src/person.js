@@ -5,28 +5,28 @@ const people = new Map();
 async function prefetchPerson(wtId) {
   // already cached
   if (people.has(wtId)) {
-    return;
+    return true;
   }
 
-  const person = await new Promise((resolve) => {
+  const response = await new Promise((resolve) => {
     chrome.runtime.sendMessage(
       {
-        type: "ENRICH_PERSON",
+        type: "FETCH_PERSON",
         wtId
       },
 
       (response) => {
-        if (!response || response.error) {
-          resolve(null);
-          return;
-        }
         resolve(response);
       }
     );
   });
-  if (person) {
-    people.set(wtId, person);
+  
+  if (!response || response.error) {
+    return false;
   }
+  
+  people.set(wtId, person);
+  return true;
 }
 
 // pull person data from the cache
