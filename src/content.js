@@ -17,6 +17,7 @@ const storageAPI = window.storageAPI;
 //const personAPI = window.personAPI;
 const themeAPI = window.themeAPI;
 const ui = window.ui;
+const tools = window.tools;
 
 // Transparent interaction layer (captures mouse input)
 const overlay = document.createElement("div");
@@ -46,7 +47,6 @@ let endX = 0, endY = 0;              // Box end (in overlay pixels)
 let box = null;                       // Temporary DOM element while dragging
 
 // Tool and interaction state
-let tool = null;                      // Active tool: null | "draw" | "select"
 let addingBoxToAnnotationId = null;   // Non-null when adding box to existing annotation
 
 // Display and selection state
@@ -510,7 +510,7 @@ function stopResize() {
  * Creates temporary DOM element that follows mouse
  */
 function onMouseDown(e) {
-  if (tool !== "draw" && !addingBoxToAnnotationId) return;
+  if (!tools.isDrawing() && !addingBoxToAnnotationId) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -538,7 +538,7 @@ function onMouseDown(e) {
  * Updates temporary box dimensions to follow cursor
  */
 function onMouseMove(e) {
-  if ((tool !== "draw" && !addingBoxToAnnotationId) || !isDragging || !box) return;
+  if ((!tools.isDrawing() && !addingBoxToAnnotationId) || !isDragging || !box) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -566,7 +566,7 @@ function onMouseMove(e) {
  * Either adds box to new annotation (prompts for WT ID) or existing annotation
  */
 async function onMouseUp(e) {
-  if ((tool !== "draw" && !addingBoxToAnnotationId) || !isDragging || !box) return;
+  if ((!tools.isDrawing() && !addingBoxToAnnotationId) || !isDragging || !box) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -858,7 +858,7 @@ function renderBox(a, boxData, index) {
 
   // Click handler: select in select mode, or open WikiTree profile
   box.addEventListener("click", (e) => {
-    if (tool === "select") {
+    if (tools.isSelecting()) {
       e.stopPropagation();
       const id = box.dataset.annotationId;
       const boxIndex = Number(box.dataset.boxIndex);
@@ -866,7 +866,7 @@ function renderBox(a, boxData, index) {
       return;
     }
 
-    if (tool === "draw") return;
+    if (tools.isDrawing()) return;
 
     // Default: click to open WikiTree profile
     if (a.wtId) {
@@ -878,7 +878,7 @@ function renderBox(a, boxData, index) {
   });
 
   box.addEventListener("mouseenter", () => {
-    if (tool === "draw" || tool === "select") return;
+    if (tools.isDrawing() || tools.isSelecting()) return;
 
     const id = box.dataset.annotationId;
 
@@ -892,7 +892,7 @@ function renderBox(a, boxData, index) {
   });
 
   box.addEventListener("mouseleave", () => {
-    if (tool === "draw" || tool === "select") return;
+    if (tools.isDrawing() || tools.isSelecting()) return;
 
     const id = box.dataset.annotationId;
 
@@ -1067,7 +1067,7 @@ function initOverlay() {
 
     // Container click: clear selection when clicking empty space
     container.addEventListener("click", (e) => {
-      if (tool !== "select" || addingBoxToAnnotationId) return;
+      if (!tools.isSelecting() || addingBoxToAnnotationId) return;
     
       // If click was on an annotation, ignore
       if (e.target.closest(".wt-annotation")) return;
