@@ -15,6 +15,8 @@ if (window.__wtOverlayInitialized) {
 // ============================================================
 const storageAPI = window.storageAPI;
 //const personAPI = window.personAPI;
+const themeAPI = window.themeAPI;
+const ui = window.ui;
 
 // Transparent interaction layer (captures mouse input)
 const overlay = document.createElement("div");
@@ -70,102 +72,6 @@ const highlightedAnnotations = new Set();
 // Resize state (when dragging resize handles)
 let resizing = null;
 
-// ============================================================
-// SECTION 3: STYLES & CSS INJECTION
-// ============================================================
-
-function injectStyles() {
-  if (document.getElementById("wt-styles")) return;
-
-  const style = document.createElement("style");
-  style.id = "wt-styles";
-
-  style.textContent = `
-    :root {
-      --wt-draw-overlay-bg: rgba(255,0,0,0.1);
-      --wt-draw-overlay-border: 2px solid red;
-      --wt-draw-bg: rgba(25, 0, 255, 0.1);
-      --wt-draw-border: 2px dashed red;
-      --wt-toolbar-bg: rgba(255, 171, 15, 0.85);
-    }
-  
-    .wt-annotation {
-      border: 2px solid lime;
-      background: rgba(0,255,0,0.1);
-      position: absolute;
-      pointer-events: auto;
-      transition: border 0.05s ease;
-    }
-
-    .wt-annotation.wt-hover {
-      border: 4px solid lime;
-      background: rgba(0,255,0,0.1);
-      position: absolute;
-      pointer-events: auto;
-      transition: border 0.05s ease;
-    }
-
-    .wt-annotation.wt-selected {
-      border: 3px solid orange;
-      background: rgba(255,165,0,0.15);
-    }
-      
-    .wt-ref-highlight {
-      animation: wtPulse 1.5s ease-out 5;
-    }
-
-    @keyframes wtPulse {
-      0%   { box-shadow: 0 0 0 0 rgba(255, 171, 15, 0.85); }
-      100% { box-shadow: 0 0 0 12px rgba(0,255,255,0); }
-    }
-
-    .annotation {
-      position: absolute;
-    }
-
-    .annotation-toolbar {
-      position: absolute;
-      top: -40px;
-      right: 0;
-
-      display: flex;
-      gap: 4px;
-
-      background: rgba(38, 35, 32, 0.8);
-      padding: 4px 6px;
-      border-radius: 6px;
-
-      z-index: 10;
-
-      pointer-events: auto;
-    }
-
-    .annotation-toolbar button {
-      background: transparent;
-      border: none;
-      color: white;
-      font-size: 18px;
-      cursor: pointer;
-    }
-
-    .resize-handle {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      background: white;
-      border: 2px solid black;
-      border-radius: 50%;
-      z-index: 20;
-    }
-
-    .resize-handle.nw { top: -6px; left: -6px; cursor: nwse-resize; }
-    .resize-handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
-    .resize-handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
-    .resize-handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
-    
-  `;
-  document.head.appendChild(style);
-}
 
 
 // ============================================================
@@ -232,106 +138,6 @@ function buildTooltip(a) {
 
 
 // ============================================================
-// SECTION 5: TOOL & MODE CONTROL
-// ============================================================
-
-/**
- * Switch between tools (draw/select) with toggle behavior
- * When switching away from "select", clears selection
- * @param {string} nextTool - Tool to switch to: "draw" | "select"
- */
-function setTool(nextTool) {
-  const prevTool = tool;
-  
-  // Toggle behavior: clicking same tool twice turns it off
-  tool = (tool === nextTool) ? null : nextTool;
-
-  // Clean up when leaving select mode
-  if (prevTool === "select" && tool !== "select") {
-    clearSelection();
-    closeWtEditor();
-  }
-
-  const isDraw = tool === "draw";
-
-  // Update overlay interaction
-  overlay.style.pointerEvents = isDraw ? "auto" : "none";
-  overlay.style.cursor = isDraw ? "crosshair" : "default";
-
-  // Auto-show annotations when entering draw mode
-  if (!showAnnotations && isDraw) {
-    showAnnotations = true;
-    renderAnnotations();
-  }
-
-  updateToolUI();
-  updateToolbarButtons();
-
-  // Visual feedback: tint overlay only in draw mode
-  overlay.style.background = isDraw ? "var(--wt-draw-overlay-bg)" : "transparent";
-  overlay.style.border = isDraw ? "var(--wt-draw-overlay-border)" : "none";
-}
-
-/**
- * Creates a button for tool selection
- * @param {string} label - Button label text
- * @param {string} toolName - Tool identifier ("draw" | "select")
- * @returns {HTMLElement} Button element
- */
-function makeToolButton(label, toolName) {
-  const btn = document.createElement("button");
-
-  btn.textContent = label;
-  btn.dataset.tool = toolName;
-
-  Object.assign(btn.style, {
-    padding: "6px 10px",
-    fontSize: "12px",
-    cursor: "pointer"
-  });
-
-  btn.addEventListener("click", () => setTool(toolName));
-
-  return btn;
-}
-
-/**
- * Updates cursor style on annotation boxes based on active tool
- */
-function updateToolUI() {
-  document.querySelectorAll(".wt-annotation").forEach(el => {
-    if (tool === "select") {
-      el.style.cursor = "pointer";
-      el.style.pointerEvents = "auto";
-    } else {
-      el.style.cursor = "default";
-      el.style.pointerEvents = "auto";
-    }
-  });
-
-  overlay.style.cursor =
-    tool === "draw" ? "crosshair" : "default";
-}
-
-/**
- * Updates toolbar button highlighting to show active tool
- */
-function updateToolbarButtons() {
-  document.querySelectorAll("#wt-toolbar button").forEach(btn => {
-    const btnTool = btn.dataset.tool;
-
-    if (btnTool && btnTool === tool) {
-      btn.style.background = "#c33";
-      btn.style.color = "white";
-    } else {
-      btn.style.background = "#eee";
-      btn.style.color = "black";
-    }
-  });
-}
-
-
-// ============================================================
 // SECTION 6: ANNOTATION SELECTION & DISPLAY
 // ============================================================
 
@@ -372,7 +178,7 @@ function updateSelectionStyles() {
       box.classList.add("wt-selected");
       if (!toolbar) {
         if (activeBoxIndex === Number(box.dataset.boxIndex)) {
-          toolbar = createAnnotationToolbar(id);
+          toolbar = ui.createAnnotationToolbar(id);
           box.appendChild(toolbar);
         } 
         addResizeHandles(box, id);
@@ -387,75 +193,6 @@ function updateSelectionStyles() {
   });
 }
 
-/**
- * Creates toolbar with ➕, ✏️, 🗑️ buttons for selected annotation
- * @param {string} id - Annotation ID
- * @returns {HTMLElement} Toolbar div
- */
-function createAnnotationToolbar(id) {
-  const toolbar = document.createElement("div");
-  toolbar.className = "annotation-toolbar";
-
-  const addBtn = document.createElement("button");
-  addBtn.textContent = "➕";
-  addBtn.title = "Add box";
-
-  const editBtn = document.createElement("button");
-  editBtn.textContent = "✏️";
-  editBtn.title = "Edit";
-
-  const deleteBtn = document.createElement("button");
-  deleteBtn.textContent = "🗑️";
-  deleteBtn.title = "Delete";
-
-  // "➕" button: toggle "add box to annotation" mode
-  addBtn.onclick = (e) => {
-    e.stopPropagation();
-
-    if (!selectedAnnotationId) return;
-
-    // Toggle behavior
-    addingBoxToAnnotationId = addingBoxToAnnotationId ? null : selectedAnnotationId;
-    overlay.style.pointerEvents = addingBoxToAnnotationId ? "auto" : "none";
-    overlay.style.cursor = addingBoxToAnnotationId ? "crosshair" : "default";
-  };
-  
-  // "✏️" button: open WT ID editor
-  editBtn.onclick = (e) => {
-    e.stopPropagation();
-    const box = e.target.closest(".wt-annotation");
-    if (!box) return;
-    const rect = box.getBoundingClientRect();
-    editAnnotation(id, rect.left + rect.width, rect.top + rect.height);
-  };
-
-  // "🗑️" button: delete with confirmation
-  deleteBtn.onclick = (e) => {
-    e.stopPropagation();
-
-    if (!deleteBtn.dataset.armed) {
-      // First click: arm for deletion
-      deleteBtn.dataset.armed = "true";
-      deleteBtn.textContent = "⚠";
-      deleteBtn.style.color = "yellow";
-      deleteBtn.style.fontsize = "22px";
-      deleteBtn.title = "Click again to delete";
-      return;
-    }
-
-    // Second click: execute deletion
-    const boxEl = deleteBtn.closest(".wt-annotation");
-    const annotationId = boxEl.dataset.annotationId;
-    const boxIndex = Number(boxEl.dataset.boxIndex);
-
-    const annotation = getAnnotationById(annotationId);
-
-    deleteBox(annotationId, boxIndex);
-  };
-
-  toolbar.append(addBtn, editBtn, deleteBtn);
-  return toolbar;
-}
 
 
 // ============================================================
@@ -1061,7 +798,7 @@ async function renderAnnotations() {
     });
 
     updateSelectionStyles();
-    updateToolUI();
+    ui.updateToolUI();
   
   } finally {
     renderInProgress = false;
@@ -1168,7 +905,7 @@ function renderBox(a, boxData, index) {
       });
   });
   
-  if (a.status === "invalid") {
+  if (!a.wtIdFound) {
     addInvalidBadge(box);
   } 
 
@@ -1266,7 +1003,7 @@ function initOverlay() {
   attachOverlayEvents();
   
   // Create the WikiTree annotation toolbar
-  createToolbar();
+  ui.createToolbar();
   
   // Create editor dialog
   createWtEditor();
@@ -1275,13 +1012,13 @@ function initOverlay() {
   initializeViewportTracking();
 
   // Inject CSS styles
-  injectStyles();
+  themeAPI.injectStyles();
 
   // Load seed data if empty, then render
   seedCurrentPageIfEmpty().then(() => {
     requestAnimationFrame(() => {
       renderAnnotations();
-      updateToolUI();
+      ui.updateToolUI();
     });
   });
 
@@ -1337,45 +1074,6 @@ function initOverlay() {
 
       clearSelection();
     });
-  }
-  
-  // create toolbar
-  function createToolbar() {
-    const toolbar = document.createElement("div");
-    toolbar.id = "wt-toolbar";
-
-    Object.assign(toolbar.style, {
-      position: "fixed",
-      top: "10px",
-      right: "40px",
-      zIndex: "100000",
-      display: "flex",
-      gap: "6px",
-      padding: "6px",
-      background: "var(--wt-toolbar-bg)",
-      borderRadius: "8px"
-    });
-    
-    // Add tool buttons to toolbar
-    toolbar.appendChild(makeToolButton("Draw", "draw"));
-    toolbar.appendChild(makeToolButton("Select", "select"));
-
-    // Button for toggling show/hide annotations
-    const toggleBtn = document.createElement("button");
-    // initial button label
-    toggleBtn.textContent = showAnnotations ? "Hide" : "Show";
-
-    toggleBtn.addEventListener("click", () => {
-      showAnnotations = !showAnnotations;
-      toggleBtn.textContent = showAnnotations ? "Hide" : "Show";
-      renderAnnotations();
-    });
-
-    // Add toggle button to toolbar
-    toolbar.appendChild(toggleBtn);
-
-    // attach the toolbar
-    document.body.appendChild(toolbar);
   }
 }
 
