@@ -14,7 +14,7 @@ const fetchInProgress = new Map();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // We may respond asynchronously
   if (message?.type === "FETCH_PERSON") {
-    handleApiFetch(message.wtId)
+    handleWtFetch(message.wtId)
       .then(sendResponse)
       .catch(err => {
         console.error("WT API fetch failed:", err);
@@ -46,7 +46,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 
-async function handleApiFetch(wtId) {
+async function handleWtFetch(wtId) {
   if (fetchInProgress.has(wtId)) {
     // return the earlier promise so all requests for the same wtId are awaiting the same promise
     return fetchInProgress.get(wtId);

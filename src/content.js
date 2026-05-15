@@ -13,7 +13,7 @@ if (window.__wtOverlayInitialized) {
 // ============================================================
 // SECTION 1: INITIALIZATION & DOM SETUP
 // ============================================================
-const storageAPI = window.storage;
+const storageAPI = window.storageAPI;
 //const personAPI = window.personAPI;
 
 // Transparent interaction layer (captures mouse input)
@@ -213,7 +213,7 @@ function buildTooltip(a) {
   let text = a.wtId;
 
   if (a.wtIdFound) {
-    const person = personAPI.getCachedPerson(a.wtId);
+    const person = personAPI.getCached(a.wtId);
 
     if (person && (person.name || person.birth || person.death)) {
       const years = (person.birth || "") + "-" + (person.death || "");
@@ -610,7 +610,7 @@ function editAnnotation(id, screenX, screenY) {
     onSave: async ({wtId, note}) => {
       if (wtId !== annotation.wtId) {
         annotation.wtId = wtId;
-        annotation.wtIdFound = await personAPI.prefetchPerson(annotation.wtId);
+        annotation.wtIdFound = await personAPI.prefetch(annotation.wtId);
       }
       annotation.note = note;
 
@@ -901,7 +901,7 @@ async function onMouseUp(e) {
       onSave: async ({wtId, note}) => {
         annotation.wtId = wtId;
         annotation.note = note;
-        annotation.wtIdFound = await personAPI.prefetchPerson(wtId); // pre-fetch person data for this ID
+        annotation.wtIdFound = await personAPI.prefetch(wtId); // pre-fetch person data for this ID
         annotations.push(annotation);
         await saveAnnotationsForPage(annotations);
         renderAnnotations();
@@ -962,10 +962,9 @@ async function loadAnnotationsIfNeeded() {
   lastPageKey = key;
 
   // only store annotations specific to this page
-  annotations = getAnnotationsByPage(key);
+  annotations = await getAnnotationsByPage(key);
 
   let saveNeeded = false;
-
   // loop through annotations cleaning up from old format
   annotations.forEach(a => {
     if (a.name) {delete a.name; saveNeeded = true;}
@@ -975,8 +974,8 @@ async function loadAnnotationsIfNeeded() {
   });
     
   // pre-fetch person data for all annotations simultaneously
-  const tasks = annotations.map(a => {
-    a.wtIdFound = personAPI.prefetchPerson(a.wtId); 
+  const tasks = annotations.map(async a => {
+    a.wtIdFound = await personAPI.prefetch(a.wtId); 
   });
 
   if (saveNeeded) tasks.push(saveAnnotationsForPage(annotations));

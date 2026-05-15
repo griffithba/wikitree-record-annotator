@@ -1,41 +1,42 @@
+(() => {
 
-const people = new Map();
+  const people = new Map();
 
-// load person data into cache
-async function prefetchPerson(wtId) {
-  // already cached
-  if (people.has(wtId)) {
+  // load person data into cache
+  async function prefetch(wtId) {
+    // already cached
+    if (people.has(wtId)) {
+      return true;
+    }
+
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "FETCH_PERSON",
+          wtId
+        },
+        resolve
+      );
+    });
+  
+    if (!response?.ok) {
+      return false;
+    }
+  
+    people.set(wtId, response.person);
     return true;
   }
 
-  const response = await new Promise((resolve) => {
-    chrome.runtime.sendMessage(
-      {
-        type: "FETCH_PERSON",
-        wtId
-      },
-      resolve
-      }
-    );
-  });
-  
-  if (!response?.ok) {
-    return false;
+  // pull person data from the cache
+  function getCached(wtId) {
+    return people.get(wtId);
   }
-  
-  people.set(wtId, response.person);
-  return true;
-}
-
-// pull person data from the cache
-function getCachedPerson(wtId) {
-  return people.get(wtId);
-}
 
 
-const personAPI = {
-  prefetchPerson,
-  getCachedPerson
-}
+  const personAPI = {
+    prefetch,
+    getCached
+  }
 
-window.personAPI = personAPI;
+  window.personAPI = personAPI;
+})();
