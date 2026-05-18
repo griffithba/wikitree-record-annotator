@@ -94,8 +94,7 @@
     `;
     document.head.appendChild(style);
   }
-  
-  const themeAPI = {injectStyles};
-  window.themeAPI = themeAPI;
+
+  window.theme = {injectStyles};
 
 })();

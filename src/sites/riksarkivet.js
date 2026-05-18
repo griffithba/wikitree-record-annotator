@@ -11,6 +11,7 @@ const riksarkivetProvider = {
   getPageKey
 };
 
+//const overlay = window.overlay;
 
 /**
  * Waits for OpenSeadragon container to load, then initializes overlay
@@ -136,12 +137,12 @@ function initializeViewportTracking() {
     const result = originalReplaceState.apply(this, args);
 
     requestAnimationFrame(() => {
-      renderAnnotations();
+      overlay.renderAnnotations();
     });
 
     return result;
   };
 
-  window.addEventListener("popstate", renderAnnotations);
+  window.addEventListener("popstate", overlay.renderAnnotations);
 }
 

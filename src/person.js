@@ -32,11 +32,9 @@
     return people.get(wtId);
   }
 
-
-  const personAPI = {
+  window.personAPI = {
     prefetch,
     getCached
   }
 
-  window.personAPI = personAPI;
 })();
