@@ -2,55 +2,55 @@
 (() => {
 
   // Transparent interaction layer (captures mouse input)
-  const overlay = document.createElement("div");
-  overlay.id = "wt-overlay";
+  const _overlay = document.createElement("div");
+  _overlay.id = "wt-overlay";
 
   // Visual layer for rendered annotations
-  const annotationLayer = document.createElement("div");
-  annotationLayer.id = "wt-annotation-layer";
+  const _annotationLayer = document.createElement("div");
+  _annotationLayer.id = "wt-annotation-layer";
 
-  let container = null;
+  let _container = null;
 
   function initialize(viewerContainer) {
 
-    container = viewerContainer;
+    _container = viewerContainer;
 
-    container.style.position = "relative";
+    _container.style.position = "relative";
   }
 
   function getContainer() {
-    return container;
+    return _container;
   }
 
 
-  let renderInProgress = false;
+  let _renderInProgress = false;
 
-  let visible = true;
+  let _visible = true;
 
   function setVisible(v) {
-    visible = v;
+    _visible = v;
     renderAnnotations();
   }
 
   function isVisible() {
-    return visible;
+    return _visible;
   }
 
 
   function setDrawingState(enabled) {
 
-    overlay.style.pointerEvents =
+    _overlay.style.pointerEvents =
       enabled ? "auto" : "none";
 
-    overlay.style.cursor =
+    _overlay.style.cursor =
       enabled ? "crosshair" : "default";
 
-    overlay.style.background =
+    _overlay.style.background =
       enabled
         ? "var(--wt-draw-overlay-bg)"
         : "transparent";
 
-    overlay.style.border =
+    _overlay.style.border =
       enabled
         ? "var(--wt-draw-overlay-border)"
         : "none";
@@ -72,7 +72,7 @@
             toolbar = ui.createAnnotationToolbar(id);
             box.appendChild(toolbar);
           } 
-          addResizeHandles(box, id);
+          tools.addResizeHandles(box, id);
         } else if (tools.getActiveBoxIndex() !== Number(box.dataset.boxIndex)) {
             toolbar?.remove();
         }
@@ -91,7 +91,7 @@
     document.getElementById("wt-overlay")?.remove();
     
     // Annotation layer: visual only, no interaction
-    Object.assign(annotationLayer.style, {
+    Object.assign(_annotationLayer.style, {
       position: "absolute",
       top: "0",
       left: "0",
@@ -101,7 +101,7 @@
     });
 
     // Overlay layer: interaction capture, no visuals
-    Object.assign(overlay.style, {
+    Object.assign(_overlay.style, {
       position: "absolute",
       top: "0",
       left: "0",
@@ -113,18 +113,18 @@
     });
 
     // Insert layers in order (annotation below overlay)
-    container.appendChild(annotationLayer);
-    container.appendChild(overlay);
+    _container.appendChild(_annotationLayer);
+    _container.appendChild(_overlay);
   }
 
   function attachEvents() {
     // Attach mouse event handlers
-    overlay.addEventListener("mousedown", tools.onMouseDown);
-    overlay.addEventListener("mousemove", tools.onMouseMove);
-    overlay.addEventListener("mouseup", tools.onMouseUp);
+    _overlay.addEventListener("mousedown", tools.onMouseDown);
+    _overlay.addEventListener("mousemove", tools.onMouseMove);
+    _overlay.addEventListener("mouseup", tools.onMouseUp);
 
     // Container click: clear selection when clicking empty space
-    container.addEventListener("click", (e) => {
+    _container.addEventListener("click", (e) => {
       if (!tools.isSelecting() || tools.isAddingBoxToAnnotationId()) return;
     
       // If click was on an annotation, ignore
@@ -143,17 +143,17 @@
    * Syncs viewport, clears previous render, renders all boxes
    */
   async function renderAnnotations() {
-    if (renderInProgress) return;
-    renderInProgress = true;
+    if (_renderInProgress) return;
+    _renderInProgress = true;
     try {
-      const container = getViewerContainer();
-      if (!container) return;
+      const _container = getViewerContainer();
+      if (!_container) return;
 
       // Always sync viewport first (prevents lag when zooming)
       syncViewport();
 
       // Clear previous render
-      annotationLayer.innerHTML = "";
+      _annotationLayer.innerHTML = "";
 
       if (!isVisible()) return;
 
@@ -168,7 +168,7 @@ console.log("Rendering annotations...");
       // Render each annotation's boxes
       annotationsAPI.getAnnotations().forEach(a => {
         a.boxes.forEach((boxData, index) => {
-          renderBox(a, boxData, index);
+          _renderBox(a, boxData, index);
         });
       });
 
@@ -176,7 +176,7 @@ console.log("Rendering annotations...");
       ui.updateToolUI();
   
     } finally {
-      renderInProgress = false;
+      _renderInProgress = false;
     }
   }
 
@@ -187,9 +187,9 @@ console.log("Rendering annotations...");
    * @param {Object} boxData - Box coordinates {x, y, w, h} in image space
    * @param {number} index - Box index within annotation
    */
-  function renderBox(a, boxData, index) {
+  function _renderBox(a, boxData, index) {
     const vp = currentViewport;
-    const rect = overlay.getBoundingClientRect();
+    const rect = _overlay.getBoundingClientRect();
 
     // STEP 1: Convert image space → viewport-relative → screen pixels
     // viewport-relative: how far through the viewport is this coordinate?
@@ -216,14 +216,14 @@ console.log("Rendering annotations...");
 
     // Set tooltip
     if (a.wtId) {
-      box.title = buildTooltip(a);
+      box.title = _buildTooltip(a);
 
       // Highlight if this annotation matches incoming profile
       if (String(a.wtId) === String(incomingWtId)) {
-        triggerRefHighlight(a.id);
-        // don't assume new annotations are for the incoming WikiTree ID if there's
+        _triggerRefHighlight(a.id);
+        // don't prefill new annotations with the incoming WikiTree ID if there's
         // already one for that ID
-        preFillWtIdOnCreate = false;
+        incomingWtId = null;
       }
     }
 
@@ -281,13 +281,41 @@ console.log("Rendering annotations...");
     });
   
     if (!a.wtIdFound) {
-      addInvalidBadge(box);
+      _addInvalidBadge(box);
     } 
 
-    annotationLayer.appendChild(box);
+    _annotationLayer.appendChild(box);
   }
 
-  function addInvalidBadge(boxEl) {
+  /**
+   * Builds HTML title/tooltip for an annotation
+   * Format: "Name (birth-death)" or WikiTree ID
+   * @param {Object} a - Annotation object
+   * @returns {string} Tooltip text
+   */
+  function _buildTooltip(a) {
+    let text = a.wtId;
+
+    if (a.wtIdFound) {
+      const person = personAPI.getCached(a.wtId);
+
+      if (person && (person.name || person.birth || person.death)) {
+        const years = (person.birth || "") + "-" + (person.death || "");
+        text = `${person.name || a.wtId} (${years})`;
+      }
+    } else {
+      text += " not found";
+    }
+    
+    if (a.note) {
+      text += "\n" + a.note;
+    }
+    
+    return text; 
+  }
+
+  
+  function _addInvalidBadge(boxEl) {
     const badge = document.createElement("div");
 
     badge.textContent = "⛓️‍💥";
@@ -303,6 +331,42 @@ console.log("Rendering annotations...");
     });
 
     boxEl.appendChild(badge);
+  }
+
+  /**
+   * Triggers pulse animation on annotation if it matches incoming WT profile
+   * Only highlights each annotation once, not on every re-render
+   * @param {string} annotationId - Annotation ID
+   */
+  function _triggerRefHighlight(annotationId) {
+    // Only highlight once per session
+    if (highlightedAnnotations.has(annotationId)) return; 
+
+    function start() {
+      highlightedAnnotations.add(annotationId);
+
+      // Highlight ALL boxes for this annotation
+      requestAnimationFrame(() => {
+        document.querySelectorAll(
+          `[data-annotation-id="${annotationId}"]`
+        ).forEach(box => {
+          box.classList.add("wt-ref-highlight");
+        });
+      });
+    }
+
+    // If tab is visible, highlight immediately
+    if (document.visibilityState === "visible") {
+      start();
+    } else {
+      // Tab in background: wait for it to become visible
+      const onVisible = () => {
+        document.removeEventListener("visibilitychange", onVisible);
+        start();
+      };
+
+      document.addEventListener("visibilitychange", onVisible);
+    }
   }
 
 
