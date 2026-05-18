@@ -6,8 +6,9 @@
 (() => {
   const tools = window.tools;
   const overlay = window.overlay;
+  
   // Dialog element for editing annotation WT ID and notes
-  let wtEditor = null;
+  let _wtEditor = null;
 
 
   function createToolbar() {
@@ -27,8 +28,8 @@
     });
     
     // Add tool buttons to toolbar
-    toolbar.appendChild(makeToolButton("Draw", "draw"));
-    toolbar.appendChild(makeToolButton("Select", "select"));
+    toolbar.appendChild(_makeToolButton("Draw", "draw"));
+    toolbar.appendChild(_makeToolButton("Select", "select"));
 
     // Button for toggling show/hide annotations
     const toggleBtn = document.createElement("button");
@@ -55,7 +56,7 @@
    * @param {string} toolName - Tool identifier ("draw" | "select")
    * @returns {HTMLElement} Button element
    */
-  function makeToolButton(label, toolName) {
+  function _makeToolButton(label, toolName) {
     const btn = document.createElement("button");
 
     btn.textContent = label;
@@ -70,7 +71,7 @@
     btn.addEventListener("click", () => {
       tools.setTool(toolName);
       updateToolUI();
-      updateToolbarButtons();
+      _updateToolbarButtons();
     });
 
     return btn;
@@ -98,7 +99,7 @@
   /**
    * Updates toolbar button highlighting to show active tool
    */
-  function updateToolbarButtons() {
+  function _updateToolbarButtons() {
     document.querySelectorAll("#wt-toolbar button").forEach(btn => {
       const btnTool = btn.dataset.tool;
 
@@ -123,9 +124,9 @@
    * Only called at init.
    */
   function createWtEditor() {
-    wtEditor = document.createElement("div");
+    _wtEditor = document.createElement("div");
 
-    Object.assign(wtEditor.style, {
+    Object.assign(_wtEditor.style, {
       position: "absolute",
       zIndex: 100001,
       background: "black",
@@ -137,7 +138,7 @@
       gap: "4px"
     });
 
-    wtEditor.innerHTML = `
+    _wtEditor.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:4px; font-family: Arial, sans-serif;">
       <div style="display:flex; align-items:center; gap:6px;">
         <span>WikiTree ID:</span>
@@ -157,12 +158,12 @@
       <div id="wt-error" style="color:red; font-size:11px;"></div>
     </div>  `;
   
-    document.body.appendChild(wtEditor);
+    document.body.appendChild(_wtEditor);
 
-    const input = wtEditor.querySelector("#wt-input");
-    const noteInput = wtEditor.querySelector("#wt-note");
-    const saveBtn = wtEditor.querySelector("#wt-save");
-    const cancelBtn = wtEditor.querySelector("#wt-cancel");
+    const input = _wtEditor.querySelector("#wt-input");
+    const noteInput = _wtEditor.querySelector("#wt-note");
+    const saveBtn = _wtEditor.querySelector("#wt-save");
+    const cancelBtn = _wtEditor.querySelector("#wt-cancel");
 
     // Handle Enter/Escape in input fields
     input.addEventListener("keydown", (e) => {
@@ -175,7 +176,7 @@
     });
 
     // Prevent dialog from being dragged away
-    wtEditor.addEventListener("mousedown", e => e.stopPropagation()); 
+    _wtEditor.addEventListener("mousedown", e => e.stopPropagation()); 
   }
 
   /**
@@ -183,7 +184,7 @@
    * @param {string} id - Potential WikiTree ID
    * @returns {boolean} True if format is valid
    */
-  function isPlausibleWtId(id) {
+  function _isPlausibleWtId(id) {
     return /^\p{L}+-\d+$/u.test(id);
   }
 
@@ -200,15 +201,15 @@
   function openWtEditor(
       { x, y, initialValue = "", initialNote = "", onSave, onCancel }) 
     {
-      const input = wtEditor.querySelector("#wt-input");
-      const noteInput = wtEditor.querySelector("#wt-note");
-      const saveBtn = wtEditor.querySelector("#wt-save");
-      const cancelBtn = wtEditor.querySelector("#wt-cancel");
-      const errorEl = wtEditor.querySelector("#wt-error");
+      const input = _wtEditor.querySelector("#wt-input");
+      const noteInput = _wtEditor.querySelector("#wt-note");
+      const saveBtn = _wtEditor.querySelector("#wt-save");
+      const cancelBtn = _wtEditor.querySelector("#wt-cancel");
+      const errorEl = _wtEditor.querySelector("#wt-error");
 
-      wtEditor.style.left = x + "px";
-      wtEditor.style.top = y + "px";
-      wtEditor.style.display = "flex";
+      _wtEditor.style.left = x + "px";
+      _wtEditor.style.top = y + "px";
+      _wtEditor.style.display = "flex";
 
       input.value = initialValue;
       input.focus();
@@ -216,7 +217,7 @@
 
       // Cleanup helper
       function cleanup() {
-        wtEditor.style.display = "none";
+        _wtEditor.style.display = "none";
         saveBtn.onclick = null;
         cancelBtn.onclick = null;
       }
@@ -230,7 +231,7 @@
           return;
         }
 
-        if (!isPlausibleWtId(value)) {
+        if (!_isPlausibleWtId(value)) {
           errorEl.textContent = "Invalid format (e.g., Smith-123)";
           return;
         }
@@ -250,8 +251,8 @@
    * Closes the WT ID/note editor dialog
    */
   function closeWtEditor() {
-    if (wtEditor) {
-      wtEditor.style.display = "none";
+    if (_wtEditor) {
+      _wtEditor.style.display = "none";
     }
   }
 
@@ -301,7 +302,7 @@
       const box = e.target.closest(".wt-annotation");
       if (!box) return;
       const rect = box.getBoundingClientRect();
-      editAnnotation(id, rect.left + rect.width, rect.top + rect.height);
+      tools.editAnnotation(id, rect.left + rect.width, rect.top + rect.height);
     };
 
     // "🗑️" button: delete with confirmation
