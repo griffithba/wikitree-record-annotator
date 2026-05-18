@@ -1,36 +1,31 @@
 (() => {
 
   let currentTool = null;               // Active tool: null | "draw" | "select"
-  
   function getTool() {
     return currentTool;
   }
-
   function isDrawing() {
     return currentTool === "draw";
   }
-
   function isSelecting() {
     return currentTool === "select";
   }
 
+  let addingBoxToAnnotationId = null;   // Non-null when adding box to existing annotation
   function isAddingBoxToAnnotationId() {
     return addingBoxToAnnotationId;
   }
 
-  // Display and selection state
   let selectedAnnotationId = null;      // Currently selected annotation (for editing/resizing)
-  let activeBoxIndex = null;            // Index of selected box
-
   function getSelectedAnnotationId() {
     return selectedAnnotationId;
   }
 
+  let activeBoxIndex = null;            // Index of selected box
   function getActiveBoxIndex() {
     return activeBoxIndex;
   }
 
-  let addingBoxToAnnotationId = null;   // Non-null when adding box to existing annotation
 
   // ============================================================
   // ANNOTATION SELECTION & DISPLAY
@@ -62,7 +57,7 @@
 
 
   // ============================================================
-  // SECTION 9: MOUSE HANDLERS (DRAWING BOXES)
+  // MOUSE HANDLERS (DRAWING BOXES)
   // ============================================================
 
   /**
@@ -154,12 +149,12 @@
 
     if (addingBoxToAnnotationId) {
       // Case 1: Adding box to existing annotation
-      const annotation = getAnnotationById(selectedAnnotationId);
+      const annotation = annotationsAPI.getAnnotationById(selectedAnnotationId);
       if (!annotation) return;
 
       annotation.boxes.push(newBox);
 
-      await saveAnnotationsForPage(annotations);
+      await annotationsAPI.saveAnnotationsForPage(annotations);
       renderAnnotations();
 
       box.remove();
@@ -200,8 +195,8 @@
           annotation.note = note;
           annotation.wtIdFound = await personAPI.prefetch(wtId); // pre-fetch person data for this ID
           annotations.push(annotation);
-          await saveAnnotationsForPage(annotations);
-          renderAnnotations();
+          await annotationsAPI.saveAnnotationsForPage(annotations);
+          overlay.renderAnnotations();
           box.remove();
           box = null;
         },
@@ -212,6 +207,11 @@
       });
     }
   }
+
+  
+  // ============================================================
+  // 
+  // ============================================================
 
   /**
    * Opens editor to modify WT ID and note for an existing annotation
@@ -243,7 +243,6 @@
   }
 
 
-
   /**
    * Switch between tools (draw/select) with toggle behavior
    * When switching away from "select", clears selection
@@ -263,18 +262,10 @@
 
     overlay.setDrawingState(isDrawing());
 
-    // Update overlay interaction
-    //overlay.style.pointerEvents = isDrawing() ? "auto" : "none";
-    //overlay.style.cursor = isDrawing() ? "crosshair" : "default";
-
     // Auto-show annotations when entering draw mode
     if (!overlay.isVisible() && isDrawing()) {
       overlay.setVisible(true);
     }
-
-    // Visual feedback: tint overlay only in draw mode
-    //overlay.style.background = isDrawing() ? "var(--wt-draw-overlay-bg)" : "transparent";
-    //overlay.style.border = isDrawing() ? "var(--wt-draw-overlay-border)" : "none";
   }
 
   window.tools = {
