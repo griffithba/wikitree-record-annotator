@@ -1,31 +1,37 @@
 (() => {
 
-  let currentTool = null;               // Active tool: null | "draw" | "select"
+  let _currentTool = null;               // Active tool: null | "draw" | "select"
   function getTool() {
-    return currentTool;
+    return _currentTool;
   }
   function isDrawing() {
-    return currentTool === "draw";
+    return _currentTool === "draw";
   }
   function isSelecting() {
-    return currentTool === "select";
+    return _currentTool === "select";
   }
 
-  let addingBoxToAnnotationId = null;   // Non-null when adding box to existing annotation
+  let _addingBoxToAnnotationId = null;   // Non-null when adding box to existing annotation
   function isAddingBoxToAnnotationId() {
-    return addingBoxToAnnotationId;
+    return _addingBoxToAnnotationId;
   }
 
-  let selectedAnnotationId = null;      // Currently selected annotation (for editing/resizing)
+  let _selectedAnnotationId = null;      // Currently selected annotation (for editing/resizing)
   function getSelectedAnnotationId() {
-    return selectedAnnotationId;
+    return _selectedAnnotationId;
   }
 
-  let activeBoxIndex = null;            // Index of selected box
+  let _activeBoxIndex = null;            // Index of selected box
   function getActiveBoxIndex() {
-    return activeBoxIndex;
+    return _activeBoxIndex;
   }
 
+   // Drawing/drag state for box creation
+  let _isDragging = false;               // Currently drawing a box
+  let _startX = 0, _startY = 0;           // Box start (in overlay pixels)
+  let _endX = 0, _endY = 0;               // Box end (in overlay pixels)
+  let _box = null;                       // Temporary DOM element while dragging
+  let _resizing = null;                  // Resize state (when dragging resize handles)
 
   // ============================================================
   // ANNOTATION SELECTION & DISPLAY
@@ -38,8 +44,8 @@
    * @param {number} index - Index of the box within the annotation
    */
   function selectAnnotation(id, index) {
-    selectedAnnotationId = id;
-    activeBoxIndex = index;
+    _selectedAnnotationId = id;
+    _activeBoxIndex = index;
     overlay.updateSelectionStyles();
   }
 
@@ -48,9 +54,9 @@
    * Counterpart to selectAnnotation()
    */
   function clearSelection() {
-    selectedAnnotationId = null;
-    activeBoxIndex = null;
-    addingBoxToAnnotationId = null;
+    _selectedAnnotationId = null;
+    _activeBoxIndex = null;
+    _addingBoxToAnnotationId = null;
     overlay.updateSelectionStyles();
     ui.closeWtEditor();
   }
@@ -70,22 +76,22 @@
     e.preventDefault();
     e.stopPropagation();
 
-    isDragging = true;
+    _isDragging = true;
 
     const rect = overlay.getBoundingClientRect();
 
     // Record starting point in overlay pixel space
-    startX = e.clientX - rect.left;
-    startY = e.clientY - rect.top;
+    _startX = e.clientX - rect.left;
+    _startY = e.clientY - rect.top;
 
     // Create temporary visual feedback box
-    box = document.createElement("div");
-    box.style.position = "absolute";
-    box.style.border = "var(--wt-draw-border)";
-    box.style.background = "var(--wt-draw-bg)";
-    box.style.pointerEvents = "none";
+    _box = document.createElement("div");
+    _box.style.position = "absolute";
+    _box.style.border = "var(--wt-draw-border)";
+    _box.style.background = "var(--wt-draw-bg)";
+    _box.style.pointerEvents = "none";
 
-    annotationLayer.appendChild(box);
+    annotationLayer.appendChild(_box);
   }
 
   /**
@@ -93,7 +99,7 @@
    * Updates temporary box dimensions to follow cursor
    */
   function onMouseMove(e) {
-    if ((isDrawing() && !addingBoxToAnnotationId) || !isDragging || !box) return;
+    if ((isDrawing() && !isAddingBoxToAnnotationId()) || !_isDragging || !_box) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -101,19 +107,19 @@
     const rect = overlay.getBoundingClientRect();
 
     // Current mouse position in overlay space
-    endX = e.clientX - rect.left;
-    endY = e.clientY - rect.top;
+    _endX = e.clientX - rect.left;
+    _endY = e.clientY - rect.top;
 
     // Normalize for drawing in any direction
-    const left = Math.min(startX, endX);
-    const top = Math.min(startY, endY);
-    const width = Math.abs(endX - startX);
-    const height = Math.abs(endY - startY);
+    const left = Math.min(_startX, _endX);
+    const top = Math.min(_startY, _endY);
+    const width = Math.abs(_endX - _startX);
+    const height = Math.abs(_endY - _startY);
 
-    box.style.left = left + "px";
-    box.style.top = top + "px";
-    box.style.width = width + "px";
-    box.style.height = height + "px";
+    _box.style.left = left + "px";
+    _box.style.top = top + "px";
+    _box.style.width = width + "px";
+    _box.style.height = height + "px";
   }
 
   /**
@@ -121,12 +127,12 @@
    * Either adds box to new annotation (prompts for WT ID) or existing annotation
    */
   async function onMouseUp(e) {
-    if ((isDrawing() && !addingBoxToAnnotationId) || !isDragging || !box) return;
+    if ((isDrawing() && !isAddingBoxToAnnotationId()) || !_isDragging || !_box) return;
 
     e.preventDefault();
     e.stopPropagation();
 
-    isDragging = false;
+    _isDragging = false;
 
     const overlayRect = overlay.getBoundingClientRect();
     const vp = currentViewport;
@@ -134,10 +140,10 @@
 
     // STEP 1: Convert overlay pixels to image space
     // Formula: imageCoord = viewport.origin + (screenPixel / screenSize) * viewport.size
-    const x1 = vp.x + (startX / overlayRect.width) * vp.w;
-    const y1 = vp.y + (startY / overlayRect.height) * vp.h;
-    const x2 = vp.x + (endX / overlayRect.width) * vp.w;
-    const y2 = vp.y + (endY / overlayRect.height) * vp.h;
+    const x1 = vp.x + (_startX / overlayRect.width) * vp.w;
+    const y1 = vp.y + (_startY / overlayRect.height) * vp.h;
+    const x2 = vp.x + (_endX / overlayRect.width) * vp.w;
+    const y2 = vp.y + (_endY / overlayRect.height) * vp.h;
 
     // STEP 2: Normalize rectangle in image space
     const newBox = {
@@ -147,22 +153,22 @@
       h: Math.abs(y2 - y1)
     };
 
-    if (addingBoxToAnnotationId) {
+    if (isAddingBoxToAnnotationId()) {
       // Case 1: Adding box to existing annotation
-      const annotation = annotationsAPI.getAnnotationById(selectedAnnotationId);
+      const annotation = annotationsAPI.getAnnotationById(_selectedAnnotationId);
       if (!annotation) return;
 
       annotation.boxes.push(newBox);
 
       await annotationsAPI.saveAnnotationsForPage(annotations);
-      renderAnnotations();
+      overlay.renderAnnotations();
 
-      box.remove();
-      box = null;
+      _box.remove();
+      _box = null;
 
       // Clear add-box mode after handlers finish
       setTimeout(() => {
-        addingBoxToAnnotationId = null;
+        _addingBoxToAnnotationId = null;
       }, 0);
     
       overlay.style.pointerEvents = "none";
@@ -188,7 +194,7 @@
       ui.openWtEditor({
         x: e.clientX,
         y: e.clientY,
-        initialValue: preFillWtIdOnCreate ? incomingWtId : "",
+        initialValue: incomingWtId ? incomingWtId : "",
         initialNote: "",
         onSave: async ({wtId, note}) => {
           annotation.wtId = wtId;
@@ -197,12 +203,13 @@
           annotations.push(annotation);
           await annotationsAPI.saveAnnotationsForPage(annotations);
           overlay.renderAnnotations();
-          box.remove();
-          box = null;
+          incomingWtId = null;    // clear this to avoid prefilling the editor after the first time
+          _box.remove();
+          _box = null;
         },
         onCancel: () => {
-          box.remove();
-          box = null;
+          _box.remove();
+          _box = null;
         }
       });
     }
@@ -249,13 +256,13 @@
    * @param {string} nextTool - Tool to switch to: "draw" | "select"
    */
   function setTool(nextTool) {
-    const prevTool = currentTool;
+    const prevTool = _currentTool;
   
     // Toggle behavior: clicking same tool twice turns it off
-    currentTool = (currentTool === nextTool) ? null : nextTool;
+    _currentTool = (_currentTool === nextTool) ? null : nextTool;
 
     // Clean up when leaving select mode
-    if (prevTool === "select" && currentTool !== "select") {
+    if (prevTool === "select" && _currentTool !== "select") {
       clearSelection();
       ui.closeWtEditor();
     }
@@ -268,6 +275,149 @@
     }
   }
 
+  // ============================================================
+  // RESIZING ANNOTATION BOXES
+  // ============================================================
+
+  /**
+   * Creates corner resize handles (nw, ne, sw, se) on selected box
+   * @param {HTMLElement} box - Annotation box DOM element
+   * @param {string} id - Annotation ID
+   */
+  function addResizeHandles(box, id) {
+    const corners = ["nw", "ne", "sw", "se"];
+
+    corners.forEach(corner => {
+      const handle = document.createElement("div");
+      handle.className = `resize-handle ${corner}`;
+      handle.dataset.corner = corner;
+
+      handle.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        _startResize(e, box, corner);
+      });
+
+      box.appendChild(handle);
+    });
+  }
+
+  /**
+   * Initiates resize drag from a handle
+   * Saves initial state and sets up event listeners
+   * @param {MouseEvent} e - mousedown event
+   * @param {HTMLElement} boxEl - Annotation box element
+   * @param {string} corner - Corner identifier (nw|ne|sw|se)
+   */
+  function _startResize(e, boxEl, corner) {
+    const id = boxEl.dataset.annotationId;
+    const annotation = annotationsAPI.getAnnotationById(id);
+    if (!annotation) return;
+
+    const boxIndex = Number(boxEl.dataset.boxIndex);
+    const box = annotation.boxes[boxIndex];
+
+    const rect = overlay.getBoundingClientRect();
+  
+    _resizing = {
+      id,
+      boxIndex,
+      corner,
+      startX: e.clientX - rect.left,
+      startY: e.clientY - rect.top,
+      startBox: { ...box }  // Save original for delta calculations
+    };
+
+    document.addEventListener("mousemove", _onResizeMove);
+    document.addEventListener("mouseup", _stopResize);
+  }
+
+  /**
+   * Handles mousemove during resize drag
+   * Converts screen deltas to image space and updates box dimensions
+   * @param {MouseEvent} e - mousemove event
+   */
+  function _onResizeMove(e) {
+    if (!_resizing) return;
+
+    const rect = overlay.getBoundingClientRect();
+    const vp = currentViewport;
+
+    // STEP 1: Compute mouse delta in overlay (screen) space
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+
+    const dx = currentX - _resizing.startX;
+    const dy = currentY - _resizing.startY;
+
+    // STEP 2: Convert delta to image space
+    // The scale factor relates overlay pixels to image coordinates
+    const scaleX = vp.w / rect.width;
+    const scaleY = vp.h / rect.height;
+
+    const dxImg = dx * scaleX;
+    const dyImg = dy * scaleY;
+
+    // STEP 3: Apply delta to annotation box in image space
+    const annotation = annotationsAPI.getAnnotationById(_resizing.id);
+    if (!annotation) return;
+
+    const box = annotation.boxes[_resizing.boxIndex];
+
+    // Start from original coordinates
+    let { x, y, w, h } = _resizing.startBox;
+    const corner = _resizing.corner;
+
+    // Apply resize based on which corner is being dragged
+    if (corner.includes("e")) w += dxImg;      // East: expand width
+    if (corner.includes("s")) h += dyImg;      // South: expand height
+    if (corner.includes("w")) {                // West: move left edge
+      x += dxImg;
+      w -= dxImg;
+    }
+    if (corner.includes("n")) {                // North: move top edge
+      y += dyImg;
+      h -= dyImg;
+    }
+
+    // Normalize negative sizes (when dragging past opposite corner)
+    if (w < 0) {
+      x = x + w;
+      w = Math.abs(w);
+    }
+
+    if (h < 0) {
+      y = y + h;
+      h = Math.abs(h);
+    }
+
+    // Enforce minimum box size
+    w = Math.max(20, w);
+    h = Math.max(20, h);
+
+    // Update box coordinates
+    box.x = x;
+    box.y = y;
+    box.w = w;
+    box.h = h;
+
+    overlay.renderAnnotations();
+  }
+
+  /**
+   * Finalizes resize drag and saves changes
+   */
+  function _stopResize() {
+    if (!_resizing) return;
+
+    annotationsAPI.saveAnnotationsForPage();
+
+    _resizing = null;
+
+    document.removeEventListener("mousemove", _onResizeMove);
+    document.removeEventListener("mouseup", _stopResize);
+  }
+
+  
   window.tools = {
     setTool,
     getTool,
@@ -276,8 +426,10 @@
     isAddingBoxToAnnotationId,
     selectAnnotation,
     clearSelection,
+    addResizeHandles,
     getSelectedAnnotationId,
     getActiveBoxIndex,
+    editAnnotation,
     onMouseDown,
     onMouseMove,
     onMouseUp
