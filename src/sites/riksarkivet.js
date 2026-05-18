@@ -137,7 +137,9 @@ function initializeViewportTracking() {
     const result = originalReplaceState.apply(this, args);
 
     requestAnimationFrame(() => {
-      overlay.renderAnnotations();
+      requestAnimationFrame(() => {
+        overlay.renderAnnotations();
+      });
     });
 
     return result;
