@@ -17,6 +17,9 @@
   function isAddingBoxToAnnotationId() {
     return _addingBoxToAnnotationId;
   }
+  function setAddingBoxToAnnotationId(id) {
+    _addingBoxToAnnotationId = id;
+  }
 
   let _selectedAnnotationId = null;      // Currently selected annotation (for editing/resizing)
   function getSelectedAnnotationId() {
@@ -426,6 +429,7 @@
     isDrawing,
     isSelecting,
     isAddingBoxToAnnotationId,
+    setAddingBoxToAnnotationId,
     selectAnnotation,
     clearSelection,
     addResizeHandles,
