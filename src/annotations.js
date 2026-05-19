@@ -107,6 +107,12 @@
     overlay.renderAnnotations();
   }
 
+  async function addAnnotation(annotation) {
+    annotations.push(annotation);
+    await saveAnnotationsForPage(annotations);
+    overlay.renderAnnotations();
+  }
+
   /**
    * Deletes entire annotation and clears selection
    * @param {string} id - Annotation ID
@@ -130,6 +136,7 @@
   }
 
   window.annotationsAPI = {
+    addAnnotation,
     saveAnnotationsForPage,
     getAnnotationById,
     getAnnotations,

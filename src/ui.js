@@ -5,7 +5,7 @@
 
 (() => {
   "use strict";
-  
+
   const tools = window.tools;
   const overlay = window.overlay;
   
@@ -290,10 +290,10 @@
     addBtn.onclick = (e) => {
       e.stopPropagation();
 
-      if (!selectedAnnotationId) return;
+      if (!tools.getSelectedAnnotationId()) return;
 
       // Toggle behavior
-      addingBoxToAnnotationId = addingBoxToAnnotationId ? null : selectedAnnotationId;
+      addingBoxToAnnotationId = addingBoxToAnnotationId ? null : tools.getSelectedAnnotationId();
       overlay.style.pointerEvents = addingBoxToAnnotationId ? "auto" : "none";
       overlay.style.cursor = addingBoxToAnnotationId ? "crosshair" : "default";
     };

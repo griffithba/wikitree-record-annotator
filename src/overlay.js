@@ -6,10 +6,16 @@
   // Transparent interaction layer (captures mouse input)
   const _overlay = document.createElement("div");
   _overlay.id = "wt-overlay";
+  function getOverlayElement() {
+    return _overlay;
+  }
 
   // Visual layer for rendered annotations
   const _annotationLayer = document.createElement("div");
   _annotationLayer.id = "wt-annotation-layer";
+  function getAnnotationLayerElement() {
+    return _annotationLayer;
+  }
 
   let _container = null;
 
@@ -385,6 +391,8 @@
 
   window.overlay = {
     initialize, 
+    getOverlayElement,
+    getAnnotationLayerElement,
     createLayers,
     attachEvents,
     setVisible,

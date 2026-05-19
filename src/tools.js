@@ -1,7 +1,7 @@
 (() => {
 
   "use strict";
-  
+
   let _currentTool = null;               // Active tool: null | "draw" | "select"
   function getTool() {
     return _currentTool;
@@ -73,14 +73,14 @@
    * Creates temporary DOM element that follows mouse
    */
   function onMouseDown(e) {
-    if (isDrawing() && !isAddingBoxToAnnotationId()) return;
+    if (!isDrawing() && !isAddingBoxToAnnotationId()) return;
 
     e.preventDefault();
     e.stopPropagation();
 
     _isDragging = true;
 
-    const rect = overlay.getBoundingClientRect();
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
 
     // Record starting point in overlay pixel space
     _startX = e.clientX - rect.left;
@@ -93,7 +93,7 @@
     _box.style.background = "var(--wt-draw-bg)";
     _box.style.pointerEvents = "none";
 
-    annotationLayer.appendChild(_box);
+    overlay.getAnnotationLayerElement().appendChild(_box);
   }
 
   /**
@@ -101,12 +101,12 @@
    * Updates temporary box dimensions to follow cursor
    */
   function onMouseMove(e) {
-    if ((isDrawing() && !isAddingBoxToAnnotationId()) || !_isDragging || !_box) return;
+    if ((!isDrawing() && !isAddingBoxToAnnotationId()) || !_isDragging || !_box) return;
 
     e.preventDefault();
     e.stopPropagation();
 
-    const rect = overlay.getBoundingClientRect();
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
 
     // Current mouse position in overlay space
     _endX = e.clientX - rect.left;
@@ -129,23 +129,23 @@
    * Either adds box to new annotation (prompts for WT ID) or existing annotation
    */
   async function onMouseUp(e) {
-    if ((isDrawing() && !isAddingBoxToAnnotationId()) || !_isDragging || !_box) return;
+    if ((!isDrawing() && !isAddingBoxToAnnotationId()) || !_isDragging || !_box) return;
 
     e.preventDefault();
     e.stopPropagation();
 
     _isDragging = false;
 
-    const overlayRect = overlay.getBoundingClientRect();
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
     const vp = currentViewport;
     if (!vp) return;
 
     // STEP 1: Convert overlay pixels to image space
     // Formula: imageCoord = viewport.origin + (screenPixel / screenSize) * viewport.size
-    const x1 = vp.x + (_startX / overlayRect.width) * vp.w;
-    const y1 = vp.y + (_startY / overlayRect.height) * vp.h;
-    const x2 = vp.x + (_endX / overlayRect.width) * vp.w;
-    const y2 = vp.y + (_endY / overlayRect.height) * vp.h;
+    const x1 = vp.x + (_startX / rect.width) * vp.w;
+    const y1 = vp.y + (_startY / rect.height) * vp.h;
+    const x2 = vp.x + (_endX / rect.width) * vp.w;
+    const y2 = vp.y + (_endY / rect.height) * vp.h;
 
     // STEP 2: Normalize rectangle in image space
     const newBox = {
@@ -202,9 +202,9 @@
           annotation.wtId = wtId;
           annotation.note = note;
           annotation.wtIdFound = await personAPI.prefetch(wtId); // pre-fetch person data for this ID
-          annotations.push(annotation);
-          await annotationsAPI.saveAnnotationsForPage(annotations);
-          overlay.renderAnnotations();
+          await annotationsAPI.addAnnotation(annotation);
+          //await annotationsAPI.saveAnnotationsForPage(annotations);
+          //overlay.renderAnnotations();
           incomingWtId = null;    // clear this to avoid prefilling the editor after the first time
           _box.remove();
           _box = null;
