@@ -8,6 +8,7 @@
 
   const tools = window.tools;
   const overlay = window.overlay;
+  const backup = window.backup;
   
   // Dialog element for editing annotation WT ID and notes
   let _wtEditor = null;
@@ -28,10 +29,55 @@
       background: "var(--wt-toolbar-bg)",
       borderRadius: "8px"
     });
-    
-    // Add tool buttons to toolbar
-    toolbar.appendChild(_makeToolButton("Draw", "draw"));
-    toolbar.appendChild(_makeToolButton("Select", "select"));
+
+    //
+    // Header
+    //
+
+    const header = document.createElement("div");
+
+    Object.assign(header.style, {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      fontWeight: "bold",
+      fontSize: "14px"
+    });
+
+    const icon = document.createElement("img");
+
+    icon.src = chrome.runtime.getURL(
+      "icons/icon32.png"
+    );
+
+    Object.assign(icon.style, {
+      width: "24px",
+      height: "24px"
+    });
+
+    const title = document.createElement("div");
+    title.textContent = "WikiTree Annotator";
+
+    header.appendChild(icon);
+    header.appendChild(title);
+
+    toolbar.appendChild(header);
+
+    //
+    // Button row
+    //
+
+    const buttonRow = document.createElement("div");
+
+    Object.assign(buttonRow.style, {
+      display: "flex",
+      gap: "6px",
+      flexWrap: "wrap"
+    });
+
+    // Add tool buttons to button row
+    buttonRow.appendChild(_makeToolButton("Draw", "draw"));
+    buttonRow.appendChild(_makeToolButton("Select", "select"));
 
     // Button for toggling show/hide annotations
     const toggleBtn = document.createElement("button");
@@ -44,11 +90,30 @@
       overlay.renderAnnotations();
     });
 
-    // Add toggle button to toolbar
-    toolbar.appendChild(toggleBtn);
+    // Add toggle button to button row
+    buttonRow.appendChild(toggleBtn);
 
+    // create utility panel
+    const utilPanel = _makeUtilPanel();
+    
+    // button for import/export annotations from/to a file
+    const utilBtn = document.createElement("button");
+    utilBtn.textContent = "💾";
+    utilBtn.title = "Import/Export";
+    utilBtn.addEventListener("click", () => {
+      utilPanel.hidden = !utilPanel.hidden;
+    });
+
+    // Add import/export button to button row
+    buttonRow.appendChild(utilBtn);
+
+    // Add button row to toolbar
+    toolbar.appendChild(buttonRow);
+    
     // attach the toolbar
     document.body.appendChild(toolbar);
+    // attach the (hidden for now) utility panel
+    document.body.appendChild(utilPanel); 
   }
 
 
@@ -77,6 +142,63 @@
     });
 
     return btn;
+  }
+
+  function _makeUtilPanel() {
+    const panel = document.createElement("div");
+
+    Object.assign(panel.style, {
+      position: "absolute",
+      top: "100%",
+      right: "0",
+      marginTop: "6px",
+      padding: "8px",
+      background: "var(--wt-toolbar-bg)",
+      borderRadius: "8px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "6px"
+    });
+
+    panel.hidden = true;
+
+    //
+    // Export button
+    //
+
+    const exportBtn = document.createElement("button");
+
+    exportBtn.textContent = "Export";
+
+    exportBtn.addEventListener("click", async backup.exportAnnotations);
+    
+    panel.appendChild(exportBtn);
+
+    //
+    // Import button
+    //
+
+    const importBtn = document.createElement("button");
+
+    importBtn.textContent = "Import";
+
+    importBtn.addEventListener("click", () => {
+      const input = document.createElement("input");
+
+      input.type = "file";
+      input.accept = ".json";
+
+      input.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+
+        if (file) {
+          await backup.importAnnotations(file);
+        }
+      });                             
+    });
+    panel.appendChild(importBtn);
+    
+    return (panel);
   }
 
   /**
