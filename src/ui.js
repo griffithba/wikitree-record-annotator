@@ -94,8 +94,6 @@
     });
 
     overlay.setDrawingState(tools.isDrawing());
-    //overlay.style.cursor =
-    //  tools.isDrawing() ? "crosshair" : "default";
   }
 
   /**
@@ -293,9 +291,8 @@
       if (!tools.getSelectedAnnotationId()) return;
 
       // Toggle behavior
-      addingBoxToAnnotationId = addingBoxToAnnotationId ? null : tools.getSelectedAnnotationId();
-      overlay.style.pointerEvents = addingBoxToAnnotationId ? "auto" : "none";
-      overlay.style.cursor = addingBoxToAnnotationId ? "crosshair" : "default";
+      tools.setAddingBoxToAnnotationId(tools.isAddingBoxToAnnotationId() ? null : tools.getSelectedAnnotationId());
+      overlay.setDrawingState(tools.isAddingBoxToAnnotationId());
     };
   
     // "✏️" button: open WT ID editor
