@@ -1,5 +1,7 @@
 (() => {
 
+  "use strict";
+  
   let _currentTool = null;               // Active tool: null | "draw" | "select"
   function getTool() {
     return _currentTool;

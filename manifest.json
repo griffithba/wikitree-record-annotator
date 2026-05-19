@@ -45,7 +45,6 @@
         "src/ui.js",
         "src/storage.js", 
         "src/person.js",
-        "src/sampleAnnotations.js", 
         "src/content.js"]
     }
   ],

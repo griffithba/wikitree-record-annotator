@@ -74,30 +74,5 @@ function initOverlay() {
   // Inject CSS styles
   theme.injectStyles();
 
-  /*
-  // Load seed data if empty, then render
-  seedCurrentPageIfEmpty().then(() => {
-    requestAnimationFrame(() => {
-      overlay.renderAnnotations();
-      ui.updateToolUI();
-    });
-  });
-  */
-
 }
 
-/**
- * Seeds page with sample annotations on first visit
- * Only does this if annotations array is empty
- */ /*
-async function seedCurrentPageIfEmpty() {
-  await annotationsAPI.loadAnnotationsIfNeeded();
-
-  if (!annotations || annotations.length === 0) {
-    const pageKey = getCurrentPageKey();
-    annotations = sampleAnnotations.filter(a => a.page === pageKey);
-
-    await annotationsAPI.saveAnnotationsForPage();
-  }
-}
-  */

@@ -2,6 +2,8 @@
 // STYLES & CSS INJECTION
 // ============================================================
 (() => {
+  "use strict";
+  
   function injectStyles() {
     if (document.getElementById("wt-styles")) return;
 

@@ -1,6 +1,8 @@
 
 (() => {
 
+  "use strict";
+
   // Transparent interaction layer (captures mouse input)
   const _overlay = document.createElement("div");
   _overlay.id = "wt-overlay";
@@ -24,6 +26,7 @@
 
 
   let _renderInProgress = false;
+  let _renderQueued = false;
 
   let _visible = true;
 
@@ -143,7 +146,10 @@
    * Syncs viewport, clears previous render, renders all boxes
    */
   async function renderAnnotations() {
-    if (_renderInProgress) return;
+    if (_renderInProgress) {
+      _renderQueued = true;
+      return;
+    }
     _renderInProgress = true;
     try {
       const _container = getViewerContainer();
@@ -161,9 +167,7 @@
       await annotationsAPI.loadAnnotationsIfNeeded();
 
       const vp = currentViewport;
-      console.log("Rendering annotations with viewport:", vp);
       if (!vp) return;
-console.log("Rendering annotations...");
 
       // Render each annotation's boxes
       annotationsAPI.getAnnotations().forEach(a => {
@@ -177,6 +181,15 @@ console.log("Rendering annotations...");
   
     } finally {
       _renderInProgress = false;
+
+      // If a render was requested while one was in progress, queue up another render to run immediately after
+      // This handles the case where an initial momentary bogus viewport causes a render with incorrect coordinates.
+      if (_renderQueued) {
+        _renderQueued = false;
+        requestAnimationFrame(() => {
+          renderAnnotations();
+        });
+      }
     }
   }
 

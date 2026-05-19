@@ -4,6 +4,8 @@
 // ============================================================
 
 (() => {
+  "use strict";
+  
   const tools = window.tools;
   const overlay = window.overlay;
   

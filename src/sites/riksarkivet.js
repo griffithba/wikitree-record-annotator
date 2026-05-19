@@ -11,7 +11,7 @@ const riksarkivetProvider = {
   getPageKey
 };
 
-//const overlay = window.overlay;
+let _firstViewportRenderDone = false;
 
 /**
  * Waits for OpenSeadragon container to load, then initializes overlay
@@ -131,20 +131,19 @@ function getCleanPageUrl() {
 
 // Tracks viewport changes (pan/zoom) and re-renders annotations to maintain alignment
 function initializeViewportTracking() {
-  const originalReplaceState = history.replaceState;
 
-  history.replaceState = function (...args) {
-    const result = originalReplaceState.apply(this, args);
+  window.addEventListener(
+    "hashchange",
+    () => {
+      overlay.renderAnnotations();
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        overlay.renderAnnotations();
-      });
-    });
+      if (!_firstViewportRenderDone) {
 
-    return result;
-  };
+        ui.updateToolUI();
 
-  window.addEventListener("popstate", overlay.renderAnnotations);
+        _firstViewportRenderDone = true;
+      }
+    }
+  );
 }
 

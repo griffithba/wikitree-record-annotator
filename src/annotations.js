@@ -1,5 +1,6 @@
 
 (() => {
+  "use strict";
 
   // Annotations array (stored in IMAGE SPACE coordinates)
   let annotations = [];
