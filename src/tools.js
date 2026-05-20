@@ -165,7 +165,7 @@
 
       annotation.boxes.push(newBox);
 
-      await annotationsAPI.saveAnnotationsForPage(annotations);
+      await annotationsAPI.updateExistingAnnotation(annotation.id, { boxes: annotation.boxes });
       overlay.renderAnnotations();
 
       _box.remove();
@@ -176,9 +176,8 @@
         _addingBoxToAnnotationId = null;
       }, 0);
     
-      overlay.style.pointerEvents = "none";
-      overlay.style.cursor = "default";
-    
+      overlay.setDrawingState(false); 
+   
       return;
 
     } else {
@@ -248,7 +247,9 @@
         }
         annotation.note = note;
 
-        await annotationsAPI.saveAnnotationsForPage(annotations);
+        await annotationsAPI.updateExistingAnnotation(annotation.id, 
+          { wtId: annotation.wtId, 
+            note: annotation.note });
         overlay.renderAnnotations();
       }
     });
@@ -321,7 +322,7 @@
     const boxIndex = Number(boxEl.dataset.boxIndex);
     const box = annotation.boxes[boxIndex];
 
-    const rect = overlay.getBoundingClientRect();
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
   
     _resizing = {
       id,
@@ -344,7 +345,7 @@
   function _onResizeMove(e) {
     if (!_resizing) return;
 
-    const rect = overlay.getBoundingClientRect();
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
     const vp = currentViewport;
 
     // STEP 1: Compute mouse delta in overlay (screen) space

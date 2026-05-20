@@ -20,8 +20,9 @@
 
     Object.assign(toolbar.style, {
       position: "fixed",
-      top: "10px",
-      right: "40px",
+      bottom: "5px",
+      left: "50%",
+      transform: "translateX(-50%)",
       zIndex: "100000",
       display: "flex",
       gap: "6px",
@@ -101,7 +102,7 @@
     utilBtn.textContent = "💾";
     utilBtn.title = "Import/Export";
     utilBtn.addEventListener("click", () => {
-      utilPanel.hidden = !utilPanel.hidden;
+      utilPanel.style.display = utilPanel.style.display === "flex" ? "none" : "flex";
     });
 
     // Add import/export button to button row
@@ -148,19 +149,18 @@
     const panel = document.createElement("div");
 
     Object.assign(panel.style, {
-      position: "absolute",
-      top: "100%",
-      right: "0",
-      marginTop: "6px",
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      zIndex: "100001",
+      transform: "translate(-50%, -50%)",
       padding: "8px",
       background: "var(--wt-toolbar-bg)",
       borderRadius: "8px",
-      display: "flex",
+      display: "none",
       flexDirection: "column",
       gap: "6px"
     });
-
-    panel.hidden = true;
 
     //
     // Export button
@@ -170,7 +170,9 @@
 
     exportBtn.textContent = "Export";
 
-    exportBtn.addEventListener("click", async backup.exportAnnotations);
+    exportBtn.addEventListener("click", async () => {
+      await backup.exportAnnotations();
+    });
     
     panel.appendChild(exportBtn);
 
@@ -194,7 +196,8 @@
         if (file) {
           await backup.importAnnotations(file);
         }
-      });                             
+      });
+      input.click();
     });
     panel.appendChild(importBtn);
     
@@ -445,7 +448,7 @@
       const annotationId = boxEl.dataset.annotationId;
       const boxIndex = Number(boxEl.dataset.boxIndex);
 
-      deleteBox(annotationId, boxIndex);
+      annotationsAPI.deleteBox(annotationId, boxIndex);
     };
 
     toolbar.append(addBtn, editBtn, deleteBtn);

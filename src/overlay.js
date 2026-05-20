@@ -358,12 +358,7 @@
    * @param {string} annotationId - Annotation ID
    */
   function _triggerRefHighlight(annotationId) {
-    // Only highlight once per session
-    if (highlightedAnnotations.has(annotationId)) return; 
-
     function start() {
-      highlightedAnnotations.add(annotationId);
-
       // Highlight ALL boxes for this annotation
       requestAnimationFrame(() => {
         document.querySelectorAll(

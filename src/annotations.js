@@ -10,7 +10,7 @@
 
 
   // ============================================================
-  // SECTION 10: STORAGE & PERSISTENCE
+  // STORAGE & PERSISTENCE
   // ============================================================
 
   /**
@@ -30,6 +30,10 @@
 
     // WARNING: Using this function incorrectly will delete all annotations!
     await storageAPI.saveAnnotations(updated);
+  }
+
+  async function updateExistingAnnotation(id, patch) {
+    await storageAPI.updateAnnotation(id, patch);
   }
 
   /**
@@ -120,7 +124,7 @@
   async function deleteAnnotation(id) {
     annotations = annotations.filter(a => a.id !== id);
     await saveAnnotationsForPage(annotations);
-    if (tools.getSelectedAnnotationId() === id) clearSelection();
+    if (tools.getSelectedAnnotationId() === id) tools.clearSelection();
     overlay.renderAnnotations();
   }
 
@@ -138,6 +142,7 @@
   window.annotationsAPI = {
     addAnnotation,
     saveAnnotationsForPage,
+    updateExistingAnnotation,
     getAnnotationById,
     getAnnotations,
     loadAnnotationsIfNeeded,

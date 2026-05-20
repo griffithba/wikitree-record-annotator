@@ -19,7 +19,7 @@
       localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
     },
 
-    /*
+    
     async updateAnnotation(id, patch) {
       const list = await this.getAnnotations();
 
@@ -29,7 +29,7 @@
 
       await this.saveAnnotations(updated);
     },
-    */
+    
   };
 
   const CHROME_KEY = "wt-annotations";
@@ -50,7 +50,7 @@
       });
     },
 
-    /*
+    
     async updateAnnotation(id, patch) {
       const list = await this.getAnnotations();
 
@@ -60,7 +60,7 @@
 
       await this.saveAnnotations(updated);
     },
-    */
+    
   };
 
   const serverAdapter = {
@@ -77,7 +77,7 @@
       });
     },
 
-    /*
+    
     async updateAnnotation(id, patch) {
       await fetch(`/api/annotations/${id}`, {
         method: "PATCH",
@@ -85,7 +85,7 @@
         body: JSON.stringify(patch)
       });
     },
-    */
+    
   };
 
 // ============================================================
@@ -109,11 +109,10 @@
       return adapter.saveAnnotations(data);
     },
 
-    /*
     updateAnnotation(id, patch) {
       return adapter.updateAnnotation(id, patch);
     },
-    */
+    
   };
 
   // expose to content scripts

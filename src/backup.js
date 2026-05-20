@@ -16,8 +16,6 @@
       await storageAPI.saveAnnotations(data.annotations);
 
       overlay.renderAnnotations();
-
-    input.click();
   }
 
 
