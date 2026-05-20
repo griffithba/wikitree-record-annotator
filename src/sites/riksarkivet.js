@@ -65,12 +65,6 @@ async function getReferenceFromPage() {
 
     if (!hasIdLabel) continue;
 
-    // Exclude simple fields (just ID or URL)
-    const looksLikeCitation =
-      text.includes(",") && text.length > 50;
-
-    if (!looksLikeCitation) continue;
-
     // Expand the text so we don't get a truncated version
     const expandLink =
       valueEl.querySelector('a.toggle.less');
@@ -83,6 +77,15 @@ async function getReferenceFromPage() {
         setTimeout(r, 50)
       );
     }
+    // Re-read AFTER expansion
+    const fullText =
+      valueEl.innerText.trim();
+
+    // Exclude simple fields (just ID or URL)
+    const looksLikeCitation =
+      fullText.includes(",") && fullText.length > 50;
+
+    if (!looksLikeCitation) continue;
 
     const clone = valueEl.cloneNode(true);
     clone.querySelector('a.toggle')?.remove();
