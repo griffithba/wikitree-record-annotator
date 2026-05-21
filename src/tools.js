@@ -140,7 +140,7 @@
     _isDragging = false;
 
     const rect = overlay.getOverlayElement().getBoundingClientRect();
-    const vp = currentViewport;
+    const vp = archiveProvider.getCurrentViewport();
     if (!vp) return;
 
     // STEP 1: Convert overlay pixels to image space
@@ -184,10 +184,10 @@
       // Case 2: Creating new annotation
       const annotation = {
         id: crypto.randomUUID(),
-        page: getCurrentPageKey(),
-        source: sourceSite,
-        url: getCleanPageUrl(),
-        reference: await getReferenceFromPage(),
+        page: archiveProvider.getCurrentPageKey(),
+        source: archiveProvider.id,
+        url: archiveProvider.getCleanPageUrl(),
+        reference: await archiveProvider.getReferenceFromPage(),
         boxes: [newBox],
         wtId: null,
         note: null, 
@@ -346,7 +346,7 @@
     if (!_resizing) return;
 
     const rect = overlay.getOverlayElement().getBoundingClientRect();
-    const vp = currentViewport;
+    const vp = archiveProvider.getCurrentViewport();
 
     // STEP 1: Compute mouse delta in overlay (screen) space
     const currentX = e.clientX - rect.left;

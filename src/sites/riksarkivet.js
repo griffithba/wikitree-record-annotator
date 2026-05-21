@@ -1,152 +1,172 @@
+(() => {
+  "use strict";
 
-const sourceSite = "riksarkivet";
+  const id = "riksarkivet";
 
-const riksarkivetProvider = {
-  id: sourceSite,
+  let _currentViewport = null; // in image space coordinates, synced from URL hash
 
-  matchesUrl(url) {
-    return url.includes(sourceSite);
-  },
-  
-  getPageKey
-};
+  let _firstViewportRenderDone = false;
 
-let _firstViewportRenderDone = false;
+  /**
+   * Waits for OpenSeadragon container to load, then initializes overlay
+   * Polls every 200ms until container is found
+   */
+  function waitForViewerReady() {
+    const el = document.querySelector(".openseadragon-canvas");
 
-/**
- * Waits for OpenSeadragon container to load, then initializes overlay
- * Polls every 200ms until container is found
- */
-function waitForViewerReady() {
-  const el = document.querySelector(".openseadragon-canvas");
-
-  if (el) {
-    initOverlay();
-    return;
-  }
-
-  setTimeout(waitForViewerReady, 200);
-}
-
-// get the OpenSeadragon container (the element the overlay should attach to)
-function getViewerContainer() {
-  return document.querySelector(".openseadragon-container");
-}
-
-/**
- * Extracts page identifier from current URL
- * Used as the key for storing/loading annotations per page
- * @returns {string} Page key (e.g., "P123_456")
- */
-function getCurrentPageKey() {
-  return getPageKey(window.location.href)
-}
-function getPageKey(href) {
-  const match = href.match(/\/bildvisning\/([^/?#]+)/i);
-  return match ? match[1] : "unknown";
-}
-
-/**
- * Extracts source reference text from page
- * @returns {string} source reference
- */
-async function getReferenceFromPage() {
-  const items = document.querySelectorAll('.item');
-
-  for (const item of items) {
-    const valueEl = item.querySelector('.value');
-    if (!valueEl) continue;
-
-    const text = valueEl.innerText.trim();
-
-    // Must contain ID label in either language
-    const hasIdLabel =
-      /bildid:/i.test(text) || /image id:/i.test(text);
-
-    if (!hasIdLabel) continue;
-
-    // Expand the text so we don't get a truncated version
-    const expandLink =
-      valueEl.querySelector('a.toggle.less');
-
-    if (expandLink) {
-
-      expandLink.click();
-
-      await new Promise(r =>
-        setTimeout(r, 50)
-      );
+    if (el) {
+      initOverlay();
+      return;
     }
-    // Re-read AFTER expansion
-    const fullText =
-      valueEl.innerText.trim();
 
-    // Exclude simple fields (just ID or URL)
-    const looksLikeCitation =
-      fullText.includes(",") && fullText.length > 50;
-
-    if (!looksLikeCitation) continue;
-
-    const clone = valueEl.cloneNode(true);
-    clone.querySelector('a.toggle')?.remove();
-
-    return clone.innerText.trim();
+    setTimeout(waitForViewerReady, 200);
   }
-  return null;
-}
 
-/**
- * Parses IIIF xywh viewport from URL hash
- * @returns {{x, y, w, h}|null} Viewport in image space or null if not found
- */
-function getViewportFromUrl() {
-  const hash = window.location.hash;
-  const query = hash.startsWith("#") ? hash.slice(1) : hash;
-  const params = new URLSearchParams(query);
-  const xywh = params.get("xywh");
+  // get the OpenSeadragon container (the element the overlay should attach to)
+  function getViewerContainer() {
+    return document.querySelector(".openseadragon-container");
+  }
 
-  if (!xywh) return null;
+  /**
+   * Extracts page identifier from current URL
+   * Used as the key for storing/loading annotations per page
+   * @returns {string} Page key (e.g., "P123_456")
+   */
+  function getCurrentPageKey() {
+    return getPageKey(window.location.href)
+  }
+  function getPageKey(href) {
+    const match = href.match(/\/bildvisning\/([^/?#]+)/i);
+    return match ? match[1] : "unknown";
+  }
 
-  const [x, y, w, h] = xywh.split(",").map(Number);
-  return { x, y, w, h };
-}
+  /**
+   * Extracts source reference text from page
+   * @returns {string} source reference
+   */
+  async function getReferenceFromPage() {
+    const items = document.querySelectorAll('.item');
 
-/**
- * Syncs currentViewport from URL hash
- * Call before rendering to pick up any viewer pan/zoom changes
- */
-function syncViewport() {
-  currentViewport = getViewportFromUrl();
-}
+    for (const item of items) {
+      const valueEl = item.querySelector('.value');
+      if (!valueEl) continue;
 
-/**
- * Grabs the page URL and strips off everything after the image ID
- * @returns {string} clean URL
- */
-function getCleanPageUrl() {
-  const url = new URL(window.location.href);
+      const text = valueEl.innerText.trim();
 
-  // remove everything after the base path
-  url.hash = "";
+      // Must contain ID label in either language
+      const hasIdLabel =
+        /bildid:/i.test(text) || /image id:/i.test(text);
 
-  return url.origin + url.pathname;
-}
+      if (!hasIdLabel) continue;
 
-// Tracks viewport changes (pan/zoom) and re-renders annotations to maintain alignment
-function initializeViewportTracking() {
+      // Expand the text so we don't get a truncated version
+      const expandLink =
+        valueEl.querySelector('a.toggle.less');
 
-  window.addEventListener(
-    "hashchange",
-    () => {
-      overlay.renderAnnotations();
+      if (expandLink) {
 
-      if (!_firstViewportRenderDone) {
+        expandLink.click();
 
-        ui.updateToolUI();
-
-        _firstViewportRenderDone = true;
+        await new Promise(r =>
+          setTimeout(r, 50)
+        );
       }
-    }
-  );
-}
+      // Re-read AFTER expansion
+      const fullText =
+        valueEl.innerText.trim();
 
+      // Exclude simple fields (just ID or URL)
+      const looksLikeCitation =
+        fullText.includes(",") && fullText.length > 50;
+
+      if (!looksLikeCitation) continue;
+
+      const clone = valueEl.cloneNode(true);
+      clone.querySelector('a.toggle')?.remove();
+
+      return clone.innerText.trim();
+    }
+    return null;
+  }
+
+  /**
+   * Parses IIIF xywh viewport from URL hash
+   * @returns {{x, y, w, h}|null} Viewport in image space or null if not found
+   */
+  function getViewportFromUrl() {
+    const hash = window.location.hash;
+    const query = hash.startsWith("#") ? hash.slice(1) : hash;
+    const params = new URLSearchParams(query);
+    const xywh = params.get("xywh");
+
+    if (!xywh) return null;
+
+    const [x, y, w, h] = xywh.split(",").map(Number);
+    return { x, y, w, h };
+  }
+
+  /**
+   * Syncs currentViewport from URL hash
+   * Call before rendering to pick up any viewer pan/zoom changes
+   */
+  function syncViewport() {
+    _currentViewport = getViewportFromUrl();
+  }
+
+  function getCurrentViewport() {
+    return _currentViewport;
+  }
+
+  /**
+   * Grabs the page URL and strips off everything after the image ID
+   * @returns {string} clean URL
+   */
+  function getCleanPageUrl() {
+    const url = new URL(window.location.href);
+
+    // remove everything after the base path
+    url.hash = "";
+
+    return url.origin + url.pathname;
+  }
+
+  // Tracks viewport changes (pan/zoom) and re-renders annotations to maintain alignment
+  function initializeViewportTracking() {
+
+    window.addEventListener(
+      "hashchange",
+      () => {
+        overlay.renderAnnotations();
+
+        if (!_firstViewportRenderDone) {
+
+          ui.updateToolUI();
+
+          _firstViewportRenderDone = true;
+        }
+      }
+    );
+  }
+
+  //function matchesUrl(url) {
+  //  return url.includes(id);
+  //}
+
+  const _provider = {
+    waitForViewerReady,
+    getViewerContainer,
+    getCurrentPageKey,
+    getReferenceFromPage,
+    syncViewport,
+    getCurrentViewport,
+    getCleanPageUrl,
+    initializeViewportTracking,
+    id,
+    //matchesUrl,   
+    getPageKey
+  };
+
+  window.archiveProviders ??= [];
+  window.archiveProviders.push(_provider);
+
+})();

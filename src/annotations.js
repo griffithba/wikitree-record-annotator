@@ -18,7 +18,7 @@
    * Preserves annotations for other pages
    */
   async function saveAnnotationsForPage() {
-    const key = getCurrentPageKey();
+    const key = archiveProvider.getCurrentPageKey();
 
     const all = await storageAPI.getAnnotations();
 
@@ -56,7 +56,7 @@
    * Lazy loads to avoid loading every page's annotations at startup
    */
   async function loadAnnotationsIfNeeded() {
-    const key = getCurrentPageKey();
+    const key = archiveProvider.getCurrentPageKey();
 
     if (key === lastPageKey) return;  // Already loaded
     lastPageKey = key;

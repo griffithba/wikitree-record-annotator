@@ -158,11 +158,11 @@
     }
     _renderInProgress = true;
     try {
-      const _container = getViewerContainer();
+      const _container = archiveProvider.getViewerContainer();
       if (!_container) return;
 
       // Always sync viewport first (prevents lag when zooming)
-      syncViewport();
+      archiveProvider.syncViewport();
 
       // Clear previous render
       _annotationLayer.innerHTML = "";
@@ -172,7 +172,7 @@
       // Load annotations for current page if not yet loaded
       await annotationsAPI.loadAnnotationsIfNeeded();
 
-      const vp = currentViewport;
+      const vp = archiveProvider.getCurrentViewport();
       if (!vp) return;
 
       // Render each annotation's boxes
@@ -207,7 +207,7 @@
    * @param {number} index - Box index within annotation
    */
   function _renderBox(a, boxData, index) {
-    const vp = currentViewport;
+    const vp = archiveProvider.getCurrentViewport();
     const rect = _overlay.getBoundingClientRect();
 
     // STEP 1: Convert image space → viewport-relative → screen pixels

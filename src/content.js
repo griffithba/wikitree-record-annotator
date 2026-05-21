@@ -2,14 +2,6 @@
 // Allows drawing annotation boxes that stay aligned during
 // zoom and pan by storing coordinates in image space (xywh).
 
-if (window.__wtOverlayInitialized) {
-  console.log("WikiTree overlay already initialized");
-} else {
-  window.__wtOverlayInitialized = true;
-
-  waitForViewerReady();
-}
-
 // ============================================================
 // SECTION 1: INITIALIZATION & DOM SETUP
 // ============================================================
@@ -20,7 +12,15 @@ const ui = window.ui;
 const tools = window.tools;
 const overlay = window.overlay;
 const annotationsAPI = window.annotationsAPI;
+const archiveProvider = window.archiveProviders[0]; // make sure only one provider is listed in manifest.json per site
 
+if (window.__wtOverlayInitialized) {
+  console.log("WikiTree overlay already initialized");
+} else {
+  window.__wtOverlayInitialized = true;
+
+  archiveProvider.waitForViewerReady();
+}
 
 // ID from incoming WikiTree profile (if navigated from one)
 let incomingWtId = null;
@@ -57,7 +57,7 @@ function initOverlay() {
   // Set flag to pre-fill the editor with the incoming WikiTree profile ID
   if (incomingWtId) preFillWtIdOnCreate = true;
     
-  overlay.initialize(getViewerContainer());
+  overlay.initialize(archiveProvider.getViewerContainer());
 
   overlay.createLayers();
   overlay.attachEvents();
@@ -69,7 +69,7 @@ function initOverlay() {
   ui.createWtEditor();
   
   // Align viewport and initialize tracking 
-  initializeViewportTracking();
+  archiveProvider.initializeViewportTracking();
 
   // Inject CSS styles
   theme.injectStyles();
