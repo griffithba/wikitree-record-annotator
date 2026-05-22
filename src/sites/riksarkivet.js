@@ -53,12 +53,6 @@
 
       const text = valueEl.innerText.trim();
 
-      // Must contain ID label in either language
-      const hasIdLabel =
-        /bildid:/i.test(text) || /image id:/i.test(text);
-
-      if (!hasIdLabel) continue;
-
       // Expand the text so we don't get a truncated version
       const expandLink =
         valueEl.querySelector('a.toggle.less');
@@ -71,6 +65,13 @@
           setTimeout(r, 50)
         );
       }
+
+      // Must contain ID label in either language
+      const hasIdLabel =
+        /bildid:/i.test(text) || /image id:/i.test(text);
+
+      if (!hasIdLabel) continue;
+
       // Re-read AFTER expansion
       const fullText =
         valueEl.innerText.trim();
