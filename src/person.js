@@ -1,4 +1,5 @@
 (() => {
+  "use strict";
 
   const people = new Map();
 
@@ -32,11 +33,9 @@
     return people.get(wtId);
   }
 
-
-  const personAPI = {
+  window.personAPI = {
     prefetch,
     getCached
   }
 
-  window.personAPI = personAPI;
 })();

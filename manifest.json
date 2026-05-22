@@ -37,13 +37,15 @@
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
       "js": [
+        "src/sites/riksarkivet.js", 
         "src/theme.js",
         "src/tools.js",
+        "src/annotations.js",
+        "src/overlay.js",
+        "src/backup.js",
         "src/ui.js",
         "src/storage.js", 
         "src/person.js",
-        "src/sampleAnnotations.js", 
-        "src/sites/riksarkivet.js", 
         "src/content.js"]
     }
   ],

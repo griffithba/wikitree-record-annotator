@@ -86,7 +86,7 @@ async function fetchWikiTreeProfile(wtId) {
     const form = new URLSearchParams();
     form.append("action", "getPerson");
     form.append("key", wtId);
-    form.append("fields", "FirstName,LastNameAtBirth,BirthDate,DeathDate");
+    form.append("fields", "FirstName,MiddleName,LastNameAtBirth,BirthDate,DeathDate");
     form.append("appId", "wikitree-ref-overlays");
 
     console.log("Fetching WT profile:", wtId);
@@ -115,10 +115,10 @@ async function fetchWikiTreeProfile(wtId) {
 
 function buildDisplayName(person) {
   const first = person.FirstName || "";
-
+  const middle = person.MiddleName || "";
   const last = person.LastNameAtBirth || "";
 
-  return `${first} ${last}`.trim();
+  return `${first} ${middle} ${last}`.trim();
 }
 
 

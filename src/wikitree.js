@@ -1,7 +1,5 @@
 (() => {
-  const archiveProviders = [
-    riksarkivetProvider
-  ];
+  const archiveProviders = window.archiveProviders;
 
   const wtId = getCurrentWtId();
 
