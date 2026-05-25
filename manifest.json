@@ -32,12 +32,42 @@
       "js": [
         "src/storage.js", 
         "src/sites/riksarkivet.js", 
+        "src/sites/digitalarkivet.js",
+//        "src/sites/archiveOrg.js",
         "src/wikitree.js"]
     },
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
       "js": [
         "src/sites/riksarkivet.js", 
+        "src/theme.js",
+        "src/tools.js",
+        "src/annotations.js",
+        "src/overlay.js",
+        "src/backup.js",
+        "src/ui.js",
+        "src/storage.js", 
+        "src/person.js",
+        "src/content.js"]
+/*    },
+    {
+      "matches": ["https://archive.org/details/*"],
+      "js": [
+        "src/sites/archiveOrg.js", 
+        "src/theme.js",
+        "src/tools.js",
+        "src/annotations.js",
+        "src/overlay.js",
+        "src/backup.js",
+        "src/ui.js",
+        "src/storage.js", 
+        "src/person.js",
+        "src/content.js"] */
+    },
+    {
+      "matches": ["https://nye.digitalarkivet.no/source/*"],
+      "js": [
+        "src/sites/digitalarkivet.js", 
         "src/theme.js",
         "src/tools.js",
         "src/annotations.js",

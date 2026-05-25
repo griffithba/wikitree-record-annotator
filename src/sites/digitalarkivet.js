@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const id = "riksarkivet";
+  const id = "digitalarkivet";
 
   let _currentViewport = null; // in image space coordinates, synced from URL hash
 
@@ -16,6 +16,7 @@
 
     if (el) {
       initOverlay();
+      syncViewport();
       return;
     }
 
@@ -36,7 +37,8 @@
     return getPageKey(window.location.href);
   }
   function getPageKey(href) {
-    const match = href.match(/\/bildvisning\/([^/?#]+)/i);
+    const match = href.match(/\/source\/([^/?#]+)/i);
+    console.log("getPageKey", href, match);
     return match ? match[1] : "unknown";
   }
 
@@ -94,16 +96,13 @@
    * Parses IIIF xywh viewport from URL hash
    * @returns {{x, y, w, h}|null} Viewport in image space or null if not found
    */
-  function _getViewportFromUrl() {
-    const hash = window.location.hash;
-    const query = hash.startsWith("#") ? hash.slice(1) : hash;
-    const params = new URLSearchParams(query);
-    const xywh = params.get("xywh");
-
-    if (!xywh) return null;
-
-    const [x, y, w, h] = xywh.split(",").map(Number);
-    return { x, y, w, h };
+  function _getViewport() {
+    return {
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1
+    };
   }
 
   /**
@@ -111,10 +110,12 @@
    * Call before rendering to pick up any viewer pan/zoom changes
    */
   function syncViewport() {
-    _currentViewport = _getViewportFromUrl();
+    console.log("syncViewport");
+    _currentViewport = _getViewport();
   }
 
   function getCurrentViewport() {
+    console.log("getCurrentViewport", _currentViewport);
     return _currentViewport;
   }
 
