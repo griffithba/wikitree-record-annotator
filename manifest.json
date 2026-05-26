@@ -32,7 +32,7 @@
       "js": [
         "src/storage.js", 
         "src/sites/riksarkivet.js", 
-        "src/sites/digitalarkivet.js",
+//        "src/sites/digitalarkivet.js",
 //        "src/sites/archiveOrg.js",
         "src/wikitree.js"]
     },
@@ -62,7 +62,7 @@
         "src/ui.js",
         "src/storage.js", 
         "src/person.js",
-        "src/content.js"] */
+        "src/content.js"] 
     },
     {
       "matches": ["https://nye.digitalarkivet.no/source/*"],
@@ -76,7 +76,7 @@
         "src/ui.js",
         "src/storage.js", 
         "src/person.js",
-        "src/content.js"]
+        "src/content.js"] */
     }
   ],
 
