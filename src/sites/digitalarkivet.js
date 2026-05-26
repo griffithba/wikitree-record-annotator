@@ -1,9 +1,17 @@
+/*  This is copied from riksarkivet.js with a few changes. It's not working yet. Image coordinates aren't in the URL like with RA, so they'll 
+ *  have to be pulled from OpenSeadragon. The URL doesn't change on pan/zoom, so another mechanism will be needed for triggering re-rendering 
+ *  the annotations. The link that's saved for citations redirects to something different. Page keys should be taken from the permalink, not 
+ *  the one that it redirects to, in order for the WikiTree side of the extension to be able to highlight annotated sources and suggest 
+ *  citations. Attaching the WT ID to the URL to enable annotation highlighting and pre-filling of the WT ID on a new annotation may not work, 
+ *  since the URL redirect will probably cause the attached WT ID to be dropped.  
+ */
+
 (() => {
   "use strict";
 
   const id = "digitalarkivet";
 
-  let _currentViewport = null; // in image space coordinates, synced from URL hash
+  let _currentViewport = null; // in image space coordinates
 
   let _firstViewportRenderDone = false;
 
@@ -150,10 +158,6 @@
     );
   }
 
-  //function matchesUrl(url) {
-  //  return url.includes(id);
-  //}
-
   const _provider = {
     waitForViewerReady,
     getViewerContainer,
@@ -164,7 +168,6 @@
     getCleanPageUrl,
     initializeViewportTracking,
     id,
-    //matchesUrl,   
     getPageKey
   };
 
