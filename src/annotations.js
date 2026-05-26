@@ -63,23 +63,12 @@
     // only store annotations specific to this page
     annotations = await getAnnotationsByPage(key);
 
-    let saveNeeded = false;
-    // loop through annotations cleaning up from old format
-    annotations.forEach(a => {
-      if (a.name) {delete a.name; saveNeeded = true;}
-      if (a.birth) {delete a.birth; saveNeeded = true;}
-      if (a.death) {delete a.death; saveNeeded = true;}
-      if (a.status) {delete a.status; saveNeeded = true;}
-    });
-    
     // pre-fetch person data for all annotations simultaneously
-    const tasks = annotations.map(async a => {
-      a.wtIdFound = await personAPI.prefetch(a.wtId); 
-    });
-
-    if (saveNeeded) tasks.push(saveAnnotationsForPage(annotations));
-
-    await Promise.all(tasks);
+    await Promise.all(
+      annotations.map(async a => {
+          a.wtIdFound = await personAPI.prefetch(a.wtId); 
+      })
+    );
   }
 
 
