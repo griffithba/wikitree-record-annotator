@@ -84,7 +84,7 @@ async function fetchWikiTreeProfile(wtId) {
     form.append("action", "getPerson");
     form.append("key", wtId);
     form.append("fields", "FirstName,MiddleName,LastNameAtBirth,BirthDate,DeathDate");
-    form.append("appId", "wikitree-ref-overlays");
+    form.append("appId", "wikitree-record-annotator");
 
     console.log("Fetching WT profile:", wtId);
     const res = await fetch("https://api.wikitree.com/api.php", {
