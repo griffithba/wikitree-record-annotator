@@ -19,7 +19,7 @@
   }
 
 
-  async function exportAnnotations() {
+  async function exportAnnotations(file) {
     const annotations = await storageAPI.getAnnotations();
 
     const blob = new Blob(
@@ -43,7 +43,7 @@
     const a = document.createElement("a");
 
     a.href = url;
-    a.download = "wikitree-annotations.json";
+    a.download = file;
 
     a.click();
 

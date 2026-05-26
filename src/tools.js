@@ -13,6 +13,7 @@
     return _currentTool === "select";
   }
 
+
   let _addingBoxToAnnotationId = null;   // Non-null when adding box to existing annotation
   function isAddingBoxToAnnotationId() {
     return _addingBoxToAnnotationId;
@@ -21,15 +22,18 @@
     _addingBoxToAnnotationId = id;
   }
 
+
   let _selectedAnnotationId = null;      // Currently selected annotation (for editing/resizing)
   function getSelectedAnnotationId() {
     return _selectedAnnotationId;
   }
 
+
   let _activeBoxIndex = null;            // Index of selected box
   function getActiveBoxIndex() {
     return _activeBoxIndex;
   }
+
 
    // Drawing/drag state for box creation
   let _isDragging = false;               // Currently drawing a box
@@ -37,6 +41,7 @@
   let _endX = 0, _endY = 0;               // Box end (in overlay pixels)
   let _box = null;                       // Temporary DOM element while dragging
   let _resizing = null;                  // Resize state (when dragging resize handles)
+
 
   // ============================================================
   // ANNOTATION SELECTION & DISPLAY
@@ -53,6 +58,7 @@
     _activeBoxIndex = index;
     overlay.updateSelectionStyles();
   }
+
 
   /**
    * Clears current selection and closes any open dialogs
@@ -99,6 +105,7 @@
     overlay.getAnnotationLayerElement().appendChild(_box);
   }
 
+
   /**
    * Handles mousemove during box drawing
    * Updates temporary box dimensions to follow cursor
@@ -126,6 +133,7 @@
     _box.style.width = width + "px";
     _box.style.height = height + "px";
   }
+
 
   /**
    * Handles mouseup to finish drawing box
@@ -221,7 +229,7 @@
 
   
   // ============================================================
-  // 
+  // EDITING ANNOTATIONS
   // ============================================================
 
   /**
@@ -307,6 +315,7 @@
     });
   }
 
+
   /**
    * Initiates resize drag from a handle
    * Saves initial state and sets up event listeners
@@ -336,6 +345,7 @@
     document.addEventListener("mousemove", _onResizeMove);
     document.addEventListener("mouseup", _stopResize);
   }
+
 
   /**
    * Handles mousemove during resize drag
@@ -409,6 +419,7 @@
     overlay.renderAnnotations();
   }
 
+  
   /**
    * Finalizes resize drag and saves changes
    */

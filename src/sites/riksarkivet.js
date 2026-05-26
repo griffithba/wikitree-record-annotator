@@ -149,9 +149,6 @@
     );
   }
 
-  //function matchesUrl(url) {
-  //  return url.includes(id);
-  //}
 
   const _provider = {
     waitForViewerReady,
@@ -163,7 +160,6 @@
     getCleanPageUrl,
     initializeViewportTracking,
     id,
-    //matchesUrl,   
     getPageKey
   };
 

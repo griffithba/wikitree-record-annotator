@@ -3,7 +3,7 @@
 // zoom and pan by storing coordinates in image space (xywh).
 
 // ============================================================
-// SECTION 1: INITIALIZATION & DOM SETUP
+// INITIALIZATION & DOM SETUP
 // ============================================================
 const storageAPI = window.storageAPI;
 const personAPI = window.personAPI;
@@ -22,8 +22,8 @@ if (window.__wtOverlayInitialized) {
   archiveProvider.waitForViewerReady();
 }
 
-// ID from incoming WikiTree profile (if navigated from one)
-let incomingWtId = null;
+let incomingWtId = null;         // ID from incoming WikiTree profile (if navigated from one)
+let preFillWtIdOnCreate = false; // flag to pre-fill the editor with the incoming WikiTree profile ID on annotation creation
 
 /**
  * Extracts WikiTree ID from URL search params (from incoming profile)

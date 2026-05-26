@@ -19,7 +19,6 @@
       localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
     },
 
-    
     async updateAnnotation(id, patch) {
       const list = await this.getAnnotations();
 
@@ -31,6 +30,7 @@
     },
     
   };
+
 
   const CHROME_KEY = "wt-annotations";
   const CHROME_PEOPLE_KEY = "wt-people";
@@ -50,7 +50,6 @@
       });
     },
 
-    
     async updateAnnotation(id, patch) {
       const list = await this.getAnnotations();
 
@@ -62,6 +61,7 @@
     },
     
   };
+
 
   const serverAdapter = {
     async getAnnotations() {
@@ -76,7 +76,6 @@
         body: JSON.stringify(data)
       });
     },
-
     
     async updateAnnotation(id, patch) {
       await fetch(`/api/annotations/${id}`, {
@@ -112,7 +111,6 @@
     updateAnnotation(id, patch) {
       return adapter.updateAnnotation(id, patch);
     },
-    
   };
 
   // expose to content scripts

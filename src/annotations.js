@@ -44,7 +44,6 @@
   async function getAnnotationsByPage(pageKey) {
     const all = await storageAPI.getAnnotations();
     return all.filter(a => a.page === pageKey);
-    console.log("Loaded annotations for page", pageKey, annotations);
   }
 
   function getAnnotations() {

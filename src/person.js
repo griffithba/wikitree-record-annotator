@@ -28,11 +28,13 @@
     return true;
   }
 
+
   // pull person data from the cache
   function getCached(wtId) {
     return people.get(wtId);
   }
 
+  
   window.personAPI = {
     prefetch,
     getCached

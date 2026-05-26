@@ -2,10 +2,6 @@
 
 const fetchInProgress = new Map();
 
-// ============================================================
-// CONFIGURATION
-// ============================================================
-
 
 /**
  * Handles messages from content scripts (RA + WT pages)
@@ -80,6 +76,7 @@ async function handleWtFetch(wtId) {
   fetchInProgress.set(wtId, promise);
   return promise;
 }
+
 
 async function fetchWikiTreeProfile(wtId) {
   try {

@@ -10,6 +10,7 @@
     return _overlay;
   }
 
+
   // Visual layer for rendered annotations
   const _annotationLayer = document.createElement("div");
   _annotationLayer.id = "wt-annotation-layer";
@@ -17,12 +18,11 @@
     return _annotationLayer;
   }
 
+
   let _container = null;
 
   function initialize(viewerContainer) {
-
     _container = viewerContainer;
-
     _container.style.position = "relative";
   }
 
@@ -33,6 +33,7 @@
 
   let _renderInProgress = false;
   let _renderQueued = false;
+
 
   let _visible = true;
 
@@ -64,6 +65,7 @@
         ? "var(--wt-draw-overlay-border)"
         : "none";
   }
+
 
   /**
    * Updates visual styles for all annotation boxes based on selection state
@@ -126,6 +128,7 @@
     _container.appendChild(_overlay);
   }
 
+
   function attachEvents() {
     // Attach mouse event handlers
     _overlay.addEventListener("mousedown", tools.onMouseDown);
@@ -143,8 +146,9 @@
     });
   }
 
+
   // ============================================================
-  // SECTION 12: RENDERING ANNOTATIONS
+  // RENDERING ANNOTATIONS
   // ============================================================
 
   /**
@@ -198,6 +202,7 @@
       }
     }
   }
+
 
   /**
    * Renders a single annotation box on screen
@@ -306,6 +311,7 @@
     _annotationLayer.appendChild(box);
   }
 
+
   /**
    * Builds HTML title/tooltip for an annotation
    * Format: "Name (birth-death)" or WikiTree ID
@@ -352,6 +358,7 @@
     boxEl.appendChild(badge);
   }
 
+  
   /**
    * Triggers pulse animation on annotation if it matches incoming WT profile
    * Only highlights each annotation once, not on every re-render

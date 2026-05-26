@@ -13,6 +13,8 @@ A single annotation can have several highlighted boxes, which is useful if a per
 ## WikiTree integration
 On the WikiTree side, sources in a profile page are marked with an icon <img src="icons/highlighter16.png"> if the source has an annotation which is linked to the profile. Conversely, if an annotation exists in a source which is not cited in the profile, an icon <img src="icons/icon16.png"> next to the Sources header will serve as an indicator of that. Clicking the icon will bring up a list of the missing citations in a format that can be copied and pasted into the profile's edit page.  
 
+![Screen shot](screenshots/WT-screenshot.png)
+
 ## Installation
 The extension currently requires manual installation and is not yet published in the Chrome Web Store.
 1. Clone or download this repository.
@@ -27,7 +29,6 @@ Archive-specific functionality is separated into provider modules, allowing supp
 
 ### Archive runtime API
 
-### WikiTree provider API
 
 ## Annotation storage
 An annotation record consists of the following fields: 
