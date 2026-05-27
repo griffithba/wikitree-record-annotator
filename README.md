@@ -22,9 +22,9 @@ On the WikiTree side, sources in a profile page are marked with an icon <img src
 
 ## Installation
 The extension currently requires manual installation and is not yet published in the Chrome Web Store.
-1. Download the latest release ZIP from the Releases page
+1. Download the latest release ZIP from the [Releases page](https://github.com/griffithba/wikitree-record-annotator/releases)
 2. Extract the ZIP file
-3. Open `chrome://extensions`
+3. Open `chrome://extensions` in your browser
 4. Enable **Developer mode**
 5. Click **Load unpacked**
 6. Select the extracted extension folder
