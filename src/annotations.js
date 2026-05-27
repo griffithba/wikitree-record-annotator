@@ -127,6 +127,10 @@
     return a || null;
   }
 
+  function invalidateAnnotationCache() {
+    lastPageKey = null;
+  }
+
   window.annotationsAPI = {
     addAnnotation,
     saveAnnotationsForPage,
@@ -135,7 +139,8 @@
     getAnnotations,
     loadAnnotationsIfNeeded,
     deleteBox,
-    deleteAnnotation
+    deleteAnnotation,
+    invalidateAnnotationCache
   };
 
 

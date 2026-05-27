@@ -15,6 +15,8 @@
 
       await storageAPI.saveAnnotations(data.annotations);
 
+      annotationsAPI.invalidateAnnotationCache(); // Force reload of annotations for current page
+
       overlay.renderAnnotations();
   }
 

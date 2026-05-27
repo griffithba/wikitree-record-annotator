@@ -187,6 +187,7 @@
      exportBtn.addEventListener("click", async () => {
       const outputFile = "wikitree_annotations_" + getLocalTimestamp() + ".json";
       await backup.exportAnnotations(outputFile);
+      _utilPanel.style.display = "none"; // Hide panel after export
     });
        
     exportRow.appendChild(exportBtn);
@@ -227,6 +228,7 @@
         }
       });
       input.click();
+      _utilPanel.style.display = "none"; // Hide panel after initiating import
     });
 
     importRow.appendChild(importBtn);
