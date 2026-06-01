@@ -124,8 +124,10 @@
     });
 
     // Insert layers in order (annotation below overlay)
-    _container.appendChild(_annotationLayer);
-    _container.appendChild(_overlay);
+    const host = _container.parentElement; 
+
+    host.appendChild(_annotationLayer);
+    host.appendChild(_overlay);
   }
 
 
@@ -156,6 +158,7 @@
    * Syncs viewport, clears previous render, renders all boxes
    */
   async function renderAnnotations() {
+    console.count("renderAnnotations");
     if (_renderInProgress) {
       _renderQueued = true;
       return;
@@ -169,7 +172,9 @@
       archiveProvider.syncViewport();
 
       // Clear previous render
-      _annotationLayer.innerHTML = "";
+      while (_annotationLayer.firstChild) {
+        _annotationLayer.removeChild(_annotationLayer.firstChild);
+      }
 
       if (!isVisible()) return;
 
@@ -186,8 +191,8 @@
         });
       });
 
-      updateSelectionStyles();
-      ui.updateToolUI();
+      requestAnimationFrame(() => updateSelectionStyles());
+      requestAnimationFrame(() => ui.updateToolUI());
   
     } finally {
       _renderInProgress = false;
@@ -196,9 +201,7 @@
       // This handles the case where an initial momentary bogus viewport causes a render with incorrect coordinates.
       if (_renderQueued) {
         _renderQueued = false;
-        requestAnimationFrame(() => {
-          renderAnnotations();
-        });
+        requestAnimationFrame(renderAnnotations);
       }
     }
   }

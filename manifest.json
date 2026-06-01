@@ -32,6 +32,7 @@
       "js": [
         "src/storage.js", 
         "src/sites/riksarkivet.js", 
+        "src/sites/matricula.js",
 //        "src/sites/digitalarkivet.js",
 //        "src/sites/archiveOrg.js",
         "src/wikitree.js"]
@@ -49,11 +50,11 @@
         "src/storage.js", 
         "src/person.js",
         "src/content.js"]
-/*    },
+    },
     {
-      "matches": ["https://archive.org/details/*"],
+      "matches": ["https://data.matricula-online.eu/*"],
       "js": [
-        "src/sites/archiveOrg.js", 
+        "src/sites/matricula.js", 
         "src/theme.js",
         "src/tools.js",
         "src/annotations.js",
@@ -63,7 +64,7 @@
         "src/storage.js", 
         "src/person.js",
         "src/content.js"] 
-    },
+/*    },
     {
       "matches": ["https://nye.digitalarkivet.no/source/*"],
       "js": [
