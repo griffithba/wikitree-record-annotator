@@ -4,14 +4,9 @@
   const id = "matricula";
   let _currentViewport = null; 
   let _firstViewportRenderDone = false;
-  let _resizeObserver = null;
-  let _mutationObserver = null;
-  let _renderAnimationFrameId = null;
 
   
   function _injectPageScript() {
-    //return new Promise((resolve, reject) => {
-
       if (document.getElementById("wbe-matricula-page-script")) {
         return;
       }
@@ -22,7 +17,6 @@
       script.onload = () => script.remove();
 
       (document.head || document.documentElement).appendChild(script);
-    //});
   }
 
   function waitForViewerReady() {
@@ -49,20 +43,54 @@
   function getPageKey(href) {
     try {
       const url = new URL(href);
-      const params = new URLSearchParams(url.hash.replace("#", "?") || url.search);
-      const id = params.get("id") || "";
-      const page = params.get("page") || "1";
-      return id ? `${id}_p${page}` : "unknown_matricula_page";
+      // Pattern skips domain and the 2-letter language code, 
+      // captures everything up to the trailing slash as the book, 
+      // and captures the 'pg' query parameter via the standard URL api.
+      const pathRegex = /^\/[a-z]{2}\/(.+?)\/?$/i;
+      const match = url.pathname.match(pathRegex);
+    
+      if (match) {
+        const book = match[1];
+        const page = url.searchParams.get("pg") || "1";
+
+        return book ? `${book}_p${page}` : "unknown_matricula_page";
+      }
     } catch (e) {
       return "unknown_matricula_page";
     }
   }
 
   
-  async function getReferenceFromPage() {
-    const titleEl = document.querySelector(".page-header h1, #sidebar-metadata, .metadata-box");
-    return titleEl ? titleEl.innerText.trim() : null;
+/**
+ * Scrapes metadata directly from Matricula's structural table cells.
+ * Operates independently of the active interface language.
+ * @returns {string|null} The formatted reference citation string
+ */
+async function getReferenceFromPage() {
+  // Target rows inside the modal table component context frame
+  const rows = document.querySelectorAll(".modal-body table.table tbody tr");
+  
+  // Ensure the table structure has the expected 5 data rows
+  if (!rows || rows.length < 5) return null;
+
+  try {
+    // Extract text directly from the second cell (td) of each index position
+    const parish = rows[0].querySelector("td")?.innerText.trim() || "";
+    const identifier = rows[1].querySelector("td")?.innerText.trim() || "";
+    const registerType = rows[2].querySelector("td")?.innerText.trim() || "";
+    const dateStart = rows[3].querySelector("td")?.innerText.trim() || "";
+    const dateEnd = rows[4].querySelector("td")?.innerText.trim() || "";
+
+    if (parish && identifier && registerType && dateStart && dateEnd) {
+      // Assemble formatting chain: Parish, Register type, Identifier, Date range start - Date range end
+      return `${parish}, ${registerType}, ${identifier}, ${dateStart} - ${dateEnd}`;
+    }
+  } catch (e) {
+    console.error("Failed to scrape reference layout matrix data cells:", e);
   }
+
+  return null;
+}
 
   
   /**
@@ -91,10 +119,12 @@
     const halfWidthUnits = (viewWidth * resolution) / 2;
     const halfHeightUnits = (viewHeight * resolution) / 2;
 
-    // OpenLayers defaults image-space cartesian math down into the negative quadrant.
-    // We normalize these values into an absolute positive bounding array coordinate grid.
+    // Horizontal plane matches standard positive coordinate tracks
     const x = centerX - halfWidthUnits;
+    // Because moving down scales into negative territory in Matricula's engine,
+    // inverting centerY aligns the translation space to match standard positive browser dimensions.
     const y = -centerY - halfHeightUnits;
+    // Viewport dimensions map linearly to resolution sizing matrices
     const w = viewWidth * resolution;
     const h = viewHeight * resolution;
 
@@ -103,21 +133,41 @@
       y: Math.round(y), 
       w: Math.round(w), 
       h: Math.round(h),
-      // Expose properties to handle rotation transforms natively inside _renderBox
       rotation: rotation 
     };
 
-    //syncInteractionLayers();
   }
   function getCurrentViewport() {
     return _currentViewport;
   }
 
   
+  /**
+   * Generates a clean URL string.
+   * Explicitly preserves the page sequence parameter ('pg') while dropping 
+   * the profile ID ('wtId').
+   * @returns {string} Clean URL string
+   */
   function getCleanPageUrl() {
     const url = new URL(window.location.href);
-    url.hash = "";
-    return url.origin + url.pathname + url.search;
+    
+    // 1. Drop any temporary view layout hashes completely
+    url.hash = ""; 
+
+    // 2. Isolate and clean the active query parameter chain
+    const originalParams = url.searchParams;
+    const cleanParams = new URLSearchParams();
+
+    // 3. Explicitly put back the pg parameter if it exists
+    if (originalParams.has("pg")) {
+      cleanParams.set("pg", originalParams.get("pg"));
+    }
+
+    // 4. Update the URL object with the scrubbed parameter profile
+    url.search = cleanParams.toString();
+
+    // Returns the fully sanitized destination string
+    return url.toString();
   }
 
   
@@ -128,6 +178,13 @@
       if (e.data?.type === "MATRICULA_VIEW_CHANGED") {
         _syncViewport(e.data.state);
         overlay.renderAnnotations();
+                
+        if (!_firstViewportRenderDone) {
+
+          ui.updateToolUI();
+
+          _firstViewportRenderDone = true;
+        }
       }
     });
   }

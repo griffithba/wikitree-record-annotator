@@ -7,7 +7,6 @@
 function getViewInstance() {
   // 1. Happy Path: Check the known standard wrapper first
   if (window.dv1?.b?.view) {
-    console.log("🎯 Found view instance in known wrapper: window.dv1.b.view");
     return window.dv1.b.view;
   }
 
