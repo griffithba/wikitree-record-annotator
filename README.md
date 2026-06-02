@@ -48,13 +48,12 @@ To add a new provider module, the following functions and objects will need to b
 + function **getCurrentPageKey()** - Returns page identifier, used as a key for storing/loading annotations per page. This should be something from the URL so WikiTree will be able to cross-reference citations.
 + function **getPageKey(href)** - Returns the page identifier for the passed in URL. 
 + function **getReferenceFromPage()** - Returns citation reference text from the page.
-+ function **syncViewport()** - Stores current viewport internally as xywh.
-+ function **getCurrentViewport()** - Returns current viewport.
++ function **getCurrentViewport()** - Returns current viewport as xywh.
 + function **getCleanPageUrl()** - Returns URL with any position/zoom or other data stripped off. 
-+ function **initializeViewportTracking()** - Adds an event listener that will trigger annotation re-rendering after pan/zoom.
++ function **initializeViewportTracking()** - Adds an event listener that will update the stored current viewport and trigger annotation re-rendering after pan/zoom.
 + const **id** - Name to differentiate between different archive providers. (Stored as `source` in each annotation.)
 
-Each provider module needs to add itself to this list of providers like this: 
+Each provider module needs to add itself to the list of providers like this: 
 ```
 window.archiveProviders ??= [];
 window.archiveProviders.push(_provider);
