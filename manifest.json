@@ -84,11 +84,28 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "src/sites/matricula-page.js"
+      ],
+      "matches": [
+        "https://data.matricula-online.eu/*"
+      ]
+    },
+    {
+      "resources": [
         "src/suggestions.html",
-        "src/suggestions.js",
+        "src/suggestions.js"
+      ],
+      "matches": [
+        "https://www.wikitree.com/*"
+      ]
+    },
+    {
+      "resources": [
         "icons/*.png"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 

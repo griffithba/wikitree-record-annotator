@@ -168,9 +168,6 @@
       const _container = archiveProvider.getViewerContainer();
       if (!_container) return;
 
-      // Always sync viewport first (prevents lag when zooming)
-      archiveProvider.syncViewport();
-
       // Clear previous render
       while (_annotationLayer.firstChild) {
         _annotationLayer.removeChild(_annotationLayer.firstChild);

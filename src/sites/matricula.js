@@ -9,60 +9,29 @@
   let _renderAnimationFrameId = null;
 
   
-  /**
-   * Defensive Scraper: Iterates through global scope structures to discover 
-   * the unminified Matricula OpenLayers view state engine, even if the primary 
-   * root variable name changes.
-   */
-  function getViewInstance() {
-    // 1. Happy Path: Check the known standard wrapper first
-    if (window.dv1 && window.dv1.b && window.dv1.b.view) {
-      return window.dv1.b.view;
-    }
+  function _injectPageScript() {
+    //return new Promise((resolve, reject) => {
 
-    // 2. Dynamic Fallback Scraper: Deep search global object spaces
-    // Only inspect top-level variables matching minified or application hashes
-    const skipList = ["window", "document", "location", "top", "chrome", "Map", "Set"];
-    
-    for (const key in window) {
-      if (skipList.includes(key) || key.startsWith("webpack") || key.startsWith("__")) continue;
-
-      try {
-        const rootObj = window[key];
-        if (!rootObj || typeof rootObj !== "object") continue;
-
-        // Matricula wraps the view controller deep inside their application controller object tree.
-        // We traverse down possible nested objects to scan for the signature 'l' structure.
-        for (const subKey in rootObj) {
-          const subObj = rootObj[subKey];
-          if (!subObj || typeof subObj !== "object") continue;
-
-          // Check if this sub-object holds the 'view' structure
-          const viewObj = subObj.view || subObj._view || subObj.mapView;
-          if (viewObj && viewObj.l && "center" in viewObj.l && "resolution" in viewObj.l) {
-            console.log(`🎯 Defensive Scraper successfully recovered hidden view module under parameter: window.${key}.${subKey}.view`);
-            return viewObj;
-          }
-          
-          // Direct double-check if the subObj itself is the view object
-          if (subObj.l && "center" in subObj.l && "resolution" in subObj.l) {
-             console.log(`🎯 Defensive Scraper successfully recovered hidden view module under parameter: window.${key}.${subKey}`);
-             return subObj;
-          }
-        }
-      } catch (e) {
-        // Suppress cross-origin security context access block exceptions cleanly
+      if (document.getElementById("wbe-matricula-page-script")) {
+        return;
       }
-    }
 
-    return null;
+      const script = document.createElement("script");
+      script.id = "wbe-matricula-page-script";
+      script.src = chrome.runtime.getURL("src/sites/matricula-page.js");
+      script.onload = () => script.remove();
+
+      (document.head || document.documentElement).appendChild(script);
+    //});
   }
-  
+
   function waitForViewerReady() {
-    const view = _getViewInstance();
     const container = document.querySelector(".ol-viewport");
 
-    if (view && container) initOverlay();
+    if (container) {
+      _injectPageScript();
+      initOverlay();
+    }
     else setTimeout(waitForViewerReady, 200);
   }
 
@@ -99,26 +68,24 @@
   /**
    * Syncs viewport geometries directly from OpenLayers internal variables.
    */
-  function syncViewport() {
-    const view = _getViewInstance();
+  function _syncViewport(viewState) {
     const container = document.querySelector(".ol-viewport");
-    
-    if (!view || !container) {
+
+    if (!container) {
       _currentViewport = null;
       return;
     }
 
-    const viewState = view.l;
     if (!viewState || !viewState.center) return;
 
     const viewWidth = container.clientWidth || window.innerWidth;
     const viewHeight = container.clientHeight || window.innerHeight;
 
     // OpenLayers minified variable translation mapping:
-    const centerX = state.$[0];
-    const centerY = state.$[1];
-    const resolution = state.L; // units per pixel
-    const rotation = state.rotation || 0;
+    const centerX = viewState.center[0];
+    const centerY = viewState.center[1];
+    const resolution = viewState.resolution; // units per pixel
+    const rotation = viewState.rotation || 0;
 
     // Calculate total visible image span boundaries based on current resolution
     const halfWidthUnits = (viewWidth * resolution) / 2;
@@ -127,7 +94,7 @@
     // OpenLayers defaults image-space cartesian math down into the negative quadrant.
     // We normalize these values into an absolute positive bounding array coordinate grid.
     const x = centerX - halfWidthUnits;
-    const y = Math.abs(centerY + halfHeightUnits); // Keep coordinates uniformly positive
+    const y = -centerY - halfHeightUnits;
     const w = viewWidth * resolution;
     const h = viewHeight * resolution;
 
@@ -140,7 +107,7 @@
       rotation: rotation 
     };
 
-    syncInteractionLayers();
+    //syncInteractionLayers();
   }
   function getCurrentViewport() {
     return _currentViewport;
@@ -155,17 +122,13 @@
 
   
   function initializeViewportTracking() {
-    const vp = document.querySelector(".ol-viewport");
+    window.addEventListener("message", e => {
+      if (e.source !== window) return;
 
-    const rerender = () => overlay.renderAnnotations();
-
-    vp.addEventListener("pointerup", rerender);
-    vp.addEventListener("wheel", rerender, { passive: true });
-
-    new MutationObserver(rerender).observe(vp, {
-      attributes: true,
-      childList: true,
-      subtree: true
+      if (e.data?.type === "MATRICULA_VIEW_CHANGED") {
+        _syncViewport(e.data.state);
+        overlay.renderAnnotations();
+      }
     });
   }
 
@@ -175,7 +138,6 @@
     getViewerContainer,
     getCurrentPageKey,
     getReferenceFromPage,
-    syncViewport,
     getCurrentViewport,
     getCleanPageUrl,
     initializeViewportTracking,
