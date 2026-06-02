@@ -1,7 +1,7 @@
 # WikiTree Record Annotator
 <img src="icons/icon128.png" align="left" width="128" height="128" style="margin-right: 15px;">
 
-This Chrome/Chromium browser extension overlays WikiTree-linked annotations directly onto online historical record images. It currently supports records hosted by the Swedish National Archives (Riksarkivet), but is designed to be expandable to other archive sites. Annotations are stored locally using Chrome storage, but the design could be extended to a future shared or collaborative storage model. The current model includes export and import capabilities, opening the door to some degree of sharing and collaboration.<br clear="left"/>
+This Chrome/Chromium browser extension overlays WikiTree-linked annotations directly onto online historical record images. It currently supports records hosted by the [Swedish National Archives (Riksarkivet)](https://sok.riksarkivet.se/) and [Matricula Online](https://data.matricula-online.eu/en/), but is designed to be expandable to other archive sites. Annotations are stored locally using Chrome storage, and work is underway to have a single shared annotation database on WikiTree+. The current local storage model includes export and import capabilities.<br clear="left"/>
 
 ## Features
 Annotations appear as shaded boxes over the record image. Their size and position are tied to image coordinates, so they remain correctly positioned during zooming and panning. Hovering the mouse over a box displays information about the linked WikiTree profile, and an optional note (see Lena Persdotter in the screenshot), and clicking on the box will open the profile in a new tab. A toolbar enables the user to draw new annotations, select existing annotations (to edit or delete), and toggle between hiding or showing all annotations. 
@@ -30,7 +30,7 @@ The extension currently requires manual installation and is not yet published in
 6. Select the extracted extension folder
 
 ## Current limitations
-- Currently supports only Riksarkivet
+- Currently supports only Riksarkivet and Matricula Online
 - Chrome/Chromium-based browsers only
 - Mobile (touchscreen) support is experimental
 - Annotations are stored locally in browser storage
@@ -39,8 +39,7 @@ The extension currently requires manual installation and is not yet published in
 
 # Technical details
 ## Archive provider architecture
-Archive-specific functionality is separated into provider modules, allowing support for additional archive providers to be added incrementally. Since there is currently only one provider, unforseen differences between providers may necessitate future changes to the API.  
-
+Archive-specific functionality is encapsulated in provider modules that implement a common interface, allowing the core extension to support multiple archive providers while minimizing provider-specific code.
 ### Archive provider API
 To add a new provider module, the following functions and objects will need to be provided: 
 + function **waitForViewerReady()** - Once the page is loaded, calls initOverlay() and then returns.
