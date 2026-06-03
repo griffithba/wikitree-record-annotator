@@ -158,7 +158,6 @@
    * Syncs viewport, clears previous render, renders all boxes
    */
   async function renderAnnotations() {
-    console.count("renderAnnotations");
     if (_renderInProgress) {
       _renderQueued = true;
       return;
