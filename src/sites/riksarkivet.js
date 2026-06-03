@@ -110,7 +110,7 @@
    * Syncs currentViewport from URL hash
    * Call before rendering to pick up any viewer pan/zoom changes
    */
-  function syncViewport() {
+  function _syncViewport() {
     _currentViewport = _getViewportFromUrl();
   }
 
@@ -137,6 +137,7 @@
     window.addEventListener(
       "hashchange",
       () => {
+        _syncViewport();
         overlay.renderAnnotations();
 
         if (!_firstViewportRenderDone) {
@@ -155,7 +156,6 @@
     getViewerContainer,
     getCurrentPageKey,
     getReferenceFromPage,
-    syncViewport,
     getCurrentViewport,
     getCleanPageUrl,
     initializeViewportTracking,

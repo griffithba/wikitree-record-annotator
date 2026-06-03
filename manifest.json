@@ -32,6 +32,7 @@
       "js": [
         "src/storage.js", 
         "src/sites/riksarkivet.js", 
+        "src/sites/matricula.js",
 //        "src/sites/digitalarkivet.js",
 //        "src/sites/archiveOrg.js",
         "src/wikitree.js"]
@@ -49,11 +50,11 @@
         "src/storage.js", 
         "src/person.js",
         "src/content.js"]
-/*    },
+    },
     {
-      "matches": ["https://archive.org/details/*"],
+      "matches": ["https://data.matricula-online.eu/*"],
       "js": [
-        "src/sites/archiveOrg.js", 
+        "src/sites/matricula.js", 
         "src/theme.js",
         "src/tools.js",
         "src/annotations.js",
@@ -63,7 +64,7 @@
         "src/storage.js", 
         "src/person.js",
         "src/content.js"] 
-    },
+/*    },
     {
       "matches": ["https://nye.digitalarkivet.no/source/*"],
       "js": [
@@ -83,11 +84,28 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "src/sites/matricula-page.js"
+      ],
+      "matches": [
+        "https://data.matricula-online.eu/*"
+      ]
+    },
+    {
+      "resources": [
         "src/suggestions.html",
-        "src/suggestions.js",
+        "src/suggestions.js"
+      ],
+      "matches": [
+        "https://www.wikitree.com/*"
+      ]
+    },
+    {
+      "resources": [
         "icons/*.png"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 

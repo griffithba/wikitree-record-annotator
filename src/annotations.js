@@ -62,7 +62,9 @@
 
     // only store annotations specific to this page
     annotations = await getAnnotationsByPage(key);
-
+    // log all loaded annotations for debugging
+    console.log(`Loaded ${annotations.length} annotations for page ${key}`, 
+                annotations);
     // pre-fetch person data for all annotations simultaneously
     await Promise.all(
       annotations.map(async a => {
@@ -73,7 +75,7 @@
 
 
   // ============================================================
-  // SECTION 11: ANNOTATION OPERATIONS (ADD/DELETE)
+  // ANNOTATION OPERATIONS (ADD/DELETE)
   // ============================================================
 
   /**
