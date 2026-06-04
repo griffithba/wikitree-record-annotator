@@ -4,7 +4,7 @@
   const id = "matricula";
   let _currentViewport = null; 
   let _firstViewportRenderDone = false;
-
+  let _currentViewerContainer = null;
   
   function _injectPageScript() {
       if (document.getElementById("wbe-matricula-page-script")) {
@@ -20,9 +20,10 @@
   }
 
   function waitForViewerReady() {
-    const container = document.querySelector(".ol-viewport");
+    const container = getViewerContainer();
 
     if (container) {
+      _currentViewerContainer = container;
       _injectPageScript();
       initOverlay();
     }
@@ -97,7 +98,7 @@ async function getReferenceFromPage() {
    * Syncs viewport geometries directly from OpenLayers internal variables.
    */
   function _syncViewport(viewState) {
-    const container = document.querySelector(".ol-viewport");
+    const container = getViewerContainer();
 
     if (!container) {
       _currentViewport = null;
@@ -169,14 +170,39 @@ async function getReferenceFromPage() {
     // Returns the fully sanitized destination string
     return url.toString();
   }
-
   
+
   function initializeViewportTracking() {
     window.addEventListener("message", e => {
       if (e.source !== window) return;
 
       if (e.data?.type === "MATRICULA_VIEW_CHANGED") {
         _syncViewport(e.data.state);
+
+        const container = getViewerContainer();
+        // If there's been a page change.
+        if (_currentViewerContainer !== container) {
+          _currentViewerContainer = container;
+          const host = container.parentElement; 
+
+          // Re-attach overlay layers to the new page's viewer container
+          host.appendChild(overlay.getAnnotationLayerElement());
+          host.appendChild(overlay.getOverlayElement());
+
+          // Remove wtId from URL if present
+          const url = new URL(window.location.href);
+
+          if (url.searchParams.has("wtId")) {
+            url.searchParams.delete("wtId");
+
+            history.replaceState(
+              history.state,
+              "",
+              url.toString()
+            );
+          }
+        }
+
         overlay.renderAnnotations();
                 
         if (!_firstViewportRenderDone) {

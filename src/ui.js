@@ -17,6 +17,8 @@
   let _utilPanel = null; 
 
   function createToolbar() {
+    // Make sure there is no stale toolbar from a previous page instance
+    document.getElementById("wt-toolbar")?.remove();
     const toolbar = document.createElement("div");
     toolbar.id = "wt-toolbar";
 
@@ -63,8 +65,38 @@
 
     header.appendChild(icon);
     header.appendChild(title);
+    header.addEventListener("mousedown", startDrag);
 
     toolbar.appendChild(header);
+
+    // Make the toolbar draggable
+    function startDrag(e) {
+      const rect = toolbar.getBoundingClientRect();
+
+      // Convert from bottom-centered positioning
+      // to top-left positioning.
+      toolbar.style.left = `${rect.left}px`;
+      toolbar.style.top = `${rect.top}px`;
+
+      toolbar.style.bottom = "auto";
+      toolbar.style.transform = "none";
+
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+
+      function drag(e) {
+        toolbar.style.left = `${e.clientX - offsetX}px`;
+        toolbar.style.top = `${e.clientY - offsetY}px`;
+      }
+
+      function stop() {
+        document.removeEventListener("mousemove", drag);
+        document.removeEventListener("mouseup", stop);
+      }
+
+      document.addEventListener("mousemove", drag);
+      document.addEventListener("mouseup", stop);
+    }
 
     //
     // Button row
@@ -184,7 +216,7 @@
     const exportText = document.createElement("span");
     exportText.textContent = "all annotations to a JSON file";
 
-     exportBtn.addEventListener("click", async () => {
+    exportBtn.addEventListener("click", async () => {
       const outputFile = "wikitree_annotations_" + getLocalTimestamp() + ".json";
       await backup.exportAnnotations(outputFile);
       _utilPanel.style.display = "none"; // Hide panel after export

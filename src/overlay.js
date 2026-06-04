@@ -98,8 +98,8 @@
   
   function createLayers() {
     // remove any stale overlays first
-    document.getElementById("wt-toolbar")?.remove();
     document.getElementById("wt-overlay")?.remove();
+    document.getElementById("wt-annotation-layer")?.remove();
     
     // Annotation layer: visual only, no interaction
     Object.assign(_annotationLayer.style, {
@@ -108,6 +108,7 @@
       left: "0",
       width: "100%",
       height: "100%",
+      zIndex: "99998",
       pointerEvents: "none"
     });
 
@@ -138,7 +139,8 @@
     _overlay.addEventListener("mouseup", tools.onMouseUp);
 
     // Container click: clear selection when clicking empty space
-    _container.addEventListener("click", (e) => {
+    const host = _container.parentElement; 
+    host.addEventListener("click", (e) => {
       if (!tools.isSelecting() || tools.isAddingBoxToAnnotationId()) return;
     
       // If click was on an annotation, ignore
