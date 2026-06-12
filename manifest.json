@@ -23,7 +23,8 @@
   },
 
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background.js",
+    "type": "module"
   },
   
   "content_scripts": [
@@ -47,6 +48,7 @@
         "src/overlay.js",
         "src/backup.js",
         "src/ui.js",
+        "src/wtplus.js",
         "src/storage.js", 
         "src/person.js",
         "src/content.js"]
@@ -61,6 +63,7 @@
         "src/overlay.js",
         "src/backup.js",
         "src/ui.js",
+        "src/wtplus.js",
         "src/storage.js", 
         "src/person.js",
         "src/content.js"] 
