@@ -34,14 +34,25 @@
         "src/storage.js", 
         "src/sites/riksarkivet.js", 
         "src/sites/matricula.js",
-//        "src/sites/digitalarkivet.js",
-//        "src/sites/archiveOrg.js",
         "src/wikitree.js"]
     },
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
       "js": [
-        "src/sites/riksarkivet.js", 
+        "src/sites/riksarkivet.js"
+      ]
+    },
+    {
+      "matches": ["https://data.matricula-online.eu/*"],
+      "js": [
+        "src/sites/matricula.js" 
+      ] 
+    },
+    {
+      "matches": [
+        "https://sok.riksarkivet.se/bildvisning/*", 
+        "https://data.matricula-online.eu/*"],
+      "js": [
         "src/theme.js",
         "src/tools.js",
         "src/annotations.js",
@@ -52,35 +63,6 @@
         "src/storage.js", 
         "src/person.js",
         "src/content.js"]
-    },
-    {
-      "matches": ["https://data.matricula-online.eu/*"],
-      "js": [
-        "src/sites/matricula.js", 
-        "src/theme.js",
-        "src/tools.js",
-        "src/annotations.js",
-        "src/overlay.js",
-        "src/backup.js",
-        "src/ui.js",
-        "src/wtplus.js",
-        "src/storage.js", 
-        "src/person.js",
-        "src/content.js"] 
-/*    },
-    {
-      "matches": ["https://nye.digitalarkivet.no/source/*"],
-      "js": [
-        "src/sites/digitalarkivet.js", 
-        "src/theme.js",
-        "src/tools.js",
-        "src/annotations.js",
-        "src/overlay.js",
-        "src/backup.js",
-        "src/ui.js",
-        "src/storage.js", 
-        "src/person.js",
-        "src/content.js"] */
     }
   ],
 
@@ -107,7 +89,9 @@
         "icons/*.png"
       ],
       "matches": [
-        "<all_urls>"
+        "https://www.wikitree.com/*",
+        "https://sok.riksarkivet.se/*",
+        "https://data.matricula-online.eu/*"
       ]
     }
   ]
