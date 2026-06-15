@@ -255,6 +255,7 @@
     // Track annotation ID and frame index for toolbar/resize operations
     frame.dataset.annotationId = a.wikitreeid;
     frame.dataset.frameIndex = index;
+    frame.dataset.frameId = frameData.frameid;
 
     // Click handler: select in select mode, or open WikiTree profile
     frame.addEventListener("click", (e) => {

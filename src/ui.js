@@ -125,7 +125,7 @@
         tools.setActiveDrawingPerson(person.wikitreeid);
         tools.setTool("draw");
         updateToolUI();
-        _updateToolbarButtons();
+        //_updateToolbarButtons();
       }
     ));
     buttonRow.appendChild(_makeToolButton("Select", "select"));
@@ -433,7 +433,7 @@
       } else {
         tools.setTool(toolName);
         updateToolUI();
-        _updateToolbarButtons();
+        //_updateToolbarButtons();
       }
     });
 
@@ -454,6 +454,8 @@
         el.style.pointerEvents = "auto";
       }
     });
+
+    _updateToolbarButtons();
 
     overlay.setDrawingState(tools.isDrawing());
   }
@@ -647,10 +649,11 @@
     // "✏️" button: open WT ID editor
     editBtn.onclick = (e) => {
       e.stopPropagation();
-      const box = e.target.closest(".wt-annotation");
-      if (!box) return;
-      const rect = box.getBoundingClientRect();
-      tools.editAnnotation(id, rect.left + rect.width, rect.top + rect.height);
+      const frame = e.target.closest(".wt-annotation");
+      if (!frame) return;
+      const rect = frame.getBoundingClientRect();
+      const frameId = Number(frame.dataset.frameId);
+      tools.editFrame(id, frameId, rect.left + rect.width, rect.top + rect.height);
     };
 
     // "🗑️" button: delete with confirmation

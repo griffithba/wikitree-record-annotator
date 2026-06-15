@@ -33,7 +33,7 @@
   }
 
   async function updateExistingAnnotation(id, patch) {
-    await storageAPI.updateAnnotation(id, patch);
+    // await storageAPI.updateAnnotation(id, patch);
   }
 
   /**

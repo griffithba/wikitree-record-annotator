@@ -67,7 +67,6 @@
   function clearSelection() {
     _selectedAnnotationId = null;
     _activeBoxIndex = null;
-    _addingBoxToAnnotationId = null;
     overlay.updateSelectionStyles();
     ui.closeWtEditor();
   }
@@ -160,28 +159,26 @@
 
     // STEP 2: Normalize rectangle in image space
     const newFrame = {
+      frameid: null, 
       x: Math.min(x1, x2),
       y: Math.min(y1, y2),
       w: Math.abs(x2 - x1),
-      h: Math.abs(y2 - y1)
+      h: Math.abs(y2 - y1), 
+      note: null
     };
 
     const annotation = annotationsAPI.getAnnotationByWtId(_activeDrawingPerson);
     if (annotation) {
       // Case 1: Adding box to existing annotation
-
+newFrame.frameid = 2;  // temporary ID until WT+
       annotation.frames.push(newFrame);
 
       await annotationsAPI.updateExistingAnnotation(annotation.wikitreeid, { frames: annotation.frames });
       overlay.renderAnnotations();
 
-      _box.remove();
-      _box = null;
-   
-      return;
-
     } else {
       // Case 2: Creating new annotation
+newFrame.frameid = 1;  // temporary ID until WT+
       const key = archiveProvider.getCurrentPageKey();
       const annotation = {
         site: key.site,
@@ -190,39 +187,18 @@
         reference: await archiveProvider.getReferenceFromPage(),
         frames: [newFrame],
         wikitreeid: _activeDrawingPerson,
-        note: null, 
         wtIdFound: await personAPI.prefetch(_activeDrawingPerson) // pre-fetch person data for this ID
       };
-/*
-      // Prompt user for WikiTree ID
-      ui.openWtEditor({
-        x: e.clientX,
-        y: e.clientY,
-        initialValue: incomingWtId ? incomingWtId : "",
-        initialNote: "",
-        onSave: async ({wtId, note}) => {
-          annotation.wtId = wtId;
-          annotation.note = note;
-          annotation.wtIdFound = 
-          await annotationsAPI.addAnnotation(annotation);
-          incomingWtId = null;    // clear this to avoid prefilling the editor after the first time
-          _box.remove();
-          _box = null;
-        },
-        onCancel: () => {
-          _box.remove();
-          _box = null;
-        }
-      }); */
 
       await annotationsAPI.addAnnotation(annotation);
-      _box.remove();
-      _box = null;
-
-      tools.clearActiveDrawingPerson();
-      tools.setTool(null);
-      ui.updateToolUI();
     }
+      
+    _box.remove();
+    _box = null;
+
+    clearActiveDrawingPerson();
+    setTool(null);
+    ui.updateToolUI();
   }
 
   
@@ -232,30 +208,33 @@
 
   /**
    * Opens editor to modify WT ID and note for an existing annotation
-   * @param {string} id - Annotation ID
+   * @param {string} id - Annotation ID (WikiTree ID)
+   * @param {number} frameId - Unique ID of the frame to edit
    * @param {number} screenX - Screen X position for dialog
    * @param {number} screenY - Screen Y position for dialog
    */
-  function editAnnotation(id, screenX, screenY) {
-    const annotation = annotationsAPI.getAnnotationById(id);
+  function editFrame(id, frameId, screenX, screenY) {
+    const annotation = annotationsAPI.getAnnotationByWtId(id);
     if (!annotation) return;
   
+    const frameData = annotation.frames.find(f => f.frameid === frameId);
+
     ui.openWtEditor({
       x: screenX,
       y: screenY,
-      initialValue: annotation.wtId || "",
-      initialNote: annotation.note || "",
+      initialValue: annotation.wikitreeid || "",
+      initialNote: frameData.note || "",
 
       onSave: async ({wtId, note}) => {
-        if (wtId !== annotation.wtId) {
+        if (wtId !== annotation.wikitreeid) {
           annotation.wtId = wtId;
           annotation.wtIdFound = await personAPI.prefetch(annotation.wtId);
         }
-        annotation.note = note;
+        frameData.note = note;
 
-        await annotationsAPI.updateExistingAnnotation(annotation.id, 
-          { wtId: annotation.wtId, 
-            note: annotation.note });
+//        await annotationsAPI.updateExistingAnnotation(annotation.id, 
+//          { wtId: annotation.wtId, 
+//            note: annotation.note });
         overlay.renderAnnotations();
       }
     });
@@ -323,7 +302,7 @@
    */
   function _startResize(e, frameEl, corner) {
     const id = frameEl.dataset.annotationId;
-    const annotation = annotationsAPI.getAnnotationById(id);
+    const annotation = annotationsAPI.getAnnotationByWtId(id);
     if (!annotation) return;
 
     const frameIndex = Number(frameEl.dataset.boxIndex);
@@ -372,7 +351,7 @@
     const dyImg = dy * scaleY;
 
     // STEP 3: Apply delta to annotation box in image space
-    const annotation = annotationsAPI.getAnnotationById(_resizing.id);
+    const annotation = annotationsAPI.getAnnotationByWtId(_resizing.id);
     if (!annotation) return;
 
     const frame = annotation.frames[_resizing.frameIndex];
@@ -424,7 +403,7 @@
   function _stopResize() {
     if (!_resizing) return;
 
-    annotationsAPI.saveAnnotationsForPage();
+    //annotationsAPI.saveAnnotationsForPage();
 
     _resizing = null;
 
@@ -445,7 +424,7 @@
     addResizeHandles,
     getSelectedAnnotationId,
     getActiveFrameIndex,
-    editAnnotation,
+    editFrame,
     onMouseDown,
     onMouseMove,
     onMouseUp
