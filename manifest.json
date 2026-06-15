@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WikiTree Record Annotator",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Annotate record images with WikiTree profiles",
   "action": {
     "default_title": "WikiTree Record Annotator",
@@ -39,30 +39,34 @@
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
       "js": [
-        "src/sites/riksarkivet.js"
+        "src/sites/riksarkivet.js",
+        "src/theme.js",
+        "src/tools.js",
+        "src/wtplus.js",
+        "src/annotations.js",
+        "src/overlay.js",
+        "src/backup.js",
+        "src/ui.js",
+        "src/storage.js", 
+        "src/person.js",
+        "src/content.js"
       ]
     },
     {
       "matches": ["https://data.matricula-online.eu/*"],
       "js": [
-        "src/sites/matricula.js" 
-      ] 
-    },
-    {
-      "matches": [
-        "https://sok.riksarkivet.se/bildvisning/*", 
-        "https://data.matricula-online.eu/*"],
-      "js": [
+        "src/sites/matricula.js",
         "src/theme.js",
         "src/tools.js",
+        "src/wtplus.js",
         "src/annotations.js",
         "src/overlay.js",
         "src/backup.js",
         "src/ui.js",
-        "src/wtplus.js",
         "src/storage.js", 
         "src/person.js",
-        "src/content.js"]
+        "src/content.js" 
+      ] 
     }
   ],
 

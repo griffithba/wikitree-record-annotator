@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const id = "matricula";
+  const site = "matricula";
   let _currentViewport = null; 
   let _firstViewportRenderDone = false;
   let _currentViewerContainer = null;
@@ -224,7 +224,7 @@ async function getReferenceFromPage() {
     getCurrentViewport,
     getCleanPageUrl,
     initializeViewportTracking,
-    id,
+    site,
     getPageKey
   };
 

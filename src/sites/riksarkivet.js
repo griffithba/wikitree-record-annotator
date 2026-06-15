@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const id = "riksarkivet";
+  const site = "riksarkivet";
 
   let _currentViewport = null; // in image space coordinates, synced from URL hash
 
@@ -36,8 +36,9 @@
     return getPageKey(window.location.href);
   }
   function getPageKey(href) {
-    const match = href.match(/\/bildvisning\/([^/?#]+)/i);
-    return match ? match[1] : "unknown";
+    let match = href.match(/\/bildvisning\/([^/?#]+)/i);
+    const [book, page] = match[1]?.split("_") || [null, null];
+    return {site, book, page };
   }
 
   /**
@@ -159,7 +160,7 @@
     getCurrentViewport,
     getCleanPageUrl,
     initializeViewportTracking,
-    id,
+    site,
     getPageKey
   };
 

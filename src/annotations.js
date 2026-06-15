@@ -3,9 +3,9 @@
   "use strict";
 
   // Annotations array (stored in IMAGE SPACE coordinates)
-  let annotations = [];
+  let _annotations = [];
   // Page tracking for lazy loading
-  let lastPageKey = null;               // Track current page to avoid redundant loads
+  let _lastPageKey = null;               // Track current page to avoid redundant loads
 
 
 
@@ -26,7 +26,7 @@
     const others = all.filter(a => a.page !== key);
 
     // Add updated ones
-    const updated = [...others, ...annotations];
+    const updated = [...others, ..._annotations];
 
     // WARNING: Using this function incorrectly will delete all annotations!
     await storageAPI.saveAnnotations(updated);
@@ -41,36 +41,43 @@
    * @param {string} pageKey - Page identifier
    * @returns {Array} Annotations for that page
    */
-  async function getAnnotationsByPage(pageKey) {
-    const all = await storageAPI.getAnnotations();
-    return all.filter(a => a.page === pageKey);
+  async function _getAnnotationsByPage(site, book, page) {
+    return(await wtplusAPI.getFramesForPage(site, book, page)) || [];
   }
 
   function getAnnotations() {
-    return annotations;
+    return _annotations;
   }
+
+
 
   /**
    * Loads annotations for current page if not already loaded
-   * Lazy loads to avoid loading every page's annotations at startup
    */
   async function loadAnnotationsIfNeeded() {
     const key = archiveProvider.getCurrentPageKey();
 
-    if (key === lastPageKey) return;  // Already loaded
-    lastPageKey = key;
+    if (samePage(key, _lastPageKey)) return;  // Already loaded
+    _lastPageKey = key;
 
-    // only store annotations specific to this page
-    annotations = await getAnnotationsByPage(key);
-    // log all loaded annotations for debugging
-    console.log(`Loaded ${annotations.length} annotations for page ${key}`, 
-                annotations);
+    _annotations = await _getAnnotationsByPage(key.site, key.book, key.page) || [];
+
+    console.log(`Loaded ${_annotations.length} annotations for page ${key}`, 
+                _annotations);
     // pre-fetch person data for all annotations simultaneously
     await Promise.all(
-      annotations.map(async a => {
-          a.wtIdFound = await personAPI.prefetch(a.wtId); 
+      _annotations.map(async a => {
+          a.wtIdFound = await personAPI.prefetch(a.wikitreeid); 
       })
     );
+
+    function samePage(a, b) {
+      return a &&
+             b &&
+             a.site === b.site &&
+             a.book === b.book &&
+             a.page === b.page;
+    }
   }
 
 
@@ -85,7 +92,7 @@
    * @param {number} boxIndex - Index of box to delete
    */
   async function deleteBox(annotationId, boxIndex) {
-    const annotation = getAnnotationById(annotationId);
+    const annotation = getAnnotationByWtId(annotationId);
     if (!annotation) return;
 
     if (annotation.boxes.length > 1) {
@@ -93,17 +100,17 @@
       annotation.boxes.splice(boxIndex, 1);
     } else {
       // Last box → delete entire annotation
-      deleteAnnotation(annotationId);
+      _deleteAnnotation(annotationId);
       return;
     }
 
-    await saveAnnotationsForPage(annotations);
+    await saveAnnotationsForPage();
     overlay.renderAnnotations();
   }
 
   async function addAnnotation(annotation) {
-    annotations.push(annotation);
-    await saveAnnotationsForPage(annotations);
+    _annotations.push(annotation);
+    // await saveAnnotationsForPage();
     overlay.renderAnnotations();
   }
 
@@ -111,37 +118,36 @@
    * Deletes entire annotation and clears selection
    * @param {string} id - Annotation ID
    */
-  async function deleteAnnotation(id) {
-    annotations = annotations.filter(a => a.id !== id);
-    await saveAnnotationsForPage(annotations);
+  async function _deleteAnnotation(id) {
+    _annotations = _annotations.filter(a => a.id !== id);
+    await saveAnnotationsForPage();
     if (tools.getSelectedAnnotationId() === id) tools.clearSelection();
     overlay.renderAnnotations();
   }
 
   /**
-   * Finds annotation by ID
-   * @param {string} id - Annotation ID
+   * Finds annotation by WikiTree ID
+   * @param {string} wtId - WikiTree ID
    * @returns {Object|null} Annotation object or null if not found
    */
-  function getAnnotationById(id) {
-    const a = annotations.find(x => x.id === id);
-    if (!a) console.warn("Annotation not found:", id);
+  function getAnnotationByWtId(wtId) {
+    const a = _annotations.find(x => x.wikitreeid === wtId);
+    if (!a) console.log("Annotation not found:", wtId);
     return a || null;
   }
 
   function invalidateAnnotationCache() {
-    lastPageKey = null;
+    _lastPageKey = null;
   }
 
   window.annotationsAPI = {
     addAnnotation,
     saveAnnotationsForPage,
     updateExistingAnnotation,
-    getAnnotationById,
+    getAnnotationByWtId,
     getAnnotations,
     loadAnnotationsIfNeeded,
     deleteBox,
-    deleteAnnotation,
     invalidateAnnotationCache
   };
 

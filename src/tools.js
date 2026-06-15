@@ -14,15 +14,6 @@
   }
 
 
-  let _addingBoxToAnnotationId = null;   // Non-null when adding box to existing annotation
-  function isAddingBoxToAnnotationId() {
-    return _addingBoxToAnnotationId;
-  }
-  function setAddingBoxToAnnotationId(id) {
-    _addingBoxToAnnotationId = id;
-  }
-
-
   let _selectedAnnotationId = null;      // Currently selected annotation (for editing/resizing)
   function getSelectedAnnotationId() {
     return _selectedAnnotationId;
@@ -30,8 +21,17 @@
 
 
   let _activeBoxIndex = null;            // Index of selected box
-  function getActiveBoxIndex() {
+  function getActiveFrameIndex() {
     return _activeBoxIndex;
+  }
+
+
+  let _activeDrawingPerson = null;      // WikiTree ID of person associated with the box currently being drawn
+  function setActiveDrawingPerson(person) {
+    _activeDrawingPerson = person;
+  }
+  function clearActiveDrawingPerson() {
+    _activeDrawingPerson = null;
   }
 
 
@@ -82,7 +82,7 @@
    * Creates temporary DOM element that follows mouse
    */
   function onMouseDown(e) {
-    if (!isDrawing() && !isAddingBoxToAnnotationId()) return;
+    if (!isDrawing()) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -111,7 +111,7 @@
    * Updates temporary box dimensions to follow cursor
    */
   function onMouseMove(e) {
-    if ((!isDrawing() && !isAddingBoxToAnnotationId()) || !_isDragging || !_box) return;
+    if (!isDrawing() || !_isDragging || !_box) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -140,7 +140,7 @@
    * Either adds box to new annotation (prompts for WT ID) or existing annotation
    */
   async function onMouseUp(e) {
-    if ((!isDrawing() && !isAddingBoxToAnnotationId()) || !_isDragging || !_box) return;
+    if (!isDrawing() || !_isDragging || !_box) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -159,49 +159,41 @@
     const y2 = vp.y + (_endY / rect.height) * vp.h;
 
     // STEP 2: Normalize rectangle in image space
-    const newBox = {
+    const newFrame = {
       x: Math.min(x1, x2),
       y: Math.min(y1, y2),
       w: Math.abs(x2 - x1),
       h: Math.abs(y2 - y1)
     };
 
-    if (isAddingBoxToAnnotationId()) {
+    const annotation = annotationsAPI.getAnnotationByWtId(_activeDrawingPerson);
+    if (annotation) {
       // Case 1: Adding box to existing annotation
-      const annotation = annotationsAPI.getAnnotationById(_selectedAnnotationId);
-      if (!annotation) return;
 
-      annotation.boxes.push(newBox);
+      annotation.frames.push(newFrame);
 
-      await annotationsAPI.updateExistingAnnotation(annotation.id, { boxes: annotation.boxes });
+      await annotationsAPI.updateExistingAnnotation(annotation.wikitreeid, { frames: annotation.frames });
       overlay.renderAnnotations();
 
       _box.remove();
       _box = null;
-
-      // Clear add-box mode after handlers finish
-      setTimeout(() => {
-        _addingBoxToAnnotationId = null;
-      }, 0);
-    
-      overlay.setDrawingState(false); 
    
       return;
 
     } else {
       // Case 2: Creating new annotation
+      const key = archiveProvider.getCurrentPageKey();
       const annotation = {
-        id: crypto.randomUUID(),
-        page: archiveProvider.getCurrentPageKey(),
-        source: archiveProvider.id,
-        url: archiveProvider.getCleanPageUrl(),
+        site: key.site,
+        book: key.book,
+        page: key.page,
         reference: await archiveProvider.getReferenceFromPage(),
-        boxes: [newBox],
-        wtId: null,
+        frames: [newFrame],
+        wikitreeid: _activeDrawingPerson,
         note: null, 
-        wtIdFound: null
+        wtIdFound: await personAPI.prefetch(_activeDrawingPerson) // pre-fetch person data for this ID
       };
-
+/*
       // Prompt user for WikiTree ID
       ui.openWtEditor({
         x: e.clientX,
@@ -211,10 +203,8 @@
         onSave: async ({wtId, note}) => {
           annotation.wtId = wtId;
           annotation.note = note;
-          annotation.wtIdFound = await personAPI.prefetch(wtId); // pre-fetch person data for this ID
+          annotation.wtIdFound = 
           await annotationsAPI.addAnnotation(annotation);
-          //await annotationsAPI.saveAnnotationsForPage(annotations);
-          //overlay.renderAnnotations();
           incomingWtId = null;    // clear this to avoid prefilling the editor after the first time
           _box.remove();
           _box = null;
@@ -223,7 +213,15 @@
           _box.remove();
           _box = null;
         }
-      });
+      }); */
+
+      await annotationsAPI.addAnnotation(annotation);
+      _box.remove();
+      _box = null;
+
+      tools.clearActiveDrawingPerson();
+      tools.setTool(null);
+      ui.updateToolUI();
     }
   }
 
@@ -320,26 +318,26 @@
    * Initiates resize drag from a handle
    * Saves initial state and sets up event listeners
    * @param {MouseEvent} e - mousedown event
-   * @param {HTMLElement} boxEl - Annotation box element
+   * @param {HTMLElement} frameEl - Annotation frame element
    * @param {string} corner - Corner identifier (nw|ne|sw|se)
    */
-  function _startResize(e, boxEl, corner) {
-    const id = boxEl.dataset.annotationId;
+  function _startResize(e, frameEl, corner) {
+    const id = frameEl.dataset.annotationId;
     const annotation = annotationsAPI.getAnnotationById(id);
     if (!annotation) return;
 
-    const boxIndex = Number(boxEl.dataset.boxIndex);
-    const box = annotation.boxes[boxIndex];
+    const frameIndex = Number(frameEl.dataset.boxIndex);
+    const frame = annotation.frames[frameIndex];
 
     const rect = overlay.getOverlayElement().getBoundingClientRect();
   
     _resizing = {
       id,
-      boxIndex,
+      frameIndex,
       corner,
       startX: e.clientX - rect.left,
       startY: e.clientY - rect.top,
-      startBox: { ...box }  // Save original for delta calculations
+      startFrame: { ...frame }  // Save original for delta calculations
     };
 
     document.addEventListener("mousemove", _onResizeMove);
@@ -377,10 +375,10 @@
     const annotation = annotationsAPI.getAnnotationById(_resizing.id);
     if (!annotation) return;
 
-    const box = annotation.boxes[_resizing.boxIndex];
+    const frame = annotation.frames[_resizing.frameIndex];
 
     // Start from original coordinates
-    let { x, y, w, h } = _resizing.startBox;
+    let { x, y, w, h } = _resizing.startFrame;
     const corner = _resizing.corner;
 
     // Apply resize based on which corner is being dragged
@@ -411,10 +409,10 @@
     h = Math.max(20, h);
 
     // Update box coordinates
-    box.x = x;
-    box.y = y;
-    box.w = w;
-    box.h = h;
+    frame.x = x;
+    frame.y = y;
+    frame.w = w;
+    frame.h = h;
 
     overlay.renderAnnotations();
   }
@@ -440,13 +438,13 @@
     getTool,
     isDrawing,
     isSelecting,
-    isAddingBoxToAnnotationId,
-    setAddingBoxToAnnotationId,
+    setActiveDrawingPerson,
+    clearActiveDrawingPerson,
     selectAnnotation,
     clearSelection,
     addResizeHandles,
     getSelectedAnnotationId,
-    getActiveBoxIndex,
+    getActiveFrameIndex,
     editAnnotation,
     onMouseDown,
     onMouseMove,

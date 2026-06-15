@@ -12,6 +12,7 @@ const ui = window.ui;
 const tools = window.tools;
 const overlay = window.overlay;
 const annotationsAPI = window.annotationsAPI;
+const wtplusAPI = window.wtplusAPI;
 const archiveProvider = window.archiveProviders[0]; // make sure only one provider is listed in manifest.json per site
 
 let incomingWtId = null;         // ID from incoming WikiTree profile (if navigated from one)

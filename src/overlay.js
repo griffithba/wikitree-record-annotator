@@ -68,29 +68,29 @@
 
 
   /**
-   * Updates visual styles for all annotation boxes based on selection state
+   * Updates visual styles for all annotation frames based on selection state
    * Shows/hides toolbar and resize handles as needed
    */
   function updateSelectionStyles() {
-    document.querySelectorAll(".wt-annotation").forEach(box => {
-      const id = box.dataset.annotationId;
-      let toolbar = box.querySelector(".annotation-toolbar");
+    document.querySelectorAll(".wt-annotation").forEach(frame => {
+      const id = frame.dataset.annotationId;
+      let toolbar = frame.querySelector(".annotation-toolbar");
        
       if (String(id) === String(tools.getSelectedAnnotationId())) {
-        box.classList.add("wt-selected");
+        frame.classList.add("wt-selected");
         if (!toolbar) {
-          if (tools.getActiveBoxIndex() === Number(box.dataset.boxIndex)) {
+          if (tools.getActiveFrameIndex() === Number(frame.dataset.frameIndex)) {
             toolbar = ui.createAnnotationToolbar(id);
-            box.appendChild(toolbar);
+            frame.appendChild(toolbar);
           } 
-          tools.addResizeHandles(box, id);
-        } else if (tools.getActiveBoxIndex() !== Number(box.dataset.boxIndex)) {
+          tools.addResizeHandles(frame, id);
+        } else if (tools.getActiveFrameIndex() !== Number(frame.dataset.frameIndex)) {
             toolbar?.remove();
         }
       } else {
-        box.classList.remove("wt-selected");
+        frame.classList.remove("wt-selected");
         toolbar?.remove();
-        box.querySelectorAll(".resize-handle").forEach(h => h.remove());
+        frame.querySelectorAll(".resize-handle").forEach(h => h.remove());
       }
     });
   }
@@ -141,7 +141,7 @@
     // Container click: clear selection when clicking empty space
     const host = _container.parentElement; 
     host.addEventListener("click", (e) => {
-      if (!tools.isSelecting() || tools.isAddingBoxToAnnotationId()) return;
+      if (!tools.isSelecting()) return;
     
       // If click was on an annotation, ignore
       if (e.target.closest(".wt-annotation")) return;
@@ -157,7 +157,7 @@
 
   /**
    * Main render loop for all annotations
-   * Syncs viewport, clears previous render, renders all boxes
+   * Syncs viewport, clears previous render, renders all frames
    */
   async function renderAnnotations() {
     if (_renderInProgress) {
@@ -182,10 +182,10 @@
       const vp = archiveProvider.getCurrentViewport();
       if (!vp) return;
 
-      // Render each annotation's boxes
+      // Render each annotation's frames
       annotationsAPI.getAnnotations().forEach(a => {
-        a.boxes.forEach((boxData, index) => {
-          _renderBox(a, boxData, index);
+        a.frames.forEach((frameData, index) => {
+          _renderFrame(a, frameData, index);
         });
       });
 
@@ -206,45 +206,45 @@
 
 
   /**
-   * Renders a single annotation box on screen
+   * Renders a single annotation frame on screen
    * Converts image space coordinates to screen pixels
    * @param {Object} a - Annotation object
-   * @param {Object} boxData - Box coordinates {x, y, w, h} in image space
-   * @param {number} index - Box index within annotation
+   * @param {Object} frameData - Frame coordinates {x, y, w, h} in image space
+   * @param {number} index - Frame index within annotation
    */
-  function _renderBox(a, boxData, index) {
+  function _renderFrame(a, frameData, index) {
     const vp = archiveProvider.getCurrentViewport();
     const rect = _overlay.getBoundingClientRect();
 
     // STEP 1: Convert image space → viewport-relative → screen pixels
     // viewport-relative: how far through the viewport is this coordinate?
-    const relX = (boxData.x - vp.x) / vp.w;
-    const relY = (boxData.y - vp.y) / vp.h;
-    const relW = boxData.w / vp.w;
-    const relH = boxData.h / vp.h;
+    const relX = (frameData.x - vp.x) / vp.w;
+    const relY = (frameData.y - vp.y) / vp.h;
+    const relW = frameData.w / vp.w;
+    const relH = frameData.h / vp.h;
 
-    const box = document.createElement("div");
+    const frame = document.createElement("div");
 
     // STEP 2: Convert viewport-relative to screen pixels
-    box.style.position = "absolute";
-    box.style.left = (relX * rect.width) + "px";
-    box.style.top = (relY * rect.height) + "px";
-    box.style.width = (relW * rect.width) + "px";
-    box.style.height = (relH * rect.height) + "px";
+    frame.style.position = "absolute";
+    frame.style.left = (relX * rect.width) + "px";
+    frame.style.top = (relY * rect.height) + "px";
+    frame.style.width = (relW * rect.width) + "px";
+    frame.style.height = (relH * rect.height) + "px";
 
-    box.className = "wt-annotation";
+    frame.className = "wt-annotation";
 
     // Add selection styling if needed
     if (a.id === tools.getSelectedAnnotationId()) {
-      box.classList.add("wt-selected");
+      frame.classList.add("wt-selected");
     }
 
     // Set tooltip
-    if (a.wtId) {
-      box.title = _buildTooltip(a);
+    if (a.wikitreeid) {
+      frame.title = _buildTooltip(a, frameData.note);
 
       // Highlight if this annotation matches incoming profile
-      if (String(a.wtId) === String(incomingWtId)) {
+      if (String(a.wikitreeid) === String(incomingWtId)) {
         _triggerRefHighlight(a.id);
         // don't prefill new annotations with the incoming WikiTree ID if there's
         // already one for that ID
@@ -252,35 +252,35 @@
       }
     }
 
-    // Track annotation ID and box index for toolbar/resize operations
-    box.dataset.annotationId = a.id;
-    box.dataset.boxIndex = index;
+    // Track annotation ID and frame index for toolbar/resize operations
+    frame.dataset.annotationId = a.wikitreeid;
+    frame.dataset.frameIndex = index;
 
     // Click handler: select in select mode, or open WikiTree profile
-    box.addEventListener("click", (e) => {
+    frame.addEventListener("click", (e) => {
       if (tools.isSelecting()) {
         e.stopPropagation();
-        const id = box.dataset.annotationId;
-        const boxIndex = Number(box.dataset.boxIndex);
-        tools.selectAnnotation(id, boxIndex);
+        const id = frame.dataset.annotationId;
+        const frameIndex = Number(frame.dataset.frameIndex);
+        tools.selectAnnotation(id, frameIndex);
         return;
       }
 
       if (tools.isDrawing()) return;
 
       // Default: click to open WikiTree profile
-      if (a.wtId) {
+      if (a.wikitreeid) {
         window.open(
-          `https://www.wikitree.com/wiki/${encodeURIComponent(a.wtId)}`,
+          `https://www.wikitree.com/wiki/${encodeURIComponent(a.wikitreeid)}`,
           "_blank"
         );
       }
     });
 
-    box.addEventListener("mouseenter", () => {
+    frame.addEventListener("mouseenter", () => {
       if (tools.isDrawing() || tools.isSelecting()) return;
 
-      const id = box.dataset.annotationId;
+      const id = frame.dataset.annotationId;
 
       document
         .querySelectorAll(
@@ -291,10 +291,10 @@
         });
     });
 
-    box.addEventListener("mouseleave", () => {
+    frame.addEventListener("mouseleave", () => {
       if (tools.isDrawing() || tools.isSelecting()) return;
 
-      const id = box.dataset.annotationId;
+      const id = frame.dataset.annotationId;
 
       document
         .querySelectorAll(
@@ -306,10 +306,10 @@
     });
   
     if (!a.wtIdFound) {
-      _addInvalidBadge(box);
+      _addInvalidBadge(frame);
     } 
 
-    _annotationLayer.appendChild(box);
+    _annotationLayer.appendChild(frame);
   }
 
 
@@ -319,29 +319,29 @@
    * @param {Object} a - Annotation object
    * @returns {string} Tooltip text
    */
-  function _buildTooltip(a) {
-    let text = a.wtId;
+  function _buildTooltip(a, note) {
+    let text = a.wikitreeid;
 
     if (a.wtIdFound) {
-      const person = personAPI.getCached(a.wtId);
+      const person = personAPI.getCached(a.wikitreeid);
 
       if (person && (person.name || person.birth || person.death)) {
         const years = (person.birth || "") + "-" + (person.death || "");
-        text = `${person.name || a.wtId} (${years})`;
+        text = `${person.name || a.wikitreeid} (${years})`;
       }
     } else {
       text += " not found";
     }
     
-    if (a.note) {
-      text += "\n" + a.note;
+    if (note) {
+      text += "\n" + note;
     }
     
     return text; 
   }
 
   
-  function _addInvalidBadge(boxEl) {
+  function _addInvalidBadge(frameEl) {
     const badge = document.createElement("div");
 
     badge.textContent = "⛓️‍💥";
@@ -356,7 +356,7 @@
       zIndex: "2"
     });
 
-    boxEl.appendChild(badge);
+    frameEl.appendChild(badge);
   }
 
   
@@ -367,12 +367,12 @@
    */
   function _triggerRefHighlight(annotationId) {
     function start() {
-      // Highlight ALL boxes for this annotation
+      // Highlight ALL frames for this annotation
       requestAnimationFrame(() => {
         document.querySelectorAll(
           `[data-annotation-id="${annotationId}"]`
-        ).forEach(box => {
-          box.classList.add("wt-ref-highlight");
+        ).forEach(frame => {
+          frame.classList.add("wt-ref-highlight");
         });
       });
     }
