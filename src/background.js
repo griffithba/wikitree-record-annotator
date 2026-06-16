@@ -32,6 +32,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       return true;
 
+    case "ADD_FRAME":
+      wtplusAPI.addFrame(
+        message.site, message.book, message.page, message.info, message.wikitreeid, 
+        message.x, message.y, message.w, message.h, message.note)
+        .then(sendResponse)
+        .catch(err => {
+          console.error("WT+ addFrame failed:", err);
+          sendResponse({ error: true });
+        });
+
+      return true;
 
     case "OPEN_SUGGESTION_WINDOW":
 

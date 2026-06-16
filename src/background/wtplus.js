@@ -29,7 +29,7 @@ export async function getFramesByPage(site, book, page) {
   return promise;
 }
 
-async function getFramesByWtId(site, wtId) {
+export async function getFramesByWtId(site, wtId) {
   if (_fetchInProgress.has(wtId)) {
     // return the earlier promise so all requests for the same wtId are awaiting the same promise
     return _fetchInProgress.get(wtId);
@@ -67,4 +67,41 @@ async function _wtplusImageFramesGet(params) {
   const json = await response.json();
 console.log("WT+ wtImageFramesGet response:", json);
   return json;
+}
+
+
+export async function addFrame(site, book, page, info, wikitreeid, x, y, w, h, note) {
+  try {
+    const url = new URL(
+      "https://plus.wikitree.com/function/wtImageFramesAdd/WT_Annotator.json"
+    );
+
+    const form = new URLSearchParams();
+    form.append("site", site);
+    form.append("book", book);
+    form.append("page", page);
+    if (info) form.append("info", info);
+    form.append("wikitreeid", wikitreeid);
+    form.append("x", x);
+    form.append("y", y);
+    form.append("w", w);
+    form.append("h", h);
+    if (note) form.append("note", note);
+
+    const res = await fetch(url, {
+      method: "POST",
+      body: form
+    });
+    
+    const data = await res.json();
+console.log("addFrame result:", data);
+    const frameId = data?.response?.frameid;
+
+    return (frameId);
+
+  } catch (e) {
+    console.error("WT add error:", e);
+    throw e;
+  }
+
 }

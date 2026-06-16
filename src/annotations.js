@@ -16,7 +16,7 @@
   /**
    * Saves annotations for current page to storage
    * Preserves annotations for other pages
-   */
+   */ /*
   async function saveAnnotationsForPage() {
     const key = archiveProvider.getCurrentPageKey();
 
@@ -30,19 +30,14 @@
 
     // WARNING: Using this function incorrectly will delete all annotations!
     await storageAPI.saveAnnotations(updated);
-  }
-
-  async function updateExistingAnnotation(id, patch) {
-    // await storageAPI.updateAnnotation(id, patch);
-  }
+  } */
 
   /**
-   * Gets all annotations for a specific page
-   * @param {string} pageKey - Page identifier
-   * @returns {Array} Annotations for that page
+   * Gets all annotations for a this page
+   * @returns {Array} Annotations for current page
    */
-  async function _getAnnotationsByPage(site, book, page) {
-    return(await wtplusAPI.getFramesForPage(site, book, page)) || [];
+  async function _getAnnotationsForCurrentPage() {
+    return(await wtplusAPI.getFramesForPage()) || [];
   }
 
   function getAnnotations() {
@@ -60,7 +55,7 @@
     if (samePage(key, _lastPageKey)) return;  // Already loaded
     _lastPageKey = key;
 
-    _annotations = await _getAnnotationsByPage(key.site, key.book, key.page) || [];
+    _annotations = await _getAnnotationsForCurrentPage() || [];
 
     console.log(`Loaded ${_annotations.length} annotations for page ${key}`, 
                 _annotations);
@@ -86,43 +81,67 @@
   // ============================================================
 
   /**
-   * Deletes a specific box from an annotation
-   * If last box, deletes entire annotation
-   * @param {string} annotationId - Annotation ID
-   * @param {number} boxIndex - Index of box to delete
+   * Deletes a specific frame from an annotation
+   * If last frame, deletes entire annotation
+   * @param {string} wtId - WikiTree ID
+   * @param {number} frameIndex - Index of frame to delete
    */
-  async function deleteBox(annotationId, boxIndex) {
-    const annotation = getAnnotationByWtId(annotationId);
+  async function deleteFrame(wtId, frameIndex) {
+    const annotation = getAnnotationByWtId(wtId);
     if (!annotation) return;
 
-    if (annotation.boxes.length > 1) {
-      // Remove just this box
-      annotation.boxes.splice(boxIndex, 1);
+    // Delete frame from WT+ backend
+    wtplusAPI.deleteFrame(wtId, frameIndex);
+
+    // Then delete from local state and re-render
+    if (annotation.frames.length > 1) {
+      // Remove just this frame
+      annotation.frames.splice(frameIndex, 1);
     } else {
-      // Last box → delete entire annotation
-      _deleteAnnotation(annotationId);
-      return;
+      // Last frame → delete entire annotation
+      _deleteAnnotation(wtId);
+      //return;
     }
 
-    await saveAnnotationsForPage();
     overlay.renderAnnotations();
   }
 
-  async function addAnnotation(annotation) {
-    _annotations.push(annotation);
-    // await saveAnnotationsForPage();
+
+  async function addFrame(wtId, frame) {
+
+    // Add frame to WT+ backend
+    const newFrameId = await wtplusAPI.addFrame(wtId, frame);
+
+    if (!newFrameId) return;
+
+    frame.frameid = newFrameId;
+
+    let annotation = getAnnotationByWtId(wtId);
+
+    if (!annotation) {
+      annotation = {
+        frames: [frame],
+        wikitreeid: wtId,
+        wtIdFound: await personAPI.prefetch(wtId) // pre-fetch person data for this ID
+      }
+      _annotations.push(annotation);
+    } else {
+      annotation.frames.push(frame);
+    }
+
     overlay.renderAnnotations();
   }
+
 
   /**
-   * Deletes entire annotation and clears selection
-   * @param {string} id - Annotation ID
+   * Deletes entire annotation and clears selection (local only, not WT+ backend)
+   * @param {string} id - Annotation/WikiTree ID
    */
   async function _deleteAnnotation(id) {
-    _annotations = _annotations.filter(a => a.id !== id);
-    await saveAnnotationsForPage();
+    _annotations = _annotations.filter(a => a.wikitreeid !== id);
+    //await saveAnnotationsForPage();
     if (tools.getSelectedAnnotationId() === id) tools.clearSelection();
-    overlay.renderAnnotations();
+    //overlay.renderAnnotations();
   }
 
   /**
@@ -141,13 +160,11 @@
   }
 
   window.annotationsAPI = {
-    addAnnotation,
-    saveAnnotationsForPage,
-    updateExistingAnnotation,
+    addFrame,
     getAnnotationByWtId,
     getAnnotations,
     loadAnnotationsIfNeeded,
-    deleteBox,
+    deleteFrame,
     invalidateAnnotationCache
   };
 

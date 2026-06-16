@@ -671,11 +671,11 @@
       }
 
       // Second click: execute deletion
-      const boxEl = deleteBtn.closest(".wt-annotation");
-      const annotationId = boxEl.dataset.annotationId;
-      const boxIndex = Number(boxEl.dataset.boxIndex);
+      const frameEl = deleteBtn.closest(".wt-annotation");
+      const wtId = frameEl.dataset.annotationId;
+      const frameIndex = Number(frameEl.dataset.frameIndex);
 
-      annotationsAPI.deleteBox(annotationId, boxIndex);
+      annotationsAPI.deleteFrame(wtId, frameIndex);
     };
 
     toolbar.append(editBtn, deleteBtn);

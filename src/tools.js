@@ -167,24 +167,17 @@
       note: null
     };
 
-    const annotation = annotationsAPI.getAnnotationByWtId(_activeDrawingPerson);
-    if (annotation) {
-      // Case 1: Adding box to existing annotation
-newFrame.frameid = 2;  // temporary ID until WT+
-      annotation.frames.push(newFrame);
-
-      await annotationsAPI.updateExistingAnnotation(annotation.wikitreeid, { frames: annotation.frames });
-      overlay.renderAnnotations();
-
+    // STEP 3: Add frame to WT+ backend and local state
+    await annotationsAPI.addFrame(_activeDrawingPerson, newFrame);
+/*
     } else {
       // Case 2: Creating new annotation
-newFrame.frameid = 1;  // temporary ID until WT+
       const key = archiveProvider.getCurrentPageKey();
       const annotation = {
         site: key.site,
         book: key.book,
         page: key.page,
-        reference: await archiveProvider.getReferenceFromPage(),
+        //reference: await archiveProvider.getReferenceFromPage(),
         frames: [newFrame],
         wikitreeid: _activeDrawingPerson,
         wtIdFound: await personAPI.prefetch(_activeDrawingPerson) // pre-fetch person data for this ID
@@ -192,7 +185,9 @@ newFrame.frameid = 1;  // temporary ID until WT+
 
       await annotationsAPI.addAnnotation(annotation);
     }
-      
+      */
+
+    // Step 4: Clean up temporary box and reset state
     _box.remove();
     _box = null;
 
@@ -305,7 +300,7 @@ newFrame.frameid = 1;  // temporary ID until WT+
     const annotation = annotationsAPI.getAnnotationByWtId(id);
     if (!annotation) return;
 
-    const frameIndex = Number(frameEl.dataset.boxIndex);
+    const frameIndex = Number(frameEl.dataset.frameIndex);
     const frame = annotation.frames[frameIndex];
 
     const rect = overlay.getOverlayElement().getBoundingClientRect();
