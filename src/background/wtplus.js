@@ -53,9 +53,7 @@ export async function getFramesByWtId(site, wtId) {
 }
 
 async function _wtplusImageFramesGet(params) {
-  const url = new URL(
-      "https://plus.wikitree.com/function/wtImageFramesGet/WT_Annotator.json"
-  );
+  const url = new URL("https://plus.wikitree.com/function/wtImageFramesGet/WT_Annotator.json");
 
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null) {
@@ -72,9 +70,7 @@ console.log("WT+ wtImageFramesGet response:", json);
 
 export async function addFrame(site, book, page, info, wikitreeid, x, y, w, h, note) {
   try {
-    const url = new URL(
-      "https://plus.wikitree.com/function/wtImageFramesAdd/WT_Annotator.json"
-    );
+    const url = new URL("https://plus.wikitree.com/function/wtImageFramesAdd/WT_Annotator.json");
 
     const form = new URLSearchParams();
     form.append("site", site);
@@ -96,12 +92,40 @@ export async function addFrame(site, book, page, info, wikitreeid, x, y, w, h, n
     const data = await res.json();
 console.log("addFrame result:", data);
     const frameId = data?.response?.frameid;
-
+console.log("frameid:", frameId);
     return (frameId);
 
   } catch (e) {
-    console.error("WT add error:", e);
+    console.error("WT+ add error:", e);
     throw e;
   }
+}
 
+
+export async function deleteFrame(site, book, page, wtId, frameId) {
+  try {
+    const url = new URL("https://plus.wikitree.com/function/wtImageFramesDelete/WT_Annotator.json");
+
+    const form = new URLSearchParams();
+    form.append("site", site);
+    form.append("book", book);
+    form.append("page", page);
+    form.append("wikitreeid", wtId);
+    form.append("frameid", frameId);
+
+    const res = await fetch(url, {
+      method: "POST",
+      body: form
+    });
+
+    const data = await res.json();
+console.log("deleteFrame result:", data);
+    const success = data?.response?.success;
+console.log("Success:", success);
+    return (success);
+
+  } catch (e) {
+    console.error("WT+ delete error:", e);
+    throw e;
+  }
 }
