@@ -54,7 +54,7 @@
         const book = match[1];
         const page = url.searchParams.get("pg") || "1";
 
-        return book ? `${book}_p${page}` : "unknown_matricula_page";
+        return { site, book, page };
       }
     } catch (e) {
       return "unknown_matricula_page";

@@ -169,23 +169,6 @@
 
     // STEP 3: Add frame to WT+ backend and local state
     await annotationsAPI.addFrame(_activeDrawingPerson, newFrame);
-/*
-    } else {
-      // Case 2: Creating new annotation
-      const key = archiveProvider.getCurrentPageKey();
-      const annotation = {
-        site: key.site,
-        book: key.book,
-        page: key.page,
-        //reference: await archiveProvider.getReferenceFromPage(),
-        frames: [newFrame],
-        wikitreeid: _activeDrawingPerson,
-        wtIdFound: await personAPI.prefetch(_activeDrawingPerson) // pre-fetch person data for this ID
-      };
-
-      await annotationsAPI.addAnnotation(annotation);
-    }
-      */
 
     // Step 4: Clean up temporary box and reset state
     _box.remove();

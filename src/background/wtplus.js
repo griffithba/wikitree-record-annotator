@@ -60,15 +60,18 @@ async function _wtplusImageFramesGet(params) {
       url.searchParams.set(k, v);
     }
   });
-
   const response = await fetch(url);
+  
+console.log("WT+ URL:", url.toString());
+console.log("status:", response.status);
+
   const json = await response.json();
 console.log("WT+ wtImageFramesGet response:", json);
   return json;
 }
 
 
-export async function addFrame(site, book, page, info, wikitreeid, x, y, w, h, note) {
+export async function addFrame(site, book, page, info, wikitreeid, frame) {
   try {
     const url = new URL("https://plus.wikitree.com/function/wtImageFramesAdd/WT_Annotator.json");
 
@@ -78,11 +81,11 @@ export async function addFrame(site, book, page, info, wikitreeid, x, y, w, h, n
     form.append("page", page);
     if (info) form.append("info", info);
     form.append("wikitreeid", wikitreeid);
-    form.append("x", x);
-    form.append("y", y);
-    form.append("w", w);
-    form.append("h", h);
-    if (note) form.append("note", note);
+    form.append("x", frame.x);
+    form.append("y", frame.y);
+    form.append("w", frame.w);
+    form.append("h", frame.h);
+    if (frame.note) form.append("note", frame.note);
 
     const res = await fetch(url, {
       method: "POST",
@@ -93,7 +96,7 @@ export async function addFrame(site, book, page, info, wikitreeid, x, y, w, h, n
 console.log("addFrame result:", data);
     const frameId = data?.response?.frameid;
 console.log("frameid:", frameId);
-    return (frameId);
+    return (data);
 
   } catch (e) {
     console.error("WT+ add error:", e);
@@ -103,6 +106,7 @@ console.log("frameid:", frameId);
 
 
 export async function deleteFrame(site, book, page, wtId, frameId) {
+  console.log("background wtplus.deleteFrame:", wtId, frameId);
   try {
     const url = new URL("https://plus.wikitree.com/function/wtImageFramesDelete/WT_Annotator.json");
 
@@ -120,9 +124,9 @@ export async function deleteFrame(site, book, page, wtId, frameId) {
 
     const data = await res.json();
 console.log("deleteFrame result:", data);
-    const success = data?.response?.success;
-console.log("Success:", success);
-    return (success);
+//    const success = data?.response?.success;
+//console.log("Success:", success);
+    return (data);
 
   } catch (e) {
     console.error("WT+ delete error:", e);

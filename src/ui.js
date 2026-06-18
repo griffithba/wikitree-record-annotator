@@ -165,6 +165,9 @@
     const unannotatedReferrers = referrers.filter(r => !annotatedIds.includes(r.wikitreeid));
     const unannotatedIds = unannotatedReferrers.map(r => r.wikitreeid);
 
+    // pre-fetch person data for all unannotated IDs simultaneously (annotated IDs were already pre-fetched)
+    await Promise.all(unannotatedIds.map(async wtId => personAPI.prefetch(wtId)));
+
     console.log("Annotated profiles:", annotatedIds);
     console.log("Unannotated profiles:", unannotatedIds);
 
@@ -254,14 +257,14 @@
       columns.appendChild(right);
 
       const rightHeader = document.createElement("h4");
-      rightHeader.textContent = "Add box(es) to:";
+      rightHeader.textContent = "Add frame to:";
       right.appendChild(rightHeader);
 
       // --------------------------------------------------
       // helper for radio rows
       // --------------------------------------------------
 
-      function addRadioRow(parent, value) {
+      function addRadioRow(parent, wtId, displayText, tooltipText) {
 
         const label = document.createElement("label");
 
@@ -270,14 +273,18 @@
           marginBottom: "4px"
         });
 
+        if (tooltipText) {
+          label.title = tooltipText;
+        }
+
         const radio = document.createElement("input");
 
         radio.type = "radio";
         radio.name = "wt-draw-target";
-        radio.value = value;
+        radio.value = wtId;
 
         label.appendChild(radio);
-        label.append(" " + value);
+        label.append(" " + displayText);
 
         parent.appendChild(label);
 
@@ -287,9 +294,14 @@
       // --------------------------------------------------
       // unannotated list
       // --------------------------------------------------
+      let toolTip = null;
 
       unannotatedIds.forEach(id => {
-        addRadioRow(left, id);
+        const exactBirth = personAPI.getExactBirth(id);
+        if (exactBirth) toolTip = `Born ${exactBirth}`;
+        else toolTip = null;
+
+        addRadioRow(left, id, personAPI.formatDisplayName(id), toolTip);
       });
 
       // --------------------------------------------------
@@ -328,7 +340,11 @@
       // --------------------------------------------------
 
       annotatedIds.forEach(id => {
-        addRadioRow(right, id);
+        const exactBirth = personAPI.getExactBirth(id);
+        if (exactBirth) toolTip = `Born ${exactBirth}`;
+        else toolTip = null;
+
+        addRadioRow(right, id, personAPI.formatDisplayName(id), toolTip);
       });
 
       // --------------------------------------------------

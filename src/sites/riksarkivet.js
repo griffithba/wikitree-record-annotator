@@ -38,7 +38,7 @@
   function getPageKey(href) {
     let match = href.match(/\/bildvisning\/([^/?#]+)/i);
     const [book, page] = match[1]?.split("_") || [null, null];
-    return {site, book, page };
+    return { site, book, page };
   }
 
   /**

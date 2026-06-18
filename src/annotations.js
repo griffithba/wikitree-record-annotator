@@ -8,30 +8,6 @@
   let _lastPageKey = null;               // Track current page to avoid redundant loads
 
 
-
-  // ============================================================
-  // STORAGE & PERSISTENCE
-  // ============================================================
-
-  /**
-   * Saves annotations for current page to storage
-   * Preserves annotations for other pages
-   */ /*
-  async function saveAnnotationsForPage() {
-    const key = archiveProvider.getCurrentPageKey();
-
-    const all = await storageAPI.getAnnotations();
-
-    // Remove old annotations for this page
-    const others = all.filter(a => a.page !== key);
-
-    // Add updated ones
-    const updated = [...others, ..._annotations];
-
-    // WARNING: Using this function incorrectly will delete all annotations!
-    await storageAPI.saveAnnotations(updated);
-  } */
-
   /**
    * Gets all annotations for a this page
    * @returns {Array} Annotations for current page
@@ -57,7 +33,7 @@
 
     _annotations = await _getAnnotationsForCurrentPage() || [];
 
-    console.log(`Loaded ${_annotations.length} annotations for page ${key}`, 
+    console.log(`Loaded ${_annotations.length} annotations for page ${key.book} ${key.page}`, 
                 _annotations);
     // pre-fetch person data for all annotations simultaneously
     await Promise.all(
@@ -90,8 +66,15 @@
     const annotation = getAnnotationByWtId(wtId);
     if (!annotation) return;
 
+    const frameId = annotation.frames[frameIndex].frameid;
+console.log("annotationsAPI.deleteFrame:", wtId, frameId);
     // Delete frame from WT+ backend
-    wtplusAPI.deleteFrame(wtId, frameIndex);
+    const success = wtplusAPI.deleteFrame(wtId, frameId);
+
+    if (!success) {
+      console.warn("Failed to delete frame:", wtId, frameId);
+      return;
+    }
 
     // Then delete from local state and re-render
     if (annotation.frames.length > 1) {
@@ -99,8 +82,8 @@
       annotation.frames.splice(frameIndex, 1);
     } else {
       // Last frame → delete entire annotation
-      _deleteAnnotation(wtId);
-      //return;
+      _annotations = _annotations.filter(a => a.wikitreeid !== wtId);
+      if (tools.getSelectedAnnotationId() === wtId) tools.clearSelection();
     }
 
     overlay.renderAnnotations();
@@ -115,7 +98,7 @@
     if (!newFrameId) return;
 
     frame.frameid = newFrameId;
-
+console.log("Added frame:", frame);
     let annotation = getAnnotationByWtId(wtId);
 
     if (!annotation) {
@@ -132,17 +115,6 @@
     overlay.renderAnnotations();
   }
 
-
-  /**
-   * Deletes entire annotation and clears selection (local only, not WT+ backend)
-   * @param {string} id - Annotation/WikiTree ID
-   */
-  async function _deleteAnnotation(id) {
-    _annotations = _annotations.filter(a => a.wikitreeid !== id);
-    //await saveAnnotationsForPage();
-    if (tools.getSelectedAnnotationId() === id) tools.clearSelection();
-    //overlay.renderAnnotations();
-  }
 
   /**
    * Finds annotation by WikiTree ID

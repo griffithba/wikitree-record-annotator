@@ -34,8 +34,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "ADD_FRAME":
       wtplusAPI.addFrame(
-        message.site, message.book, message.page, message.info, message.wikitreeid, 
-        message.x, message.y, message.w, message.h, message.note)
+        message.site, message.book, message.page, message.info, message.wikitreeid, message.frame)
         .then(sendResponse)
         .catch(err => {
           console.error("WT+ addFrame failed:", err);
@@ -44,7 +43,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       return true;
 
-    case "OPEN_SUGGESTION_WINDOW":
+    case "DELETE_FRAME":
+      console.log("background DELETE_FRAME:", message.wikitreeid, message.frameId);
+      wtplusAPI.deleteFrame(
+        message.site, message.book, message.page, message.wikitreeid, message.frameId)
+        .then(sendResponse)
+        .catch(err => {
+          console.error("WT+ deleteFrame failed:", err);
+          sendResponse({ error: true });
+        });
+
+      return true;
+
+   case "OPEN_SUGGESTION_WINDOW":
 
       currentSuggestions = message.suggestions || [];
 

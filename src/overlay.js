@@ -240,19 +240,22 @@
     }
 
     // Set tooltip
-    if (a.wikitreeid) {
-      frame.title = _buildTooltip(a, frameData.note);
-
-      // Highlight if this annotation matches incoming profile
-      if (String(a.wikitreeid) === String(incomingWtId)) {
-        _triggerRefHighlight(a.id);
-        // don't prefill new annotations with the incoming WikiTree ID if there's
-        // already one for that ID
-        incomingWtId = null;
-      }
+    frame.title = personAPI.formatDisplayName(a.wikitreeid);
+      
+    // append note, if present
+    if (frameData.note) {
+      frame.title += "\n" + frameData.note;
     }
 
-    // Track annotation ID and frame index for toolbar/resize operations
+    // Highlight if this annotation matches incoming profile
+    if (String(a.wikitreeid) === String(incomingWtId)) {
+      _triggerRefHighlight(a.id);
+      // don't prefill new annotations with the incoming WikiTree ID if there's
+      // already one for that ID
+      incomingWtId = null;
+    }
+
+    // Track annotation ID (WT ID) and frame index for toolbar/resize operations
     frame.dataset.annotationId = a.wikitreeid;
     frame.dataset.frameIndex = index;
     frame.dataset.frameId = frameData.frameid;
@@ -314,34 +317,6 @@
   }
 
 
-  /**
-   * Builds HTML title/tooltip for an annotation
-   * Format: "Name (birth-death)" or WikiTree ID
-   * @param {Object} a - Annotation object
-   * @returns {string} Tooltip text
-   */
-  function _buildTooltip(a, note) {
-    let text = a.wikitreeid;
-
-    if (a.wtIdFound) {
-      const person = personAPI.getCached(a.wikitreeid);
-
-      if (person && (person.name || person.birth || person.death)) {
-        const years = (person.birth || "") + "-" + (person.death || "");
-        text = `${person.name || a.wikitreeid} (${years})`;
-      }
-    } else {
-      text += " not found";
-    }
-    
-    if (note) {
-      text += "\n" + note;
-    }
-    
-    return text; 
-  }
-
-  
   function _addInvalidBadge(frameEl) {
     const badge = document.createElement("div");
 

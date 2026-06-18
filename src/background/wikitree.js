@@ -26,6 +26,7 @@ export async function handleWtFetch(wtId) {
         person: {
           wtId,
           name: profile.name || null,
+          birthDate: profile.birthDate || null,
           birth: profile.birthYear || null,
           death: profile.deathYear || null
         }
@@ -62,6 +63,7 @@ async function _fetchWikiTreeProfile(wtId) {
 
     return {
       name: _buildDisplayName(person) || null,
+      birthDate: _formatDate(person.BirthDate), 
       birthYear: _extractYear(person.BirthDate),
       deathYear: _extractYear(person.DeathDate)
     };
@@ -92,3 +94,11 @@ function _extractYear(dateStr) {
   return year === "0000" ? null : year;
 }
 
+function _formatDate(dateStr) {
+  if (!dateStr) return null;
+
+  const [year, month, day] = dateStr.split("-");
+
+  if (year === "0000" || month === "00" || day === "00") return null;
+  return dateStr;
+}

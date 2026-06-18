@@ -47,7 +47,6 @@
         "src/overlay.js",
         "src/backup.js",
         "src/ui.js",
-        "src/storage.js", 
         "src/person.js",
         "src/content.js"
       ]
@@ -63,7 +62,6 @@
         "src/overlay.js",
         "src/backup.js",
         "src/ui.js",
-        "src/storage.js", 
         "src/person.js",
         "src/content.js" 
       ] 

@@ -79,8 +79,8 @@
 
 
   async function addFrame(wtId, frame) {
-    const info = _pageInfo ? null : archiveProvider.getReferenceFromPage();
-console.log("Adding frame:", wtId, frame);
+    const info = _pageInfo ? null : await archiveProvider.getReferenceFromPage();
+console.log("Adding frame:", wtId, frame, info);
     const response = await new Promise((resolve) => {
       chrome.runtime.sendMessage(
         {
@@ -90,11 +90,7 @@ console.log("Adding frame:", wtId, frame);
           page: _page,
           info: info, 
           wikitreeid: wtId,
-          x: frame.x,
-          y: frame.y, 
-          w: frame.w, 
-          h: frame.h,
-          note: frame.note
+          frame: frame
         },
         resolve
       );
@@ -111,7 +107,25 @@ console.log("Adding frame:", wtId, frame);
 
 
   async function deleteFrame(wtId, frameId) {
-    
+    console.log("wtplusAPI.deleteFrame:", wtId, frameId);
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "DELETE_FRAME", 
+          site: _site, 
+          book: _book, 
+          page: _page, 
+          wikitreeid: wtId, 
+          frameId: frameId
+        },
+        resolve
+      );
+    });
+    if (response?.response?.success !== "OK") {
+      console.warn("Failed to delete frame:", response);
+      return null;
+    }
+    return (true);
   }
 
 
