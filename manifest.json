@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WikiTree Record Annotator (WT+ Beta)",
-  "version": "0.2.1.2",
+  "version": "0.2.1.3",
   "description": "Annotate record images with WikiTree profiles",
   "action": {
     "default_title": "WikiTree Record Annotator",
@@ -12,7 +12,8 @@
   },
   "permissions": ["storage"],
   "host_permissions": [
-    "https://api.wikitree.com/*"
+    "https://api.wikitree.com/*",
+    "https://plus.wikitree.com/*"
   ],
 
   "icons": {
