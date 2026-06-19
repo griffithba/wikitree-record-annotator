@@ -32,6 +32,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       return true;
 
+      
+    case "GET_FRAMES_FOR_PROFILE":
+      wtplusAPI.getFramesByWtId(message.site, message.wtId)
+        .then(sendResponse)
+        .catch(err => {
+          console.error("WT+ wtImageFramesGet for profile failed:", err);
+          sendResponse({ error: true });
+        });
+
+      return true;
+
+      
     case "ADD_FRAME":
       wtplusAPI.addFrame(
         message.site, message.book, message.page, message.info, message.wikitreeid, message.frame)
@@ -43,6 +55,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       return true;
 
+      
     case "DELETE_FRAME":
       console.log("background DELETE_FRAME:", message.wikitreeid, message.frameId);
       wtplusAPI.deleteFrame(
@@ -55,6 +68,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       return true;
 
+      
    case "OPEN_SUGGESTION_WINDOW":
 
       currentSuggestions = message.suggestions || [];
