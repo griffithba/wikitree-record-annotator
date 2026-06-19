@@ -73,8 +73,27 @@
   }
 
 
-  async function getFramesForProfile(wtId) {
-    
+  async function getFramesForProfile(site, wtId) {
+    const key = `${site}|${wtId}`;
+    if (!_profileCache.has(key)) {
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "GET_FRAMES_FOR_PROFILE",
+            site: site, 
+            wtId: wtId
+          },
+          resolve
+        );
+      });
+      
+      if (response?.error) {
+        console.warn("Failed to fetch frame data from WT+ API for", {site, wtId}, "Response:", response);
+      }
+      const profileData = response.response.profiles;
+      _profileCache.set(key, profileData);
+    }
+    return _profileCache.get(key);
   }
 
 
