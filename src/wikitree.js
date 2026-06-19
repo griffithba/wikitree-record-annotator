@@ -4,45 +4,43 @@
   const wtId = getCurrentWtId();
 
   async function processCitationLinks() {
-    const annotations = await storageAPI.getAnnotations();
 
-    const profileAnnotations =
-      annotations.filter(a => a.wtId === wtId);
-
-    const annotatedPages = new Set(
-      profileAnnotations.map(a => a.page)
-    );
-
-    const citedPages = new Set();
+    const missingAnnotations = [];
 
     // mark sources that have annotations for this profile, and 
     // inject wtId into citation links, and
     // find annotated pages that aren't cited
-    archiveProviders.forEach(provider => {
+    for (const provider of archiveProviders) {
       // find all links on the page that point to this provider
       const links = [
         ...document.querySelectorAll(
-          `a[href*="${provider.id}"]`
+          `a[href*="${provider.site}"]`
         )
       ];
 
-      for (const link of links) {
-        const key = provider.getPageKey(link.href);
+      // only try to fetch all annotations for a profile if there's at least one link for this source already listed on the profile page
+      if (links.length > 0) {
+        const profileAnnotations = await wtplusAPI.getFramesForProfile(provider.site, wtId);
+        const annotatedPages = new Set(profileAnnotations.map(a => `${a.site}|${a.book}|${a.page}`));
+        const citedPages = new Set();
+      
+        for (const link of links) {
+          const keyObj = provider.getPageKey(link.href);
+          const key = `${keyObj.site}|${keyObj.book}|${keyObj.page}`
 
-        citedPages.add(key);
+          citedPages.add(key);
 
-        if (annotatedPages.has(key)) {
-          addAnnotationMarker(link);
+          if (annotatedPages.has(key)) {
+            addAnnotationMarker(link);
+          }
+
+          injectWtIdIntoCitationLink(link);
         }
-
-        injectWtIdIntoCitationLink(link);
+        const missingLinks = profileAnnotations.filter(a => !citedPages.has(`${a.site}|${a.book}|${a.page}`));
+        missingAnnotations.push(...missingLinks);
       }
+      
     });
-
-    const missingAnnotations =
-      profileAnnotations.filter(a =>
-        !citedPages.has(a.page)
-      );
 
     recommendMissingCitations(missingAnnotations);
   }
