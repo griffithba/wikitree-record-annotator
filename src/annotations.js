@@ -53,8 +53,31 @@
 
 
   // ============================================================
-  // ANNOTATION OPERATIONS (ADD/DELETE)
+  // ANNOTATION OPERATIONS (ADD/DELETE/EDIT)
   // ============================================================
+
+
+  async function addFrame(wtId, frame) {
+
+    let annotation = getAnnotationByWtId(wtId);
+    let frameIndex = 0;
+
+    if (!annotation) {
+      annotation = {
+        frames: [frame],
+        wikitreeid: wtId,
+        wtIdFound: await personAPI.prefetch(wtId) // pre-fetch person data for this ID
+      }
+      _annotations.push(annotation);
+    } else {
+      frameIndex = annotation.frames.push(frame) - 1;
+    }
+
+    overlay.renderAnnotations();
+
+    return frameIndex;
+  }
+
 
   /**
    * Deletes a specific frame from an annotation
@@ -67,13 +90,16 @@
     if (!annotation) return;
 
     const frameId = annotation.frames[frameIndex].frameid;
-console.log("annotationsAPI.deleteFrame:", wtId, frameId);
-    // Delete frame from WT+ backend
-    const success = wtplusAPI.deleteFrame(wtId, frameId);
 
-    if (!success) {
-      console.warn("Failed to delete frame:", wtId, frameId);
-      return;
+    // Only delete it from WT+ if it's actually there. 
+    if (frameId) {
+      // Delete frame from WT+ backend
+      const success = await wtplusAPI.deleteFrame(wtId, frameId);
+
+      if (!success) {
+        console.warn("Failed to delete frame:", wtId, frameId);
+        return;
+      }
     }
 
     // Then delete from local state and re-render
@@ -88,31 +114,30 @@ console.log("annotationsAPI.deleteFrame:", wtId, frameId);
 
     overlay.renderAnnotations();
   }
-
-
-  async function addFrame(wtId, frame) {
-
-    // Add frame to WT+ backend
-    const newFrameId = await wtplusAPI.addFrame(wtId, frame);
-
-    if (!newFrameId) return;
-
-    frame.frameid = newFrameId;
-console.log("Added frame:", frame);
-    let annotation = getAnnotationByWtId(wtId);
-
-    if (!annotation) {
-      annotation = {
-        frames: [frame],
-        wikitreeid: wtId,
-        wtIdFound: await personAPI.prefetch(wtId) // pre-fetch person data for this ID
+  
+  
+  async function updateExistingAnnotation(wtId) {
+    const a = getAnnotationByWtId(wtId);
+    if (!a) return;
+    // loop through all frames in the annotation
+    a.frames.forEach(async frame => {
+      // if changes were made
+      if (frame._dirty) {
+        const oldFrameId = frame.frameid;
+        // save a new copy of the frame
+        const newFrameId = await wtplusAPI.addFrame(wtId, frame);
+        if (newFrameId) {
+          // store the new frame ID
+          frame.frameid = newFrameId;
+          // if there was an old frame ID (this isn't a new frame)
+          if (oldFrameId) {
+            // delete the old version
+            const success = await wtplusAPI.deleteFrame(wtId, oldFrameId);
+          }
+        }
+        delete frame._dirty;
       }
-      _annotations.push(annotation);
-    } else {
-      annotation.frames.push(frame);
-    }
-
-    overlay.renderAnnotations();
+    });
   }
 
 
@@ -127,17 +152,14 @@ console.log("Added frame:", frame);
     return a || null;
   }
 
-  function invalidateAnnotationCache() {
-    _lastPageKey = null;
-  }
-
+  
   window.annotationsAPI = {
     addFrame,
+    deleteFrame,
+    updateExistingAnnotation,
     getAnnotationByWtId,
     getAnnotations,
-    loadAnnotationsIfNeeded,
-    deleteFrame,
-    invalidateAnnotationCache
+    loadAnnotationsIfNeeded
   };
 
 

@@ -8,7 +8,6 @@
 
   const tools = window.tools;
   const overlay = window.overlay;
-  const backup = window.backup;
   
   // Dialog element for editing annotation WT ID and notes
   let _wtEditor = null;
@@ -125,7 +124,6 @@
         tools.setActiveDrawingPerson(person.wikitreeid);
         tools.setTool("draw");
         updateToolUI();
-        //_updateToolbarButtons();
       }
     ));
     buttonRow.appendChild(_makeToolButton("Select", "select"));
@@ -449,7 +447,6 @@
       } else {
         tools.setTool(toolName);
         updateToolUI();
-        //_updateToolbarButtons();
       }
     });
 
@@ -496,11 +493,11 @@
 
 
   // ============================================================
-  // ANNOTATION EDITOR (WT ID & NOTES)
+  // ANNOTATION EDITOR (NOTES)
   // ============================================================
 
   /**
-   * Creates the modal dialog for editing WT ID and notes.
+   * Creates the modal dialog for editing notes.
    * Dialog is hidden by default and shown via openWtEditor().
    * Only called at init.
    */
@@ -522,11 +519,6 @@
     _wtEditor.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:4px; font-family: Arial, sans-serif;">
       <div style="display:flex; align-items:center; gap:6px;">
-        <span>WikiTree ID:</span>
-        <input type="text" id="wt-input" style="width:120px;" />
-      </div>
-
-      <div style="display:flex; align-items:center; gap:6px;">
         <span>Optional note:</span>
         <input type="text" id="wt-note" style="width:180px;" />
       </div>
@@ -541,16 +533,11 @@
   
     document.body.appendChild(_wtEditor);
 
-    const input = _wtEditor.querySelector("#wt-input");
     const noteInput = _wtEditor.querySelector("#wt-note");
     const saveBtn = _wtEditor.querySelector("#wt-save");
     const cancelBtn = _wtEditor.querySelector("#wt-cancel");
 
     // Handle Enter/Escape in input fields
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") saveBtn.click();
-      if (e.key === "Escape") cancelBtn.click();
-    });
     noteInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") saveBtn.click();
       if (e.key === "Escape") cancelBtn.click();
@@ -572,17 +559,16 @@
 
 
   /**
-   * Opens the WT ID/note editor dialog at specified position
+   * Opens the WT note editor dialog at specified position
    * @param {Object} options
    * @param {number} options.x - Screen X position
    * @param {number} options.y - Screen Y position
-   * @param {string} [options.initialValue=""] - Initial WT ID
    * @param {string} [options.initialNote=""] - Initial note
    * @param {Function} [options.onSave] - Callback with {wtId, note}
    * @param {Function} [options.onCancel] - Callback on cancel
    */
   function openWtEditor(
-      { x, y, initialValue = "", initialNote = "", onSave, onCancel }) 
+      { x, y, initialNote = "", onSave, onCancel }) 
     {
       const input = _wtEditor.querySelector("#wt-input");
       const noteInput = _wtEditor.querySelector("#wt-note");
@@ -594,9 +580,8 @@
       _wtEditor.style.top = y + "px";
       _wtEditor.style.display = "flex";
 
-      input.value = initialValue;
-      input.focus();
       noteInput.value = initialNote;
+      noteInput.focus();
 
       // Cleanup helper
       function cleanup() {
@@ -606,22 +591,9 @@
       }
   
       saveBtn.onclick = () => {
-        const value = input.value.trim();
         const note = noteInput.value.trim();
-      
-        if (!value) {
-          errorEl.textContent = "ID required";
-          return;
-        }
-
-        if (!_isPlausibleWtId(value)) {
-          errorEl.textContent = "Invalid format (e.g., Smith-123)";
-          return;
-        }
-
-        errorEl.textContent = "";
         cleanup();
-        onSave?.({wtId: value, note: note});
+        onSave?.({note: note});
     };
 
     cancelBtn.onclick = () => {
@@ -646,7 +618,7 @@
   // ============================================================
 
   /**
-   * Creates toolbar with ✏️, 🗑️ buttons for selected annotation
+   * Creates toolbar with ➕, 📝, 🗑️ buttons for selected annotation
    * @param {string} id - Annotation ID
    * @returns {HTMLElement} Toolbar div
    */
@@ -654,15 +626,31 @@
     const toolbar = document.createElement("div");
     toolbar.className = "annotation-toolbar";
 
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "➕";
+    addBtn.title = "Add box";
+
     const editBtn = document.createElement("button");
-    editBtn.textContent = "✏️";
-    editBtn.title = "Edit";
+    editBtn.textContent = "📝";
+    editBtn.title = "Notes";
 
     const deleteBtn = document.createElement("button");
     deleteBtn.textContent = "🗑️";
     deleteBtn.title = "Delete";
   
-    // "✏️" button: open WT ID editor
+    // "➕" button: toggle "add box to annotation" mode
+    addBtn.onclick = (e) => {
+      e.stopPropagation();
+
+      if (!tools.getSelectedAnnotationId()) return;
+
+      // Toggle behavior              
+      tools.setActiveDrawingPerson(tools.getSelectedAnnotationId());
+      tools.setTool("draw");
+      updateToolUI();
+    };
+
+    // "📝" button: open annotation note editor
     editBtn.onclick = (e) => {
       e.stopPropagation();
       const frame = e.target.closest(".wt-annotation");
@@ -694,7 +682,7 @@
       annotationsAPI.deleteFrame(wtId, frameIndex);
     };
 
-    toolbar.append(editBtn, deleteBtn);
+    toolbar.append(addBtn, editBtn, deleteBtn);
     return toolbar;
   }
 

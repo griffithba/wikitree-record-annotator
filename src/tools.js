@@ -20,9 +20,9 @@
   }
 
 
-  let _activeBoxIndex = null;            // Index of selected box
+  let _activeFrameIndex = null;            // Index of selected frame
   function getActiveFrameIndex() {
-    return _activeBoxIndex;
+    return _activeFrameIndex;
   }
 
 
@@ -51,11 +51,15 @@
    * Selects an annotation by ID and updates UI
    * Shows toolbar and resize handles
    * @param {string} id - Annotation ID to select
-   * @param {number} index - Index of the box within the annotation
+   * @param {number} index - Index of the frame within the annotation
    */
   function selectAnnotation(id, index) {
+    // Save changes from previously selected frame
+    if (_selectedAnnotationId && (_selectedAnnotationId !== id)) {
+      annotationsAPI.updateExistingAnnotation(_selectedAnnotationId);
+    }
     _selectedAnnotationId = id;
-    _activeBoxIndex = index;
+    _activeFrameIndex = index;
     overlay.updateSelectionStyles();
   }
 
@@ -65,8 +69,12 @@
    * Counterpart to selectAnnotation()
    */
   function clearSelection() {
+    // Save changes from previously selected frame
+    if (_selectedAnnotationId) {
+      annotationsAPI.updateExistingAnnotation(_selectedAnnotationId);
+    }
     _selectedAnnotationId = null;
-    _activeBoxIndex = null;
+    _activeFrameIndex = null;
     overlay.updateSelectionStyles();
     ui.closeWtEditor();
   }
@@ -144,38 +152,41 @@
     e.preventDefault();
     e.stopPropagation();
 
+    // Ignore extra click 
+    overlay.ignoreNextClick();
+
     _isDragging = false;
 
     const rect = overlay.getOverlayElement().getBoundingClientRect();
     const vp = archiveProvider.getCurrentViewport();
     if (!vp) return;
 
-    // STEP 1: Convert overlay pixels to image space
+    // Convert overlay pixels to image space
     // Formula: imageCoord = viewport.origin + (screenPixel / screenSize) * viewport.size
     const x1 = vp.x + (_startX / rect.width) * vp.w;
     const y1 = vp.y + (_startY / rect.height) * vp.h;
     const x2 = vp.x + (_endX / rect.width) * vp.w;
     const y2 = vp.y + (_endY / rect.height) * vp.h;
 
-    // STEP 2: Normalize rectangle in image space
+    // Normalize rectangle in image space
     const newFrame = {
       frameid: null, 
       x: Math.min(x1, x2),
       y: Math.min(y1, y2),
       w: Math.abs(x2 - x1),
       h: Math.abs(y2 - y1), 
-      note: null
+      note: null,
+      _dirty: true
     };
 
-    // STEP 3: Add frame to WT+ backend and local state
-    await annotationsAPI.addFrame(_activeDrawingPerson, newFrame);
-
-    // Step 4: Clean up temporary box and reset state
     _box.remove();
     _box = null;
 
+    // Set up to have the frame be selected in case of further editing
+    _selectedAnnotationId = _activeDrawingPerson;
+    _activeFrameIndex = await annotationsAPI.addFrame(_activeDrawingPerson, newFrame);
     clearActiveDrawingPerson();
-    setTool(null);
+    setTool("select");
     ui.updateToolUI();
   }
 
@@ -200,19 +211,14 @@
     ui.openWtEditor({
       x: screenX,
       y: screenY,
-      initialValue: annotation.wikitreeid || "",
       initialNote: frameData.note || "",
 
-      onSave: async ({wtId, note}) => {
-        if (wtId !== annotation.wikitreeid) {
-          annotation.wtId = wtId;
-          annotation.wtIdFound = await personAPI.prefetch(annotation.wtId);
-        }
+      onSave: async ({note}) => {
         frameData.note = note;
 
-//        await annotationsAPI.updateExistingAnnotation(annotation.id, 
-//          { wtId: annotation.wtId, 
-//            note: annotation.note });
+        // Mark this frame as having unsaved changes
+        frameData._dirty = true;
+
         overlay.renderAnnotations();
       }
     });
@@ -232,7 +238,7 @@
 
     // Clean up when leaving select mode
     if (prevTool === "select" && _currentTool !== "select") {
-      clearSelection();
+      if (_activeDrawingPerson !== _selectedAnnotationId) clearSelection();
       ui.closeWtEditor();
     }
 
@@ -371,17 +377,18 @@
     frame.w = w;
     frame.h = h;
 
+    // mark this frame as needing to be saved
+    frame._dirty = true;
+
     overlay.renderAnnotations();
   }
 
   
   /**
-   * Finalizes resize drag and saves changes
+   * Finalizes resize drag and cleans up
    */
   function _stopResize() {
     if (!_resizing) return;
-
-    //annotationsAPI.saveAnnotationsForPage();
 
     _resizing = null;
 

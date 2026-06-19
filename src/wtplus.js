@@ -132,6 +132,7 @@ console.log("Adding frame:", wtId, frame, info);
   window.wtplusAPI = {
     getFramesForPage,
     getPageReferrers,
+    getPageCitation,
     getFramesForProfile,
     addFrame,
     deleteFrame

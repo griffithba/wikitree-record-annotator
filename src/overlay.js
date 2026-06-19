@@ -47,6 +47,12 @@
   }
 
 
+  let _ignoreNextClick = false;
+
+  function ignoreNextClick() {
+    _ignoreNextClick = true;
+  }
+
   function setDrawingState(enabled) {
 
     _overlay.style.pointerEvents =
@@ -142,7 +148,11 @@
     const host = _container.parentElement; 
     host.addEventListener("click", (e) => {
       if (!tools.isSelecting()) return;
-    
+      if (_ignoreNextClick) {
+        _ignoreNextClick = false;
+        return;
+      }
+
       // If click was on an annotation, ignore
       if (e.target.closest(".wt-annotation")) return;
 
@@ -372,6 +382,7 @@
     initialize, 
     getOverlayElement,
     getAnnotationLayerElement,
+    ignoreNextClick, 
     createLayers,
     attachEvents,
     setVisible,

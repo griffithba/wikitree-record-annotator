@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WikiTree Record Annotator (WT+ Beta)",
-  "version": "0.2.1.1",
+  "version": "0.2.1.2",
   "description": "Annotate record images with WikiTree profiles",
   "action": {
     "default_title": "WikiTree Record Annotator",
@@ -45,7 +45,6 @@
         "src/wtplus.js",
         "src/annotations.js",
         "src/overlay.js",
-        "src/backup.js",
         "src/ui.js",
         "src/person.js",
         "src/content.js"
@@ -60,7 +59,6 @@
         "src/wtplus.js",
         "src/annotations.js",
         "src/overlay.js",
-        "src/backup.js",
         "src/ui.js",
         "src/person.js",
         "src/content.js" 
