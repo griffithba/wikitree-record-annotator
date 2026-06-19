@@ -30,9 +30,10 @@ export async function getFramesByPage(site, book, page) {
 }
 
 export async function getFramesByWtId(site, wtId) {
-  if (_fetchInProgress.has(wtId)) {
+  const key = `${site}|${wtId}`;
+  if (_fetchInProgress.has(key)) {
     // return the earlier promise so all requests for the same wtId are awaiting the same promise
-    return _fetchInProgress.get(wtId);
+    return _fetchInProgress.get(key);
   }
 
   const promise = (async () => {
@@ -44,11 +45,11 @@ export async function getFramesByWtId(site, wtId) {
     
       return response;
     } finally {
-      _fetchInProgress.delete(wtId);
+      _fetchInProgress.delete(key);
     }
   })();
 
-  _fetchInProgress.set(wtId, promise);
+  _fetchInProgress.set(key, promise);
   return promise;
 }
 
