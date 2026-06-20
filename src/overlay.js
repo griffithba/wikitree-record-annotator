@@ -47,11 +47,16 @@
   }
 
 
-  let _ignoreNextClick = false;
+  let _ignoreClicksUntil = 0;
 
   function ignoreNextClick() {
-    _ignoreNextClick = true;
+    _ignoreClicksUntil = Date.now() + 100;
   }
+
+  function _shouldIgnoreClick() {
+    return Date.now() < _ignoreClicksUntil;
+  }
+
 
   function setDrawingState(enabled) {
 
@@ -147,11 +152,7 @@
     // Container click: clear selection when clicking empty space
     const host = _container.parentElement; 
     host.addEventListener("click", (e) => {
-      if (!tools.isSelecting()) return;
-      if (_ignoreNextClick) {
-        _ignoreNextClick = false;
-        return;
-      }
+      if (!tools.isSelecting() || _shouldIgnoreClick()) return;
 
       // If click was on an annotation, ignore
       if (e.target.closest(".wt-annotation")) return;
