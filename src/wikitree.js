@@ -5,7 +5,7 @@
 
   async function processCitationLinks() {
 
-    const missingAnnotations = [];
+    const missingCitations = [];
 
     // mark sources that have annotations for this profile, and 
     // inject wtId into citation links, and
@@ -36,18 +36,23 @@
 
           injectWtIdIntoCitationLink(link);
         }
-        const missingLinks = profileAnnotations.filter(a => !citedPages.has(`${a.site}|${a.book}|${a.page}`));
-        missingAnnotations.push(...missingLinks);
+        const missingAnnotations = profileAnnotations.filter(a => !citedPages.has(`${a.site}|${a.book}|${a.page}`));
+
+        for (const annotation of missingAnnotations) {
+          const url = provider.buildUrlFromBookPage(annotation.book, annotation.page);
+          const citation = { citation:`${annotation.info}, ${url}`, url: url };
+          missingCitations.push(citation);
+        }
       }
       
-    });
+    }
 
-    recommendMissingCitations(missingAnnotations);
+    recommendMissingCitations(missingCitations);
   }
 
 
-  function recommendMissingCitations(missingAnnotations) {
-    if (!missingAnnotations.length) return;
+  function recommendMissingCitations(missingCitations) {
+    if (!missingCitations.length) return;
 
     const sourcesHeader =
       [...document.querySelectorAll("h2")]
@@ -61,12 +66,12 @@
 
     icon.src = chrome.runtime.getURL("icons/icon32.png");
 
-    if (missingAnnotations.length === 1) {
+    if (missingCitations.length === 1) {
       icon.title =
         "1 citation suggestion available";
     } else {
       icon.title =
-        `${missingAnnotations.length} citation suggestions available`;
+        `${missingCitations.length} citation suggestions available`;
     }
 
     Object.assign(icon.style, {
@@ -81,7 +86,7 @@
     icon.addEventListener("click", () => {
       chrome.runtime.sendMessage({
         type: "OPEN_SUGGESTION_WINDOW",
-        suggestions: missingAnnotations
+        suggestions: missingCitations
       });
     });
 

@@ -42,6 +42,13 @@
   }
 
   /**
+   * Builds a URL from the passed in book and page
+   */
+  function buildUrlFromBookPage(book, page) {
+    return (`https://sok.riksarkivet.se/bildvisning/${book}_${page}`);
+  }
+
+  /**
    * Extracts source reference text from page
    * @returns {string} source reference
    */
@@ -161,7 +168,8 @@
     getCleanPageUrl,
     initializeViewportTracking,
     site,
-    getPageKey
+    getPageKey,
+    buildUrlFromBookPage
   };
 
   window.archiveProviders ??= [];

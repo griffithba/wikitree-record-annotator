@@ -61,6 +61,13 @@
     }
   }
 
+  /**
+   * Builds a URL from the passed in book and page
+   */
+  function buildUrlFromBookPage(book, page) {
+    return (`https://data.matricula-online.eu/${book}/?pg=${page}`);
+  }
+
   
 /**
  * Scrapes metadata directly from Matricula's structural table cells.
@@ -225,7 +232,8 @@ async function getReferenceFromPage() {
     getCleanPageUrl,
     initializeViewportTracking,
     site,
-    getPageKey
+    getPageKey,
+    buildUrlFromBookPage
   };
 
   window.archiveProviders ??= [];

@@ -32,10 +32,11 @@
     {
       "matches": ["https://www.wikitree.com/wiki/*"],
       "js": [
-        "src/storage.js", 
         "src/sites/riksarkivet.js", 
         "src/sites/matricula.js",
-        "src/wikitree.js"]
+        "src/wtplus.js",
+        "src/wikitree.js"
+      ]
     },
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],

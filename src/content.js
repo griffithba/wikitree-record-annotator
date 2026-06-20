@@ -5,7 +5,6 @@
 // ============================================================
 // INITIALIZATION & DOM SETUP
 // ============================================================
-const storageAPI = window.storageAPI;
 const personAPI = window.personAPI;
 const theme = window.theme;
 const ui = window.ui;

@@ -23,9 +23,7 @@ chrome.runtime.sendMessage(
     
     container.appendChild(header);
 
-    suggestions.forEach(annotation => {
-
-      const citation = (annotation.reference || "Untitled") + ", " + annotation.url;
+    suggestions.forEach(citation => {
 
       const copyIcon = document.createElement("span");
 
@@ -40,7 +38,7 @@ chrome.runtime.sendMessage(
       });
 
       copyIcon.addEventListener("click", async() => {
-        await navigator.clipboard.writeText(citation);
+        await navigator.clipboard.writeText(citation.citation);
         copyIcon.textContent = "✓";
         copyIcon.title = "Citation copied!";
         setTimeout(() => {
@@ -63,10 +61,10 @@ chrome.runtime.sendMessage(
 
       item.innerHTML = `
         <strong>
-          ${citation}
+          ${citation.citation}
         </strong>
         <br>
-        <a href="${annotation.url}"
+        <a href="${citation.url}"
           target="_blank">
           Open source
         </a>
