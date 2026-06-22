@@ -259,8 +259,8 @@
     }
 
     // Highlight if this annotation matches incoming profile
-    if (String(a.wikitreeid) === String(incomingWtId)) {
-      _triggerRefHighlight(a.id);
+    if (a.wikitreeid === incomingWtId) {
+      _triggerRefHighlight(a.wikitreeid);
       // don't prefill new annotations with the incoming WikiTree ID if there's
       // already one for that ID
       incomingWtId = null;
