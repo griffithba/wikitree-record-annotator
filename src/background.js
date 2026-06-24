@@ -1,131 +1,91 @@
 // background.js (MV3 service worker)
+import * as wikitreeAPI from "./background/wikitree.js";
+import * as wtplusAPI from "./background/wtplus.js";
 
-const fetchInProgress = new Map();
-
+let currentSuggestions = [];
 
 /**
  * Handles messages from content scripts (RA + WT pages)
  * and performs WikiTree fetch operations.
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // We may respond asynchronously
-  if (message?.type === "FETCH_PERSON") {
-    handleWtFetch(message.wtId)
-      .then(sendResponse)
-      .catch(err => {
-        console.error("WT API fetch failed:", err);
-        sendResponse({ error: true });
+  switch (message?.type) {
+
+    case "FETCH_PERSON":
+      wikitreeAPI.handleWtFetch(message.wtId)
+        .then(sendResponse)
+        .catch(err => {
+          console.error("WT API fetch failed:", err);
+          sendResponse({ error: true });
+        });
+
+      return true; // IMPORTANT: keeps message channel open
+  
+
+    case "GET_FRAMES_FOR_PAGE":
+      wtplusAPI.getFramesByPage(message.site, message.book, message.page)
+        .then(sendResponse)
+        .catch(err => {
+          console.error("WT+ wtImageFramesGet for page failed:", err);
+          sendResponse({ error: true });
+        });
+
+      return true;
+
+      
+    case "GET_FRAMES_FOR_PROFILE":
+      wtplusAPI.getFramesByWtId(message.site, message.wtId)
+        .then(sendResponse)
+        .catch(err => {
+          console.error("WT+ wtImageFramesGet for profile failed:", err);
+          sendResponse({ error: true });
+        });
+
+      return true;
+
+      
+    case "ADD_FRAME":
+      wtplusAPI.addFrame(
+        message.site, message.book, message.page, message.info, message.wikitreeid, message.frame)
+        .then(sendResponse)
+        .catch(err => {
+          console.error("WT+ addFrame failed:", err);
+          sendResponse({ error: true });
+        });
+
+      return true;
+
+      
+    case "DELETE_FRAME":
+      wtplusAPI.deleteFrame(
+        message.site, message.book, message.page, message.wikitreeid, message.frameId)
+        .then(sendResponse)
+        .catch(err => {
+          console.error("WT+ deleteFrame failed:", err);
+          sendResponse({ error: true });
+        });
+
+      return true;
+
+      
+    case "OPEN_SUGGESTION_WINDOW":
+
+      currentSuggestions = message.suggestions || [];
+
+      chrome.windows.create({
+        url: chrome.runtime.getURL("src/background/suggestions.html"),
+        type: "popup",
+        width: 450,
+        height: 700
       });
 
-    return true; // IMPORTANT: keeps message channel open
-  }
+      return;
+  
 
-  if (message?.type === "OPEN_SUGGESTION_WINDOW") {
-
-    currentSuggestions = message.suggestions || [];
-
-    chrome.windows.create({
-      url: chrome.runtime.getURL("src/suggestions.html"),
-      type: "popup",
-      width: 450,
-      height: 700
-    });
-
-    return;
-  }
-
-  if (message?.type === "GET_SUGGESTIONS") {
-    sendResponse(currentSuggestions);
-    return;
+    case "GET_SUGGESTIONS":
+      sendResponse(currentSuggestions);
+      return;
   }
 
 });
 
-
-async function handleWtFetch(wtId) {
-  if (fetchInProgress.has(wtId)) {
-    // return the earlier promise so all requests for the same wtId are awaiting the same promise
-    return fetchInProgress.get(wtId);
-  }
-
-  const promise = (async () => {
-    try {
-      const profile = await fetchWikiTreeProfile(wtId);
-
-      if (!profile) {
-        return {
-          ok: false, 
-          reason: "not_found"
-        };
-      }
-
-      return {
-        ok: true, 
-        person: {
-          wtId,
-          name: profile.name || null,
-          birth: profile.birthYear || null,
-          death: profile.deathYear || null
-        }
-      };
-    } finally {
-      fetchInProgress.delete(wtId);
-    }
-  })();
-  
-  fetchInProgress.set(wtId, promise);
-  return promise;
-}
-
-
-async function fetchWikiTreeProfile(wtId) {
-  try {
-    const form = new URLSearchParams();
-    form.append("action", "getPerson");
-    form.append("key", wtId);
-    form.append("fields", "FirstName,MiddleName,LastNameAtBirth,BirthDate,DeathDate");
-    form.append("appId", "wikitree-record-annotator");
-
-    console.log("Fetching WT profile:", wtId);
-    const res = await fetch("https://api.wikitree.com/api.php", {
-      method: "POST",
-      body: form
-    });
-    console.log("WT response status:", res.status);
-    
-    const data = await res.json();
-
-    const person = data?.[0]?.person;
-    if (!person) return null;
-
-    return {
-      name: buildDisplayName(person) || null,
-      birthYear: extractYear(person.BirthDate),
-      deathYear: extractYear(person.DeathDate)
-    };
-  } catch (e) {
-    console.error("WT fetch error:", e);
-    throw e;
-  }
-}
-
-
-function buildDisplayName(person) {
-  const first = person.FirstName || "";
-  const middle = person.MiddleName || "";
-  const last = person.LastNameAtBirth || "";
-
-  return `${first} ${middle} ${last}`.trim();
-}
-
-
-function extractYear(dateStr) {
-  if (!dateStr) return null;
-
-  const match = dateStr.match(/\d{4}/);
-  if (!match) return null;
-
-  const year = match[0];
-
-  return year === "0000" ? null : year;
-}

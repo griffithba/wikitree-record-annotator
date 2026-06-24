@@ -8,7 +8,6 @@
 
   const tools = window.tools;
   const overlay = window.overlay;
-  const backup = window.backup;
   
   // Dialog element for editing annotation WT ID and notes
   let _wtEditor = null;
@@ -111,7 +110,22 @@
     });
 
     // Add tool buttons to button row
-    buttonRow.appendChild(_makeToolButton("Draw", "draw"));
+    buttonRow.appendChild(_makeToolButton(
+      "Draw", 
+      "draw", 
+      async () => {
+        const person = await _showDrawDialog();
+
+        if (!person) {
+          console.log("Draw cancelled");
+          return;
+        }
+
+        tools.setActiveDrawingPerson(person.wikitreeid);
+        tools.setTool("draw");
+        updateToolUI();
+      }
+    ));
     buttonRow.appendChild(_makeToolButton("Select", "select"));
 
     // Button for toggling show/hide annotations
@@ -127,38 +141,292 @@
 
     // Add toggle button to button row
     buttonRow.appendChild(toggleBtn);
-
-    // create utility panel
-    _utilPanel = _makeUtilPanel();
     
-    // button for import/export annotations from/to a file
-    const utilBtn = document.createElement("button");
-    utilBtn.textContent = "💾";
-    utilBtn.title = "Import/Export";
-    utilBtn.addEventListener("click", () => {
-      _utilPanel.style.display = _utilPanel.style.display === "flex" ? "none" : "flex";
-    });
-
-    // Add import/export button to button row
-    buttonRow.appendChild(utilBtn);
-
     // Add button row to toolbar
     toolbar.appendChild(buttonRow);
     
     // attach the toolbar
     document.body.appendChild(toolbar);
-    // attach the (hidden for now) utility panel
-    document.body.appendChild(_utilPanel); 
   }
+
+
+  // Display a dialog with list of annotated and unannotated profiles for the current page, and 
+  // let user select one to start drawing annotation frames for that profile. Returns the selected 
+  // profile object or null if dialog was cancelled.
+  async function _showDrawDialog() {
+    const key = archiveProvider.getCurrentPageKey();
+    const referrers = await wtplusAPI.getPageReferrers(key.site, key.book, key.page);
+
+    const annotatedProfiles = annotationsAPI.getAnnotations();
+    const annotatedIds = annotatedProfiles.map(p => p.wikitreeid);
+
+    const unannotatedReferrers = referrers.filter(r => !annotatedIds.includes(r.wikitreeid));
+    const unannotatedIds = unannotatedReferrers.map(r => r.wikitreeid);
+
+    // pre-fetch person data for all unannotated IDs simultaneously (annotated IDs were already pre-fetched)
+    await Promise.all(unannotatedIds.map(async wtId => personAPI.prefetch(wtId)));
+
+    return new Promise(resolve => {
+
+      // --------------------------------------------------
+      // backdrop
+      // --------------------------------------------------
+
+      const backdrop = document.createElement("div");
+
+      Object.assign(backdrop.style, {
+        position: "fixed",
+        inset: "0",
+        background: "rgba(0,0,0,0.4)",
+        zIndex: "100000"
+      });
+
+      // --------------------------------------------------
+      // dialog
+      // --------------------------------------------------
+
+      const dialog = document.createElement("div");
+
+      Object.assign(dialog.style, {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        background: "white",
+        padding: "16px",
+        borderRadius: "8px",
+        minWidth: "500px",
+        maxHeight: "80vh",
+        overflowY: "auto"
+      });
+
+      backdrop.appendChild(dialog);
+
+      // --------------------------------------------------
+      // title
+      // --------------------------------------------------
+
+      const title = document.createElement("h3");
+      title.textContent = "Select profile for annotation";
+      dialog.appendChild(title);
+
+      // --------------------------------------------------
+      // two-column container
+      // --------------------------------------------------
+
+      const columns = document.createElement("div");
+
+      Object.assign(columns.style, {
+        display: "flex",
+        gap: "24px"
+      });
+
+      dialog.appendChild(columns);
+
+      // --------------------------------------------------
+      // left column
+      // --------------------------------------------------
+
+      const left = document.createElement("div");
+
+      Object.assign(left.style, {
+        flex: "1"
+      });
+
+      columns.appendChild(left);
+
+      const leftHeader = document.createElement("h4");
+      leftHeader.textContent = "New annotation for:";
+      left.appendChild(leftHeader);
+
+      // --------------------------------------------------
+      // right column
+      // --------------------------------------------------
+
+      const right = document.createElement("div");
+
+      Object.assign(right.style, {
+        flex: "1"
+      });
+
+      columns.appendChild(right);
+
+      const rightHeader = document.createElement("h4");
+      rightHeader.textContent = "Add frame to:";
+      right.appendChild(rightHeader);
+
+      // --------------------------------------------------
+      // helper for radio rows
+      // --------------------------------------------------
+
+      function addRadioRow(parent, wtId, displayText, tooltipText) {
+
+        const label = document.createElement("label");
+
+        Object.assign(label.style, {
+          display: "block",
+          marginBottom: "4px"
+        });
+
+        if (tooltipText) {
+          label.title = tooltipText;
+        }
+
+        const radio = document.createElement("input");
+
+        radio.type = "radio";
+        radio.name = "wt-draw-target";
+        radio.value = wtId;
+
+        label.appendChild(radio);
+        label.append(" " + displayText);
+
+        parent.appendChild(label);
+
+        return radio;
+      }
+
+      // --------------------------------------------------
+      // unannotated list
+      // --------------------------------------------------
+      let toolTip = null;
+
+      unannotatedIds.forEach(id => {
+        const exactBirth = personAPI.getExactBirth(id);
+        if (exactBirth) toolTip = `Born ${exactBirth}`;
+        else toolTip = null;
+
+        addRadioRow(left, id, personAPI.formatDisplayName(id), toolTip);
+      });
+
+      // --------------------------------------------------
+      // custom WT ID
+      // --------------------------------------------------
+
+      const otherLabel = document.createElement("label");
+
+      Object.assign(otherLabel.style, {
+        display: "block",
+        marginTop: "12px"
+      });
+
+      const otherRadio = document.createElement("input");
+
+      otherRadio.type = "radio";
+      otherRadio.name = "wt-draw-target";
+
+      const otherInput = document.createElement("input");
+
+      otherInput.type = "text";
+      otherInput.placeholder = "Other WT ID";
+
+      otherInput.addEventListener("focus", () => {
+        otherRadio.checked = true;
+      });
+
+      otherLabel.appendChild(otherRadio);
+      otherLabel.append(" Other: ");
+      otherLabel.appendChild(otherInput);
+
+      left.appendChild(otherLabel);
+
+      // --------------------------------------------------
+      // annotated list
+      // --------------------------------------------------
+
+      annotatedIds.forEach(id => {
+        const exactBirth = personAPI.getExactBirth(id);
+        if (exactBirth) toolTip = `Born ${exactBirth}`;
+        else toolTip = null;
+
+        addRadioRow(right, id, personAPI.formatDisplayName(id), toolTip);
+      });
+
+      // --------------------------------------------------
+      // buttons
+      // --------------------------------------------------
+
+      const buttonRow = document.createElement("div");
+
+      Object.assign(buttonRow.style, {
+        marginTop: "16px",
+        textAlign: "right"
+      });
+
+      dialog.appendChild(buttonRow);
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.textContent = "Cancel";
+
+      const goBtn = document.createElement("button");
+      goBtn.textContent = "Go";
+
+      Object.assign(goBtn.style, {
+        marginLeft: "8px"
+      });
+
+      buttonRow.appendChild(cancelBtn);
+      buttonRow.appendChild(goBtn);
+
+      // --------------------------------------------------
+      // handlers
+      // --------------------------------------------------
+
+      cancelBtn.addEventListener("click", () => {
+        backdrop.remove();
+        resolve(null);
+      });
+
+      goBtn.addEventListener("click", () => {
+
+        let selectedId = null;
+
+        const selectedRadio =
+          dialog.querySelector(
+            'input[name="wt-draw-target"]:checked'
+          );
+
+        if (!selectedRadio) {
+          alert("Select a profile.");
+          return;
+        }
+
+        if (selectedRadio === otherRadio) {
+
+          selectedId =
+            otherInput.value.trim();
+
+        } else {
+
+          selectedId =
+            selectedRadio.value;
+        }
+
+        if (!selectedId) {
+          alert("Enter a WikiTree ID.");
+          return;
+        }
+
+        backdrop.remove();
+
+        resolve({
+          wikitreeid: selectedId
+        });
+      });
+
+      document.body.appendChild(backdrop);
+    });
+  } 
 
 
   /**
    * Creates a button for tool selection
    * @param {string} label - Button label text
    * @param {string} toolName - Tool identifier ("draw" | "select")
+   * @param {Function} onClick - Optional custom click handler
    * @returns {HTMLElement} Button element
    */
-  function _makeToolButton(label, toolName) {
+  function _makeToolButton(label, toolName, onClick = null) {
     const btn = document.createElement("button");
 
     btn.textContent = label;
@@ -170,125 +438,16 @@
       cursor: "pointer"
     });
 
-    btn.addEventListener("click", () => {
-      tools.setTool(toolName);
-      updateToolUI();
-      _updateToolbarButtons();
+    btn.addEventListener("click", async () => {
+      if (onClick) {
+        await onClick();
+      } else {
+        tools.setTool(toolName);
+        updateToolUI();
+      }
     });
 
     return btn;
-  }
-
-
-  function _makeUtilPanel() {
-    const panel = document.createElement("div");
-
-    Object.assign(panel.style, {
-      position: "fixed",
-      top: "50%",
-      left: "50%",
-      zIndex: "100001",
-      transform: "translate(-50%, -50%)",
-      padding: "8px",
-      background: "var(--wt-toolbar-bg)",
-      borderRadius: "8px",
-      display: "none",
-      flexDirection: "column",
-      gap: "6px"
-    });
-
-    //
-    // Export button
-    //
-
-    const exportRow = document.createElement("div");
-
-    Object.assign(exportRow.style, {
-      display: "flex",
-      flexDirection: "row",
-      alignItems: "center",
-      gap: "6px"
-    });
-
-    const exportBtn = document.createElement("button");
-    exportBtn.textContent = "Export";
-
-    const exportText = document.createElement("span");
-    exportText.textContent = "all annotations to a JSON file";
-
-    exportBtn.addEventListener("click", async () => {
-      const outputFile = "wikitree_annotations_" + getLocalTimestamp() + ".json";
-      await backup.exportAnnotations(outputFile);
-      _utilPanel.style.display = "none"; // Hide panel after export
-    });
-       
-    exportRow.appendChild(exportBtn);
-    exportRow.appendChild(exportText);
-
-    panel.appendChild(exportRow);
-
-    //
-    // Import button
-    //
-
-    const importRow = document.createElement("div");
-
-    Object.assign(importRow.style, {
-      display: "flex",
-      flexDirection: "row",
-      alignItems: "center",
-      gap: "6px"
-    });
-
-    const importBtn = document.createElement("button");
-    importBtn.textContent = "Import";
-
-    const importText = document.createElement("span");
-    importText.textContent = "annotations from a JSON file";
-
-    importBtn.addEventListener("click", () => {
-      const input = document.createElement("input");
-
-      input.type = "file";
-      input.accept = ".json";
-
-      input.addEventListener("change", async (e) => {
-        const inputFile = e.target.files[0];
-
-        if (inputFile) {
-          await backup.importAnnotations(inputFile);
-        }
-      });
-      input.click();
-      _utilPanel.style.display = "none"; // Hide panel after initiating import
-    });
-
-    importRow.appendChild(importBtn);
-    importRow.appendChild(importText);
-
-    panel.appendChild(importRow);
-
-    const warningText = document.createElement("div");
-    
-    warningText.textContent = "⚠ Importing will overwrite all existing annotations!";
-    
-    panel.appendChild(warningText);
-
-    return (panel);
-  }
-
-  
-  function getLocalTimestamp() {
-    const now = new Date();
-
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0'); // +1 because months are 0-11
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-
-    return `${year}${month}${day}${hours}${minutes}${seconds}`;
   }
 
 
@@ -305,6 +464,8 @@
         el.style.pointerEvents = "auto";
       }
     });
+
+    _updateToolbarButtons();
 
     overlay.setDrawingState(tools.isDrawing());
   }
@@ -329,11 +490,11 @@
 
 
   // ============================================================
-  // ANNOTATION EDITOR (WT ID & NOTES)
+  // ANNOTATION EDITOR (NOTES)
   // ============================================================
 
   /**
-   * Creates the modal dialog for editing WT ID and notes.
+   * Creates the modal dialog for editing notes.
    * Dialog is hidden by default and shown via openWtEditor().
    * Only called at init.
    */
@@ -355,11 +516,6 @@
     _wtEditor.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:4px; font-family: Arial, sans-serif;">
       <div style="display:flex; align-items:center; gap:6px;">
-        <span>WikiTree ID:</span>
-        <input type="text" id="wt-input" style="width:120px;" />
-      </div>
-
-      <div style="display:flex; align-items:center; gap:6px;">
         <span>Optional note:</span>
         <input type="text" id="wt-note" style="width:180px;" />
       </div>
@@ -374,16 +530,11 @@
   
     document.body.appendChild(_wtEditor);
 
-    const input = _wtEditor.querySelector("#wt-input");
     const noteInput = _wtEditor.querySelector("#wt-note");
     const saveBtn = _wtEditor.querySelector("#wt-save");
     const cancelBtn = _wtEditor.querySelector("#wt-cancel");
 
     // Handle Enter/Escape in input fields
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") saveBtn.click();
-      if (e.key === "Escape") cancelBtn.click();
-    });
     noteInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") saveBtn.click();
       if (e.key === "Escape") cancelBtn.click();
@@ -405,17 +556,16 @@
 
 
   /**
-   * Opens the WT ID/note editor dialog at specified position
+   * Opens the WT note editor dialog at specified position
    * @param {Object} options
    * @param {number} options.x - Screen X position
    * @param {number} options.y - Screen Y position
-   * @param {string} [options.initialValue=""] - Initial WT ID
    * @param {string} [options.initialNote=""] - Initial note
    * @param {Function} [options.onSave] - Callback with {wtId, note}
    * @param {Function} [options.onCancel] - Callback on cancel
    */
   function openWtEditor(
-      { x, y, initialValue = "", initialNote = "", onSave, onCancel }) 
+      { x, y, initialNote = "", onSave, onCancel }) 
     {
       const input = _wtEditor.querySelector("#wt-input");
       const noteInput = _wtEditor.querySelector("#wt-note");
@@ -427,9 +577,8 @@
       _wtEditor.style.top = y + "px";
       _wtEditor.style.display = "flex";
 
-      input.value = initialValue;
-      input.focus();
       noteInput.value = initialNote;
+      noteInput.focus();
 
       // Cleanup helper
       function cleanup() {
@@ -439,22 +588,9 @@
       }
   
       saveBtn.onclick = () => {
-        const value = input.value.trim();
         const note = noteInput.value.trim();
-      
-        if (!value) {
-          errorEl.textContent = "ID required";
-          return;
-        }
-
-        if (!_isPlausibleWtId(value)) {
-          errorEl.textContent = "Invalid format (e.g., Smith-123)";
-          return;
-        }
-
-        errorEl.textContent = "";
         cleanup();
-        onSave?.({wtId: value, note: note});
+        onSave?.({note: note});
     };
 
     cancelBtn.onclick = () => {
@@ -479,7 +615,7 @@
   // ============================================================
 
   /**
-   * Creates toolbar with ➕, ✏️, 🗑️ buttons for selected annotation
+   * Creates toolbar with ➕, 📝, 🗑️ buttons for selected annotation
    * @param {string} id - Annotation ID
    * @returns {HTMLElement} Toolbar div
    */
@@ -492,31 +628,33 @@
     addBtn.title = "Add box";
 
     const editBtn = document.createElement("button");
-    editBtn.textContent = "✏️";
-    editBtn.title = "Edit";
+    editBtn.textContent = "📝";
+    editBtn.title = "Notes";
 
     const deleteBtn = document.createElement("button");
     deleteBtn.textContent = "🗑️";
     deleteBtn.title = "Delete";
-
+  
     // "➕" button: toggle "add box to annotation" mode
     addBtn.onclick = (e) => {
       e.stopPropagation();
 
       if (!tools.getSelectedAnnotationId()) return;
 
-      // Toggle behavior
-      tools.setAddingBoxToAnnotationId(tools.isAddingBoxToAnnotationId() ? null : tools.getSelectedAnnotationId());
-      overlay.setDrawingState(tools.isAddingBoxToAnnotationId());
+      // Toggle behavior              
+      tools.setActiveDrawingPerson(tools.getSelectedAnnotationId());
+      tools.setTool("draw");
+      updateToolUI();
     };
-  
-    // "✏️" button: open WT ID editor
+
+    // "📝" button: open annotation note editor
     editBtn.onclick = (e) => {
       e.stopPropagation();
-      const box = e.target.closest(".wt-annotation");
-      if (!box) return;
-      const rect = box.getBoundingClientRect();
-      tools.editAnnotation(id, rect.left + rect.width, rect.top + rect.height);
+      const frame = e.target.closest(".wt-annotation");
+      if (!frame) return;
+      const rect = frame.getBoundingClientRect();
+      const frameId = Number(frame.dataset.frameId);
+      tools.editFrame(id, frameId, rect.left + rect.width, rect.top + rect.height);
     };
 
     // "🗑️" button: delete with confirmation
@@ -534,11 +672,11 @@
       }
 
       // Second click: execute deletion
-      const boxEl = deleteBtn.closest(".wt-annotation");
-      const annotationId = boxEl.dataset.annotationId;
-      const boxIndex = Number(boxEl.dataset.boxIndex);
+      const frameEl = deleteBtn.closest(".wt-annotation");
+      const wtId = frameEl.dataset.annotationId;
+      const frameIndex = Number(frameEl.dataset.frameIndex);
 
-      annotationsAPI.deleteBox(annotationId, boxIndex);
+      annotationsAPI.deleteFrame(wtId, frameIndex);
     };
 
     toolbar.append(addBtn, editBtn, deleteBtn);

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const id = "matricula";
+  const site = "matricula";
   let _currentViewport = null; 
   let _firstViewportRenderDone = false;
   let _currentViewerContainer = null;
@@ -54,11 +54,18 @@
         const book = match[1];
         const page = url.searchParams.get("pg") || "1";
 
-        return book ? `${book}_p${page}` : "unknown_matricula_page";
+        return { site, book, page };
       }
     } catch (e) {
       return "unknown_matricula_page";
     }
+  }
+
+  /**
+   * Builds a URL from the passed in book and page
+   */
+  function buildUrlFromBookPage(book, page) {
+    return (`https://data.matricula-online.eu/${book}/?pg=${page}`);
   }
 
   
@@ -224,8 +231,9 @@ async function getReferenceFromPage() {
     getCurrentViewport,
     getCleanPageUrl,
     initializeViewportTracking,
-    id,
-    getPageKey
+    site,
+    getPageKey,
+    buildUrlFromBookPage
   };
 
   window.archiveProviders ??= [];

@@ -3,146 +3,162 @@
   "use strict";
 
   // Annotations array (stored in IMAGE SPACE coordinates)
-  let annotations = [];
+  let _annotations = [];
   // Page tracking for lazy loading
-  let lastPageKey = null;               // Track current page to avoid redundant loads
+  let _lastPageKey = null;               // Track current page to avoid redundant loads
 
-
-
-  // ============================================================
-  // STORAGE & PERSISTENCE
-  // ============================================================
 
   /**
-   * Saves annotations for current page to storage
-   * Preserves annotations for other pages
+   * Gets all annotations for a this page
+   * @returns {Array} Annotations for current page
    */
-  async function saveAnnotationsForPage() {
-    const key = archiveProvider.getCurrentPageKey();
-
-    const all = await storageAPI.getAnnotations();
-
-    // Remove old annotations for this page
-    const others = all.filter(a => a.page !== key);
-
-    // Add updated ones
-    const updated = [...others, ...annotations];
-
-    // WARNING: Using this function incorrectly will delete all annotations!
-    await storageAPI.saveAnnotations(updated);
-  }
-
-  async function updateExistingAnnotation(id, patch) {
-    await storageAPI.updateAnnotation(id, patch);
-  }
-
-  /**
-   * Gets all annotations for a specific page
-   * @param {string} pageKey - Page identifier
-   * @returns {Array} Annotations for that page
-   */
-  async function getAnnotationsByPage(pageKey) {
-    const all = await storageAPI.getAnnotations();
-    return all.filter(a => a.page === pageKey);
+  async function _getAnnotationsForCurrentPage() {
+    return(await wtplusAPI.getFramesForPage()) || [];
   }
 
   function getAnnotations() {
-    return annotations;
+    return _annotations;
   }
+
+
 
   /**
    * Loads annotations for current page if not already loaded
-   * Lazy loads to avoid loading every page's annotations at startup
    */
   async function loadAnnotationsIfNeeded() {
     const key = archiveProvider.getCurrentPageKey();
 
-    if (key === lastPageKey) return;  // Already loaded
-    lastPageKey = key;
+    if (samePage(key, _lastPageKey)) return;  // Already loaded
+    _lastPageKey = key;
 
-    // only store annotations specific to this page
-    annotations = await getAnnotationsByPage(key);
-    // log all loaded annotations for debugging
-    console.log(`Loaded ${annotations.length} annotations for page ${key}`, 
-                annotations);
+    _annotations = await _getAnnotationsForCurrentPage() || [];
+
+    console.log(`Loaded ${_annotations.length} annotations for page ${key.book} ${key.page}`, 
+                _annotations);
     // pre-fetch person data for all annotations simultaneously
     await Promise.all(
-      annotations.map(async a => {
-          a.wtIdFound = await personAPI.prefetch(a.wtId); 
+      _annotations.map(async a => {
+          a.wtIdFound = await personAPI.prefetch(a.wikitreeid); 
       })
     );
+
+    function samePage(a, b) {
+      return a &&
+             b &&
+             a.site === b.site &&
+             a.book === b.book &&
+             a.page === b.page;
+    }
   }
 
 
   // ============================================================
-  // ANNOTATION OPERATIONS (ADD/DELETE)
+  // ANNOTATION OPERATIONS (ADD/DELETE/EDIT)
   // ============================================================
 
-  /**
-   * Deletes a specific box from an annotation
-   * If last box, deletes entire annotation
-   * @param {string} annotationId - Annotation ID
-   * @param {number} boxIndex - Index of box to delete
-   */
-  async function deleteBox(annotationId, boxIndex) {
-    const annotation = getAnnotationById(annotationId);
-    if (!annotation) return;
 
-    if (annotation.boxes.length > 1) {
-      // Remove just this box
-      annotation.boxes.splice(boxIndex, 1);
+  async function addFrame(wtId, frame) {
+
+    let annotation = getAnnotationByWtId(wtId);
+    let frameIndex = 0;
+
+    if (!annotation) {
+      annotation = {
+        frames: [frame],
+        wikitreeid: wtId,
+        wtIdFound: await personAPI.prefetch(wtId) // pre-fetch person data for this ID
+      }
+      _annotations.push(annotation);
     } else {
-      // Last box → delete entire annotation
-      deleteAnnotation(annotationId);
-      return;
+      frameIndex = annotation.frames.push(frame) - 1;
     }
 
-    await saveAnnotationsForPage(annotations);
     overlay.renderAnnotations();
+
+    return frameIndex;
   }
 
-  async function addAnnotation(annotation) {
-    annotations.push(annotation);
-    await saveAnnotationsForPage(annotations);
-    overlay.renderAnnotations();
-  }
 
   /**
-   * Deletes entire annotation and clears selection
-   * @param {string} id - Annotation ID
+   * Deletes a specific frame from an annotation
+   * If last frame, deletes entire annotation
+   * @param {string} wtId - WikiTree ID
+   * @param {number} frameIndex - Index of frame to delete
    */
-  async function deleteAnnotation(id) {
-    annotations = annotations.filter(a => a.id !== id);
-    await saveAnnotationsForPage(annotations);
-    if (tools.getSelectedAnnotationId() === id) tools.clearSelection();
+  async function deleteFrame(wtId, frameIndex) {
+    const annotation = getAnnotationByWtId(wtId);
+    if (!annotation) return;
+
+    const frameId = annotation.frames[frameIndex].frameid;
+
+    // Only delete it from WT+ if it's actually there. 
+    if (frameId) {
+      // Delete frame from WT+ backend
+      const success = await wtplusAPI.deleteFrame(wtId, frameId);
+
+      if (!success) {
+        console.warn("Failed to delete frame:", wtId, frameId);
+        return;
+      }
+    }
+
+    // Then delete from local state and re-render
+    if (annotation.frames.length > 1) {
+      // Remove just this frame
+      annotation.frames.splice(frameIndex, 1);
+    } else {
+      // Last frame → delete entire annotation
+      _annotations = _annotations.filter(a => a.wikitreeid !== wtId);
+      if (tools.getSelectedAnnotationId() === wtId) tools.clearSelection();
+    }
+
     overlay.renderAnnotations();
   }
+  
+  
+  async function updateExistingAnnotation(wtId) {
+    const a = getAnnotationByWtId(wtId);
+    if (!a) return;
+    // loop through all frames in the annotation
+    a.frames.forEach(async frame => {
+      // if changes were made
+      if (frame._dirty) {
+        const oldFrameId = frame.frameid;
+        // save a new copy of the frame
+        const newFrameId = await wtplusAPI.addFrame(wtId, frame);
+        if (newFrameId) {
+          // store the new frame ID
+          frame.frameid = newFrameId;
+          // if there was an old frame ID (this isn't a new frame)
+          if (oldFrameId) {
+            // delete the old version
+            const success = await wtplusAPI.deleteFrame(wtId, oldFrameId);
+          }
+        }
+        delete frame._dirty;
+      }
+    });
+  }
+
 
   /**
-   * Finds annotation by ID
-   * @param {string} id - Annotation ID
+   * Finds annotation by WikiTree ID
+   * @param {string} wtId - WikiTree ID
    * @returns {Object|null} Annotation object or null if not found
    */
-  function getAnnotationById(id) {
-    const a = annotations.find(x => x.id === id);
-    if (!a) console.warn("Annotation not found:", id);
+  function getAnnotationByWtId(wtId) {
+    const a = _annotations.find(x => x.wikitreeid === wtId);
     return a || null;
   }
 
-  function invalidateAnnotationCache() {
-    lastPageKey = null;
-  }
-
+  
   window.annotationsAPI = {
-    addAnnotation,
-    saveAnnotationsForPage,
+    addFrame,
+    deleteFrame,
     updateExistingAnnotation,
-    getAnnotationById,
+    getAnnotationByWtId,
     getAnnotations,
-    loadAnnotationsIfNeeded,
-    deleteBox,
-    deleteAnnotation,
-    invalidateAnnotationCache
+    loadAnnotationsIfNeeded
   };
 
 
