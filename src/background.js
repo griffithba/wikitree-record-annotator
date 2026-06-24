@@ -57,7 +57,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       
     case "DELETE_FRAME":
-      console.log("background DELETE_FRAME:", message.wikitreeid, message.frameId);
       wtplusAPI.deleteFrame(
         message.site, message.book, message.page, message.wikitreeid, message.frameId)
         .then(sendResponse)
@@ -69,12 +68,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
       
-   case "OPEN_SUGGESTION_WINDOW":
+    case "OPEN_SUGGESTION_WINDOW":
 
       currentSuggestions = message.suggestions || [];
 
       chrome.windows.create({
-        url: chrome.runtime.getURL("src/suggestions.html"),
+        url: chrome.runtime.getURL("src/background/suggestions.html"),
         type: "popup",
         width: 450,
         height: 700

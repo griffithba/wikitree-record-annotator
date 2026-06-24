@@ -1,7 +1,9 @@
 (() => {
   const archiveProviders = window.archiveProviders;
 
-  const wtId = getCurrentWtId();
+  const pageData = document.getElementById("pageData")?.dataset;
+  const name = `${pageData.mfirstname} ${pageData.mlastnameatbirth}`; 
+  const wtId = pageData.mnamedb;
 
   async function processCitationLinks() {
 
@@ -40,7 +42,7 @@
 
         for (const annotation of missingAnnotations) {
           const url = provider.buildUrlFromBookPage(annotation.book, annotation.page);
-          const citation = { citation:`${annotation.info}, ${url}`, url: url };
+          const citation = { citation:`${annotation.info}, ${url}`, url: url, name: name, gender: pageData.mgender };
           missingCitations.push(citation);
         }
       }
@@ -82,7 +84,6 @@
       verticalAlign: "middle"
     });
   
-
     icon.addEventListener("click", () => {
       chrome.runtime.sendMessage({
         type: "OPEN_SUGGESTION_WINDOW",

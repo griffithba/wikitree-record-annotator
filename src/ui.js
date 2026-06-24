@@ -166,9 +166,6 @@
     // pre-fetch person data for all unannotated IDs simultaneously (annotated IDs were already pre-fetched)
     await Promise.all(unannotatedIds.map(async wtId => personAPI.prefetch(wtId)));
 
-    console.log("Annotated profiles:", annotatedIds);
-    console.log("Unannotated profiles:", unannotatedIds);
-
     return new Promise(resolve => {
 
       // --------------------------------------------------

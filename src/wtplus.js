@@ -99,7 +99,6 @@
 
   async function addFrame(wtId, frame) {
     const info = _pageInfo ? null : await archiveProvider.getReferenceFromPage();
-console.log("Adding frame:", wtId, frame, info);
     const response = await new Promise((resolve) => {
       chrome.runtime.sendMessage(
         {
@@ -126,7 +125,6 @@ console.log("Adding frame:", wtId, frame, info);
 
 
   async function deleteFrame(wtId, frameId) {
-    console.log("wtplusAPI.deleteFrame:", wtId, frameId);
     const response = await new Promise((resolve) => {
       chrome.runtime.sendMessage(
         {

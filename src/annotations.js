@@ -148,7 +148,6 @@
    */
   function getAnnotationByWtId(wtId) {
     const a = _annotations.find(x => x.wikitreeid === wtId);
-    if (!a) console.log("Annotation not found:", wtId);
     return a || null;
   }
 

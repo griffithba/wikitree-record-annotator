@@ -79,8 +79,8 @@
     },
     {
       "resources": [
-        "src/suggestions.html",
-        "src/suggestions.js"
+        "src/background/suggestions.html",
+        "src/background/suggestions.js"
       ],
       "matches": [
         "https://www.wikitree.com/*"

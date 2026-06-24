@@ -13,13 +13,15 @@ chrome.runtime.sendMessage(
 
     const header = document.createElement("h2");
 
-    if (suggestions.length === 1) {
-      header.textContent = 
-        `${suggestions[0].wtId} is annotated in the following source which is not cited in their profile:`;
-    } else {
-      header.textContent = 
-        `${suggestions[0].wtId} is annotated in the following sources which are not cited in their profile:`;
-    }
+    const possessivePronoun =
+      suggestions[0].gender === "Male" ? "his" :
+      suggestions[0].gender === "Female" ? "her" :
+      "their";
+
+    const sourcePhrase = suggestions.length === 1 ? "source which is" : "sources which are";
+
+    header.textContent = 
+      `${suggestions[0].name} is annotated in the following ${sourcePhrase} not cited in ${possessivePronoun} profile:`;
     
     container.appendChild(header);
 

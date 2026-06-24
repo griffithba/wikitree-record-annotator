@@ -63,11 +63,8 @@ async function _wtplusImageFramesGet(params) {
   });
   const response = await fetch(url);
   
-console.log("WT+ URL:", url.toString());
-console.log("status:", response.status);
-
   const json = await response.json();
-console.log("WT+ wtImageFramesGet response:", json);
+
   return json;
 }
 
@@ -94,9 +91,9 @@ export async function addFrame(site, book, page, info, wikitreeid, frame) {
     });
     
     const data = await res.json();
-console.log("addFrame result:", data);
+
     const frameId = data?.response?.frameid;
-console.log("frameid:", frameId);
+
     return (data);
 
   } catch (e) {
@@ -107,7 +104,6 @@ console.log("frameid:", frameId);
 
 
 export async function deleteFrame(site, book, page, wtId, frameId) {
-  console.log("background wtplus.deleteFrame:", wtId, frameId);
   try {
     const url = new URL("https://plus.wikitree.com/function/wtImageFramesDelete/WT_Annotator.json");
 
@@ -124,9 +120,7 @@ export async function deleteFrame(site, book, page, wtId, frameId) {
     });
 
     const data = await res.json();
-console.log("deleteFrame result:", data);
-//    const success = data?.response?.success;
-//console.log("Success:", success);
+
     return (data);
 
   } catch (e) {
