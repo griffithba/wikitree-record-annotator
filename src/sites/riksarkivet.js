@@ -24,13 +24,13 @@
 
   // get the OpenSeadragon container (the element the overlay should attach to)
   function getViewerContainer() {
-    return document.querySelector(".openseadragon-container");
+    return document.querySelector(".openseadragon-canvas");
   }
 
   /**
    * Extracts page identifier from current URL
    * Used as the key for storing/loading annotations per page
-   * @returns {string} Page key (e.g., "P123_456")
+   * @returns {site, book, page} 
    */
   function getCurrentPageKey() {
     return getPageKey(window.location.href);
