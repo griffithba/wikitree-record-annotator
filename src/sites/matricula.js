@@ -20,12 +20,16 @@
   }
 
   function waitForViewerReady() {
+    // If we're on something other than a record image page then bail out
+    if (!new URL(window.location.href).searchParams.has("pg")) return;
+    
     const container = getViewerContainer();
 
     if (container) {
       _currentViewerContainer = container;
       _injectPageScript();
       initOverlay();
+      return;
     }
     else setTimeout(waitForViewerReady, 200);
   }
