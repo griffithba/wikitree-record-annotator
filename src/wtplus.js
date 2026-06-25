@@ -50,6 +50,7 @@
       const pageData = response.response;
       _pageInfo = pageData?.profiles[0]?.info;
       _pageCache.set(key, pageData);
+      console.log(pageData);
     }
 
     return _pageCache.get(key);

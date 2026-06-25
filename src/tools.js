@@ -196,17 +196,17 @@
   // ============================================================
 
   /**
-   * Opens editor to modify WT ID and note for an existing annotation
+   * Opens editor to modify note for an existing annotation
    * @param {string} id - Annotation ID (WikiTree ID)
-   * @param {number} frameId - Unique ID of the frame to edit
+   * @param {number} frameIndex - Index of the frame to edit
    * @param {number} screenX - Screen X position for dialog
    * @param {number} screenY - Screen Y position for dialog
    */
-  function editFrame(id, frameId, screenX, screenY) {
+  function editFrame(id, frameIndex, screenX, screenY) {
     const annotation = annotationsAPI.getAnnotationByWtId(id);
     if (!annotation) return;
-  
-    const frameData = annotation.frames.find(f => f.frameid === frameId);
+
+    const frameData = annotation.frames[frameIndex];
 
     ui.openWtEditor({
       x: screenX,

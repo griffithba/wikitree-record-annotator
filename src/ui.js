@@ -653,8 +653,8 @@
       const frame = e.target.closest(".wt-annotation");
       if (!frame) return;
       const rect = frame.getBoundingClientRect();
-      const frameId = Number(frame.dataset.frameId);
-      tools.editFrame(id, frameId, rect.left + rect.width, rect.top + rect.height);
+      const frameIndex = Number(frame.dataset.frameIndex);
+      tools.editFrame(id, frameIndex, rect.left + rect.width, rect.top + rect.height);
     };
 
     // "🗑️" button: delete with confirmation
