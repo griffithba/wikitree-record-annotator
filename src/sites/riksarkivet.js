@@ -5,7 +5,6 @@
 
   let _currentViewport = null; // in image space coordinates, synced from URL hash
 
-  let _firstViewportRenderDone = false;
 
   /**
    * Waits for OpenSeadragon container to load, then initializes overlay
@@ -15,12 +14,30 @@
     const el = document.querySelector(".openseadragon-canvas");
 
     if (el) {
+      _injectPageScript();
       initOverlay();
       return;
     }
 
     setTimeout(waitForViewerReady, 200);
   }
+
+
+  function _injectPageScript() {
+    if (document.getElementById("wta-riksarkivet-page-script")) {
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "wta-riksarkivet-page-script";
+    script.src = chrome.runtime.getURL("src/sites/riksarkivet-page.js");
+    script.onload = () => script.remove();
+
+    (document.head || document.documentElement).appendChild(script);
+
+
+  }
+
 
   // get the OpenSeadragon container (the element the overlay should attach to)
   function getViewerContainer() {
@@ -98,33 +115,98 @@
     return null;
   }
 
+
   /**
-   * Parses IIIF xywh viewport from URL hash
-   * @returns {{x, y, w, h}|null} Viewport in image space or null if not found
+   * Syncs _currentViewport from URL hash and rotation from Universal Viewer
+   * Call before rendering to pick up any viewer pan/zoom/rotate changes
    */
-  function _getViewportFromUrl() {
+  async function _syncViewport() {
+    // fetching rotation first because that seems to give enough time for the hash to populate on a fresh load
+    const rotation = await _getRotationFromPage();
     const hash = window.location.hash;
     const query = hash.startsWith("#") ? hash.slice(1) : hash;
     const params = new URLSearchParams(query);
     const xywh = params.get("xywh");
-
-    if (!xywh) return null;
-
     const [x, y, w, h] = xywh.split(",").map(Number);
-    return { x, y, w, h };
-  }
 
-  /**
-   * Syncs currentViewport from URL hash
-   * Call before rendering to pick up any viewer pan/zoom changes
-   */
-  function _syncViewport() {
-    _currentViewport = _getViewportFromUrl();
+
+    _currentViewport = { x, y, w, h, rotation };
   }
 
   function getCurrentViewport() {
     return _currentViewport;
   }
+
+
+  async function _getRotationFromPage() {
+    return new Promise((resolve) => {
+
+      function onMessage(event) {
+        if (event.source !== window) return;
+        if (event.data?.type !== "WT_ROTATION") return;
+console.log("Received rotation");
+        window.removeEventListener("message", onMessage);
+        resolve(event.data.rotation);
+      }
+
+      window.addEventListener("message", onMessage);
+console.log("Requesting rotation from page");
+      window.postMessage({
+        type: "WT_GET_ROTATION"
+      });
+    });
+  }
+
+
+  async function projectImagePoints(frameData) {
+    const requestId = crypto.randomUUID();
+
+    return new Promise((resolve) => {
+
+      function onMessage(event) {
+        if (event.source !== window) return;
+        if (event.data?.type !== "WT_PROJECT_IMAGE_POINTS_RESULT") return;
+        if (event.data.requestId !== requestId) return;
+
+        window.removeEventListener("message", onMessage);
+        resolve(event.data.points);
+      }
+
+      window.addEventListener("message", onMessage);
+
+      window.postMessage({
+        type: "WT_PROJECT_IMAGE_POINTS",
+        requestId,
+        points: [
+          {x: frameData.x, y: frameData.y},  // top-left
+          {x: frameData.x + frameData.w, y: frameData.y},  // top-right
+          {x: frameData.x, y: frameData.y + frameData.h},  // bottom-left
+          {x: frameData.x + frameData.w, y: frameData.y + frameData.h}  // bottom-right
+        ]
+      });
+    });
+  }
+
+
+  async function unprojectScreenPoints(screenFrameData) {
+    return new Promise((resolve) => {
+      function onMessage(event) {
+        if (event.source !== window) return;
+        if (event.data?.type !== "WT_UNPROJECT_SCREEN_POINTS_RESULT") return;
+
+        window.removeEventListener("message", onMessage);
+        resolve(event.data.points);
+      }
+
+      window.addEventListener("message", onMessage);
+
+      window.postMessage({
+        type: "WT_UNPROJECT_SCREEN_POINTS",
+        points: screenFrameData
+      });
+    })
+  }
+
 
   /**
    * Grabs the page URL and strips off everything after the image ID
@@ -139,23 +221,27 @@
     return url.origin + url.pathname;
   }
 
-  // Tracks viewport changes (pan/zoom) and re-renders annotations to maintain alignment
+
+  // Tracks viewport changes (pan/zoom/rotate) and re-renders annotations to maintain alignment
   function initializeViewportTracking() {
 
     window.addEventListener(
       "hashchange",
-      () => {
-        _syncViewport();
+      async () => {
+        await _syncViewport();
         overlay.renderAnnotations();
-
-        if (!_firstViewportRenderDone) {
-
-          ui.updateToolUI();
-
-          _firstViewportRenderDone = true;
-        }
       }
     );
+
+    // Initial render
+    requestAnimationFrame(async () => {
+console.log("Initial viewport:", _currentViewport);
+      await _syncViewport();
+console.log("Synced viewport:", _currentViewport);      
+      overlay.renderAnnotations();
+      ui.updateToolUI();
+    });
+
   }
 
 
@@ -169,7 +255,9 @@
     initializeViewportTracking,
     site,
     getPageKey,
-    buildUrlFromBookPage
+    buildUrlFromBookPage,
+    projectImagePoints,
+    unprojectScreenPoints
   };
 
   window.archiveProviders ??= [];

@@ -7,12 +7,12 @@
   let _currentViewerContainer = null;
   
   function _injectPageScript() {
-      if (document.getElementById("wbe-matricula-page-script")) {
+      if (document.getElementById("wta-matricula-page-script")) {
         return;
       }
 
       const script = document.createElement("script");
-      script.id = "wbe-matricula-page-script";
+      script.id = "wta-matricula-page-script";
       script.src = chrome.runtime.getURL("src/sites/matricula-page.js");
       script.onload = () => script.remove();
 
@@ -73,36 +73,36 @@
   }
 
   
-/**
- * Scrapes metadata directly from Matricula's structural table cells.
- * Operates independently of the active interface language.
- * @returns {string|null} The formatted reference citation string
- */
-async function getReferenceFromPage() {
-  // Target rows inside the modal table component context frame
-  const rows = document.querySelectorAll(".modal-body table.table tbody tr");
+  /**
+   * Scrapes metadata directly from Matricula's structural table cells.
+   * Operates independently of the active interface language.
+   * @returns {string|null} The formatted reference citation string
+   */
+  async function getReferenceFromPage() {
+    // Target rows inside the modal table component context frame
+    const rows = document.querySelectorAll(".modal-body table.table tbody tr");
   
-  // Ensure the table structure has the expected 5 data rows
-  if (!rows || rows.length < 5) return null;
+    // Ensure the table structure has the expected 5 data rows
+    if (!rows || rows.length < 5) return null;
 
-  try {
-    // Extract text directly from the second cell (td) of each index position
-    const parish = rows[0].querySelector("td")?.innerText.trim() || "";
-    const identifier = rows[1].querySelector("td")?.innerText.trim() || "";
-    const registerType = rows[2].querySelector("td")?.innerText.trim() || "";
-    const dateStart = rows[3].querySelector("td")?.innerText.trim() || "";
-    const dateEnd = rows[4].querySelector("td")?.innerText.trim() || "";
+    try {
+      // Extract text directly from the second cell (td) of each index position
+      const parish = rows[0].querySelector("td")?.innerText.trim() || "";
+      const identifier = rows[1].querySelector("td")?.innerText.trim() || "";
+      const registerType = rows[2].querySelector("td")?.innerText.trim() || "";
+      const dateStart = rows[3].querySelector("td")?.innerText.trim() || "";
+      const dateEnd = rows[4].querySelector("td")?.innerText.trim() || "";
 
-    if (parish && identifier && registerType && dateStart && dateEnd) {
-      // Assemble formatting chain: Parish, Register type, Identifier, Date range start - Date range end
-      return `${parish}, ${registerType}, ${identifier}, ${dateStart} - ${dateEnd}`;
+      if (parish && identifier && registerType && dateStart && dateEnd) {
+        // Assemble formatting chain: Parish, Register type, Identifier, Date range start - Date range end
+        return `${parish}, ${registerType}, ${identifier}, ${dateStart} - ${dateEnd}`;
+      }
+    } catch (e) {
+      console.error("Failed to scrape reference layout matrix data cells:", e);
     }
-  } catch (e) {
-    console.error("Failed to scrape reference layout matrix data cells:", e);
-  }
 
-  return null;
-}
+    return null;
+  }
 
   
   /**

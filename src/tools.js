@@ -157,24 +157,47 @@
 
     _isDragging = false;
 
-    const rect = overlay.getOverlayElement().getBoundingClientRect();
-    const vp = archiveProvider.getCurrentViewport();
-    if (!vp) return;
+    let frameLeft, frameTop, frameWidth, frameHeight;
 
-    // Convert overlay pixels to image space
-    // Formula: imageCoord = viewport.origin + (screenPixel / screenSize) * viewport.size
-    const x1 = vp.x + (_startX / rect.width) * vp.w;
-    const y1 = vp.y + (_startY / rect.height) * vp.h;
-    const x2 = vp.x + (_endX / rect.width) * vp.w;
-    const y2 = vp.y + (_endY / rect.height) * vp.h;
+    if (archiveProvider.unprojectScreenPoints) {
+      const imagePoints = await archiveProvider.unprojectScreenPoints([
+        { x: _startX, y: _startY },
+        { x: _endX,   y: _startY },
+        { x: _endX,   y: _endY },
+        { x: _startX, y: _endY }
+      ]);
 
+      frameLeft = Math.min(...imagePoints.map(p => p.x));
+      frameTop = Math.min(...imagePoints.map(p => p.y));
+      frameWidth = Math.max(...imagePoints.map(p => p.x)) - frameLeft;
+      frameHeight = Math.max(...imagePoints.map(p => p.y)) - frameTop;
+
+    } else {
+      
+      const rect = overlay.getOverlayElement().getBoundingClientRect();
+      const vp = archiveProvider.getCurrentViewport();
+      if (!vp) return;
+
+      // Convert overlay pixels to image space
+      // Formula: imageCoord = viewport.origin + (screenPixel / screenSize) * viewport.size
+      const x1 = vp.x + (_startX / rect.width) * vp.w;
+      const y1 = vp.y + (_startY / rect.height) * vp.h;
+      const x2 = vp.x + (_endX / rect.width) * vp.w;
+      const y2 = vp.y + (_endY / rect.height) * vp.h;
+
+      frameLeft = Math.min(x1, x2);
+      frameTop = Math.min(y1, y2);
+      frameWidth = Math.abs(x2 - x1);
+      frameHeight = Math.abs(y2 - y1);
+    }
+     
     // Normalize rectangle in image space
     const newFrame = {
       frameid: null, 
-      x: Math.min(x1, x2),
-      y: Math.min(y1, y2),
-      w: Math.abs(x2 - x1),
-      h: Math.abs(y2 - y1), 
+      x: frameLeft,
+      y: frameTop,
+      w: frameWidth,
+      h: frameHeight,
       note: null,
       _dirty: true
     };

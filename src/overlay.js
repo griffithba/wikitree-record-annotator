@@ -223,27 +223,67 @@
    * @param {Object} frameData - Frame coordinates {x, y, w, h} in image space
    * @param {number} index - Frame index within annotation
    */
-  function _renderFrame(a, frameData, index) {
-    const vp = archiveProvider.getCurrentViewport();
-    const rect = _overlay.getBoundingClientRect();
-
-    // STEP 1: Convert image space → viewport-relative → screen pixels
-    // viewport-relative: how far through the viewport is this coordinate?
-    const relX = (frameData.x - vp.x) / vp.w;
-    const relY = (frameData.y - vp.y) / vp.h;
-    const relW = frameData.w / vp.w;
-    const relH = frameData.h / vp.h;
+  async function _renderFrame(a, frameData, index) {
 
     const frame = document.createElement("div");
 
-    // STEP 2: Convert viewport-relative to screen pixels
-    frame.style.position = "absolute";
-    frame.style.left = (relX * rect.width) + "px";
-    frame.style.top = (relY * rect.height) + "px";
-    frame.style.width = (relW * rect.width) + "px";
-    frame.style.height = (relH * rect.height) + "px";
-
     frame.className = "wt-annotation";
+
+    let frameLeft, frameTop, frameWidth, frameHeight;
+
+    if (archiveProvider.projectImagePoints) {
+      const cornerPoints = await archiveProvider.projectImagePoints(frameData);
+
+      frameLeft = Math.min(...cornerPoints.map(p => p.x));
+      frameTop = Math.min(...cornerPoints.map(p => p.y));
+      frameWidth = Math.max(...cornerPoints.map(p => p.x)) - frameLeft;
+      frameHeight = Math.max(...cornerPoints.map(p => p.y)) - frameTop;
+
+    } else {
+      const vp = archiveProvider.getCurrentViewport();
+      const rect = _overlay.getBoundingClientRect();
+
+      // STEP 1: Convert image space → viewport-relative → screen pixels
+      // viewport-relative: how far through the viewport is this coordinate?
+      const relX = (frameData.x - vp.x) / vp.w;
+      const relY = (frameData.y - vp.y) / vp.h;
+
+      const relW = frameData.w / vp.w;
+      const relH = frameData.h / vp.h;
+
+      // STEP 2: Convert viewport-relative to screen pixels (Unrotated baseline)
+      frameLeft = relX * rect.width;
+      frameTop = relY * rect.height;
+      frameWidth = relW * rect.width;
+      frameHeight = relH * rect.height;
+
+      // STEP 3: Apply Rotation via CSS Transform
+      if (vp.rotation && vp.rotation !== 0) {
+        // 1. Convert radians to degrees for CSS
+        const degrees = vp.rotation * (180 / Math.PI);
+
+        // 2. Find the center of the viewport in screen pixels
+        const vpCenterX = rect.width / 2;
+        const vpCenterY = rect.height / 2;
+
+        // 3. Calculate the pivot point relative to this frame's TOP-LEFT corner
+        const originX = vpCenterX - frameLeft;
+        const originY = vpCenterY - frameTop;
+
+        // 4. Set the origin and rotate
+        frame.style.transformOrigin = `${originX}px ${originY}px`;
+        frame.style.transform = `rotate(${degrees}deg)`;
+      } else {
+        frame.style.transform = "none";
+        frame.style.transformOrigin = "initial";
+      }
+    }
+
+    frame.style.position = "absolute";
+    frame.style.left = frameLeft + "px";
+    frame.style.top = frameTop + "px";
+    frame.style.width = frameWidth + "px";
+    frame.style.height = frameHeight + "px";
 
     // Add selection styling if needed
     if (a.id === tools.getSelectedAnnotationId()) {
