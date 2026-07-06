@@ -3,8 +3,9 @@
 
   const site = "riksarkivet";
 
-  let _currentViewport = null; // in image space coordinates, synced from URL hash
+  let _currentViewport = null;
 
+  let _firstViewportRenderDone = false;
 
   /**
    * Waits for OpenSeadragon container to load, then initializes overlay
@@ -117,44 +118,15 @@
 
 
   /**
-   * Syncs _currentViewport from URL hash and rotation from Universal Viewer
-   * Call before rendering to pick up any viewer pan/zoom/rotate changes
+   * Syncs _currentViewport
+   * Call when viewport changes
    */
-  async function _syncViewport() {
-    // fetching rotation first because that seems to give enough time for the hash to populate on a fresh load
-    const rotation = await _getRotationFromPage();
-    const hash = window.location.hash;
-    const query = hash.startsWith("#") ? hash.slice(1) : hash;
-    const params = new URLSearchParams(query);
-    const xywh = params.get("xywh");
-    const [x, y, w, h] = xywh.split(",").map(Number);
-
-
-    _currentViewport = { x, y, w, h, rotation };
+  async function _syncViewport(viewport) {
+    _currentViewport = viewport;
   }
 
   function getCurrentViewport() {
     return _currentViewport;
-  }
-
-
-  async function _getRotationFromPage() {
-    return new Promise((resolve) => {
-
-      function onMessage(event) {
-        if (event.source !== window) return;
-        if (event.data?.type !== "WT_ROTATION") return;
-console.log("Received rotation");
-        window.removeEventListener("message", onMessage);
-        resolve(event.data.rotation);
-      }
-
-      window.addEventListener("message", onMessage);
-console.log("Requesting rotation from page");
-      window.postMessage({
-        type: "WT_GET_ROTATION"
-      });
-    });
   }
 
 
@@ -225,23 +197,22 @@ console.log("Requesting rotation from page");
   // Tracks viewport changes (pan/zoom/rotate) and re-renders annotations to maintain alignment
   function initializeViewportTracking() {
 
-    window.addEventListener(
-      "hashchange",
-      async () => {
-        await _syncViewport();
+    window.addEventListener("message", e => {
+      if (e.source !== window) return;
+
+      if (e.data?.type === "RIKSARKIVET_VIEW_CHANGED") {
+        _syncViewport(e.data.viewport);
+
         overlay.renderAnnotations();
+                
+//        if (!_firstViewportRenderDone) {
+
+//          ui.updateToolUI();
+
+//          _firstViewportRenderDone = true;
+//        }
       }
-    );
-
-    // Initial render
-    requestAnimationFrame(async () => {
-console.log("Initial viewport:", _currentViewport);
-      await _syncViewport();
-console.log("Synced viewport:", _currentViewport);      
-      overlay.renderAnnotations();
-      ui.updateToolUI();
     });
-
   }
 
 

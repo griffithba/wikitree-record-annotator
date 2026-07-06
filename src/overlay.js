@@ -3,6 +3,8 @@
 
   "use strict";
 
+  let _renderCount = 0;
+
   // Transparent interaction layer (captures mouse input)
   const _overlay = document.createElement("div");
   _overlay.id = "wt-overlay";
@@ -171,48 +173,45 @@
    * Syncs viewport, clears previous render, renders all frames
    */
   async function renderAnnotations() {
-    if (_renderInProgress) {
-      _renderQueued = true;
+    const id = ++_renderCount;
+
+    //console.log("Render start:", id);
+      
+    const _container = archiveProvider.getViewerContainer();
+    if (!_container) return;
+
+    // Clear previous render
+    while (_annotationLayer.firstChild) {
+      _annotationLayer.removeChild(_annotationLayer.firstChild);
+    }
+
+    if (!isVisible()) return;
+
+    // Load annotations for current page if not yet loaded
+    await annotationsAPI.loadAnnotationsIfNeeded();
+
+    // Render each annotation's frames
+    const annotations = annotationsAPI.getAnnotations();
+
+    const promises = [];
+
+    for (const a of annotations) {
+      for (const [index, frameData] of a.frames.entries()) {
+        promises.push(_renderFrame(a, frameData, index));
+      }
+    }
+
+    await Promise.all(promises);
+
+    if (id !== _renderCount) {
+      console.log("Render interrupted");
       return;
     }
-    _renderInProgress = true;
-    try {
-      const _container = archiveProvider.getViewerContainer();
-      if (!_container) return;
 
-      // Clear previous render
-      while (_annotationLayer.firstChild) {
-        _annotationLayer.removeChild(_annotationLayer.firstChild);
-      }
-
-      if (!isVisible()) return;
-
-      // Load annotations for current page if not yet loaded
-      await annotationsAPI.loadAnnotationsIfNeeded();
-
-      const vp = archiveProvider.getCurrentViewport();
-      if (!vp) return;
-
-      // Render each annotation's frames
-      annotationsAPI.getAnnotations().forEach(a => {
-        a.frames.forEach((frameData, index) => {
-          _renderFrame(a, frameData, index);
-        });
-      });
-
-      requestAnimationFrame(() => updateSelectionStyles());
-      requestAnimationFrame(() => ui.updateToolUI());
+    updateSelectionStyles();
+    ui.updateToolUI();
   
-    } finally {
-      _renderInProgress = false;
-
-      // If a render was requested while one was in progress, queue up another render to run immediately after
-      // This handles the case where an initial momentary bogus viewport causes a render with incorrect coordinates.
-      if (_renderQueued) {
-        _renderQueued = false;
-        requestAnimationFrame(renderAnnotations);
-      }
-    }
+//console.log("Render end:", id);
   }
 
 
@@ -259,20 +258,17 @@
 
       // STEP 3: Apply Rotation via CSS Transform
       if (vp.rotation && vp.rotation !== 0) {
-        // 1. Convert radians to degrees for CSS
-        const degrees = vp.rotation * (180 / Math.PI);
-
-        // 2. Find the center of the viewport in screen pixels
+        // 1. Find the center of the viewport in screen pixels
         const vpCenterX = rect.width / 2;
         const vpCenterY = rect.height / 2;
 
-        // 3. Calculate the pivot point relative to this frame's TOP-LEFT corner
+        // 2. Calculate the pivot point relative to this frame's TOP-LEFT corner
         const originX = vpCenterX - frameLeft;
         const originY = vpCenterY - frameTop;
-
-        // 4. Set the origin and rotate
+console.log("Rendering with rotation =", vp.rotation);
+        // 3. Set the origin and rotate
         frame.style.transformOrigin = `${originX}px ${originY}px`;
-        frame.style.transform = `rotate(${degrees}deg)`;
+        frame.style.transform = `rotate(${vp.rotation}deg)`;
       } else {
         frame.style.transform = "none";
         frame.style.transformOrigin = "initial";

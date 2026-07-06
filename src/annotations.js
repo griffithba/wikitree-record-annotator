@@ -123,6 +123,7 @@
     a.frames.forEach(async frame => {
       // if changes were made
       if (frame._dirty) {
+console.log("Updating existing frame for", wtId, "frame:", frame);
         const oldFrameId = frame.frameid;
         // save a new copy of the frame
         const newFrameId = await wtplusAPI.addFrame(wtId, frame);

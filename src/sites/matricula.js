@@ -145,7 +145,7 @@
       y: Math.round(y), 
       w: Math.round(w), 
       h: Math.round(h),
-      rotation: rotation 
+      rotation: rotation * (180 / Math.PI)
     };
 
   }

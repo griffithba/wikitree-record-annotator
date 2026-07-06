@@ -2,6 +2,11 @@
   "use strict";
 
   let _uvExtension = null;
+  let _viewer = null;
+
+  let attachedViewer = null;
+
+  let lastVp = "";
 
 
   function getUvExtension() {
@@ -18,24 +23,82 @@
     return _uvExtension;
   }
 
+  function getViewer() {
+    if (_viewer) return _viewer;
+
+    const extension = getUvExtension();
+    if (!extension) return null;
+
+    _viewer = extension.centerPanel.viewer;
+    return _viewer;
+  }
+
+
+  function debounce(func, delay) {
+    let timeoutId;
+    return function (...args) {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func.apply(this, args);
+      }, delay);
+    };
+  }
+
+
+  function attach(viewer) {
+    if (viewer === attachedViewer) return;
+    attachedViewer = viewer;
+
+    const debouncedSend = debounce(sendViewport, 10);
+
+    viewer.addHandler("animation", debouncedSend);
+    //viewer.addHandler("resize", debouncedSend);
+
+    //viewer.addHandler("rotate", sendViewport);
+    viewer.addHandler("open", sendViewport);
+
+    // Initial state
+    sendViewport();
+  }
+
+
+  function quantize(v) {
+    return Math.round(v * 10) / 10;   // nearest 0.1 image pixel
+  }
+
+
+  function sendViewport() {
+    const viewer = getViewer();
+    if (!viewer) return;
+    const bounds = viewer.viewport.getBounds(true);
+
+    const vp = {
+        x: quantize(bounds.x),
+        y: quantize(bounds.y),
+        w: quantize(bounds.width),
+        h: quantize(bounds.height),
+        rotation: ((viewer.viewport.getRotation(true) % 360) + 360) % 360
+    };
+
+    const key = JSON.stringify(vp);
+    if (key === lastVp) return;
+    lastVp = key;
+console.log("Sending viewport:", vp);
+    window.postMessage({
+        type: "RIKSARKIVET_VIEW_CHANGED",
+        viewport: vp
+    });
+  }
+
+  attach(getViewer());
+
 
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
 
-    if (event.data?.type === "WT_GET_ROTATION") {
-      const extension = getUvExtension();
-      const deg = ((extension.getViewerRotation() % 360) + 360) % 360;
-      const rotation = deg * Math.PI / 180;
-
-      window.postMessage({
-        type: "WT_ROTATION",
-        rotation
-      });
-    }
-
     if (event.data?.type === "WT_PROJECT_IMAGE_POINTS") {
       const extension = getUvExtension();
-      const viewer = extension.centerPanel.viewer;
+      const viewer = getViewer();
       const item = viewer.world.getItemAt(0);
 
       const { points, requestId } = event.data;
@@ -56,7 +119,7 @@
 
     if (event.data?.type === "WT_UNPROJECT_SCREEN_POINTS") {
       const extension = getUvExtension();
-      const viewer = extension.centerPanel.viewer;
+      const viewer = getViewer();
       const item = viewer.world.getItemAt(0);
 
       const { points } = event.data;
@@ -81,8 +144,4 @@
     }
   });
 
-
-  window.postMessage({
-    type: "WT_RIKSARKIVET_READY"
-  });
 })();

@@ -69,6 +69,7 @@
    * Counterpart to selectAnnotation()
    */
   function clearSelection() {
+console.log("Clearing selection");    
     // Save changes from previously selected frame
     if (_selectedAnnotationId) {
       annotationsAPI.updateExistingAnnotation(_selectedAnnotationId);
@@ -173,7 +174,7 @@
       frameHeight = Math.max(...imagePoints.map(p => p.y)) - frameTop;
 
     } else {
-      
+
       const rect = overlay.getOverlayElement().getBoundingClientRect();
       const vp = archiveProvider.getCurrentViewport();
       if (!vp) return;
