@@ -14,7 +14,8 @@
 
 
   // Visual layer for rendered annotations
-  const _annotationLayer = document.createElement("div");
+  const _annotationLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+
   _annotationLayer.id = "wt-annotation-layer";
   function getAnnotationLayerElement() {
     return _annotationLayer;
@@ -85,29 +86,80 @@
    * Shows/hides toolbar and resize handles as needed
    */
   function updateSelectionStyles() {
+    const layer = overlay.getAnnotationLayerElement();
+
     document.querySelectorAll(".wt-annotation").forEach(frame => {
+      // Skip the loop if this element is an HTML toolbar
+      if (frame.tagName.toLowerCase() !== "polygon") {
+        return; 
+      }
       const id = frame.dataset.annotationId;
-      let toolbar = frame.querySelector(".annotation-toolbar");
+      const frameIndex = frame.dataset.frameIndex;
+      
+      // Look for the toolbar container associated with this specific ID & frame index in the parent layer
+      let toolbarWrapper = layer.querySelector(
+        `foreignObject[data-annotation-id="${id}"][data-toolbar-for="${frameIndex}"]`
+      );
        
       if (String(id) === String(tools.getSelectedAnnotationId())) {
         frame.classList.add("wt-selected");
-        if (!toolbar) {
-          if (tools.getActiveFrameIndex() === Number(frame.dataset.frameIndex)) {
-            toolbar = ui.createAnnotationToolbar(id);
-            frame.appendChild(toolbar);
+        
+        if (!toolbarWrapper) {
+          if (tools.getActiveFrameIndex() === Number(frameIndex)) {
+            // 1. Calculate a bounding box from the polygon points to anchor the HTML toolbar
+            const points = frame.getAttribute("points").split(" ").map(p => {
+              const [x, y] = p.split(",").map(Number);
+              return { x, y };
+            });
+            const xs = points.map(p => p.x);
+            const ys = points.map(p => p.y);
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const maxY = Math.max(...ys);
+
+            const boxWidth = maxX - minX;
+            const MIN_TOOLBAR_WIDTH = 120; // Minimum width for the toolbar
+            const toolbarWidth = Math.max(boxWidth, MIN_TOOLBAR_WIDTH);
+            const xOffset = boxWidth < MIN_TOOLBAR_WIDTH ? (MIN_TOOLBAR_WIDTH - boxWidth) / 2 : 0;
+            // 2. Create the foreignObject portal wrapper
+            toolbarWrapper = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+            toolbarWrapper.setAttribute("data-annotation-id", id);
+            toolbarWrapper.setAttribute("data-toolbar-for", frameIndex);
+            toolbarWrapper.setAttribute("x", minX - xOffset);
+            // Place it right below the bottom edge of the frame
+            toolbarWrapper.setAttribute("y", maxY + 5); 
+            toolbarWrapper.setAttribute("width", toolbarWidth);
+            toolbarWrapper.setAttribute("height", "50"); // Give the toolbar enough vertical room
+            toolbarWrapper.style.overflow = "visible";
+
+            // 3. Generate HTML toolbar and inject it
+            const toolbar = ui.createAnnotationToolbar(id);
+
+            // attach the datasets to the toolbar 
+            // so e.target.closest(".wt-annotation") inside button actions can still resolve it!
+            toolbar.className += " wt-annotation"; 
+            toolbar.dataset.annotationId = id;
+            toolbar.dataset.frameIndex = frameIndex;
+
+            toolbarWrapper.appendChild(toolbar);
+            layer.appendChild(toolbarWrapper);
           } 
+          
           tools.addResizeHandles(frame, id);
-        } else if (tools.getActiveFrameIndex() !== Number(frame.dataset.frameIndex)) {
-            toolbar?.remove();
+        } else if (tools.getActiveFrameIndex() !== Number(frameIndex)) {
+            toolbarWrapper?.remove();
         }
       } else {
         frame.classList.remove("wt-selected");
-        toolbar?.remove();
-        frame.querySelectorAll(".resize-handle").forEach(h => h.remove());
+        
+        const specificToolbar = layer.querySelector(`foreignObject[data-annotation-id="${id}"]`);
+        specificToolbar?.remove();
+        
+        // Target handles by data-annotation-id since they are side-by-side siblings now
+        layer.querySelectorAll(`.resize-handle[data-annotation-id="${id}"]`).forEach(h => h.remove());
       }
     });
   }
-
   
   function createLayers() {
     // remove any stale overlays first
@@ -174,8 +226,6 @@
    */
   async function renderAnnotations() {
     const id = ++_renderCount;
-
-    //console.log("Render start:", id);
       
     const _container = archiveProvider.getViewerContainer();
     if (!_container) return;
@@ -204,14 +254,13 @@
     await Promise.all(promises);
 
     if (id !== _renderCount) {
-      console.log("Render interrupted");
+      console.log("Render interrupted by newer render request, aborting");
       return;
     }
 
     updateSelectionStyles();
     ui.updateToolUI();
   
-//console.log("Render end:", id);
   }
 
 
@@ -223,82 +272,34 @@
    * @param {number} index - Frame index within annotation
    */
   async function _renderFrame(a, frameData, index) {
+    // 1. Create an SVG polygon instead of a div
+    const frame = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    frame.setAttribute("class", "wt-annotation");
 
-    const frame = document.createElement("div");
-
-    frame.className = "wt-annotation";
-
-    let frameLeft, frameTop, frameWidth, frameHeight;
-
-    if (archiveProvider.projectImagePoints) {
-      const cornerPoints = await archiveProvider.projectImagePoints(frameData);
-
-      frameLeft = Math.min(...cornerPoints.map(p => p.x));
-      frameTop = Math.min(...cornerPoints.map(p => p.y));
-      frameWidth = Math.max(...cornerPoints.map(p => p.x)) - frameLeft;
-      frameHeight = Math.max(...cornerPoints.map(p => p.y)) - frameTop;
-
-    } else {
-      const vp = archiveProvider.getCurrentViewport();
-      const rect = _overlay.getBoundingClientRect();
-
-      // STEP 1: Convert image space → viewport-relative → screen pixels
-      // viewport-relative: how far through the viewport is this coordinate?
-      const relX = (frameData.x - vp.x) / vp.w;
-      const relY = (frameData.y - vp.y) / vp.h;
-
-      const relW = frameData.w / vp.w;
-      const relH = frameData.h / vp.h;
-
-      // STEP 2: Convert viewport-relative to screen pixels (Unrotated baseline)
-      frameLeft = relX * rect.width;
-      frameTop = relY * rect.height;
-      frameWidth = relW * rect.width;
-      frameHeight = relH * rect.height;
-
-      // STEP 3: Apply Rotation via CSS Transform
-      if (vp.rotation && vp.rotation !== 0) {
-        // 1. Find the center of the viewport in screen pixels
-        const vpCenterX = rect.width / 2;
-        const vpCenterY = rect.height / 2;
-
-        // 2. Calculate the pivot point relative to this frame's TOP-LEFT corner
-        const originX = vpCenterX - frameLeft;
-        const originY = vpCenterY - frameTop;
-console.log("Rendering with rotation =", vp.rotation);
-        // 3. Set the origin and rotate
-        frame.style.transformOrigin = `${originX}px ${originY}px`;
-        frame.style.transform = `rotate(${vp.rotation}deg)`;
-      } else {
-        frame.style.transform = "none";
-        frame.style.transformOrigin = "initial";
-      }
-    }
-
-    frame.style.position = "absolute";
-    frame.style.left = frameLeft + "px";
-    frame.style.top = frameTop + "px";
-    frame.style.width = frameWidth + "px";
-    frame.style.height = frameHeight + "px";
+    // 2. Project all 4 true corner coordinates
+    const cornerPoints = await archiveProvider.projectImagePoints(frameData);
+  
+    // 3. Map corners straight into the SVG 'points' attribute
+    const pointsString = cornerPoints.map(p => `${p.x},${p.y}`).join(" ");
+    frame.setAttribute("points", pointsString);
 
     // Add selection styling if needed
     if (a.id === tools.getSelectedAnnotationId()) {
       frame.classList.add("wt-selected");
     }
 
-    // Set tooltip
-    frame.title = personAPI.formatDisplayName(a.wikitreeid);
-      
-    // append note, if present
+    // 4. Set tooltip 
+    let tooltipText = personAPI.formatDisplayName(a.wikitreeid);
     if (frameData.note) {
-      frame.title += "\n" + frameData.note;
+      tooltipText += "\n" + frameData.note;
     }
-
+    const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    titleEl.textContent = tooltipText;
+    frame.appendChild(titleEl);
+    
     // Highlight if this annotation matches incoming profile
     if (a.wikitreeid === incomingWtId) {
       _triggerRefHighlight(a.wikitreeid);
-      // don't prefill new annotations with the incoming WikiTree ID if there's
-      // already one for that ID
       incomingWtId = null;
     }
 
@@ -331,11 +332,8 @@ console.log("Rendering with rotation =", vp.rotation);
       if (tools.isDrawing() || tools.isSelecting()) return;
 
       const id = frame.dataset.annotationId;
-
       document
-        .querySelectorAll(
-          `[data-annotation-id="${id}"]`
-        )
+        .querySelectorAll(`[data-annotation-id="${id}"]`)
         .forEach(el => {
           el.classList.add("wt-hover");
         });
@@ -345,42 +343,46 @@ console.log("Rendering with rotation =", vp.rotation);
       if (tools.isDrawing() || tools.isSelecting()) return;
 
       const id = frame.dataset.annotationId;
-
       document
-        .querySelectorAll(
-          `[data-annotation-id="${id}"]`
-        )
+        .querySelectorAll(`[data-annotation-id="${id}"]`)
         .forEach(el => {
           el.classList.remove("wt-hover");
         });
     });
-  
+
     if (!a.wtIdFound) {
-      _addInvalidBadge(frame);
+      _addInvalidBadge(cornerPoints);
     } 
 
     _annotationLayer.appendChild(frame);
   }
 
 
-  function _addInvalidBadge(frameEl) {
-    const badge = document.createElement("div");
-
+  function _addInvalidBadge(cornerPoints) {
+    const badge = document.createElementNS("http://www.w3.org/2000/svg", "text");
     badge.textContent = "⛓️‍💥";
 
+    // Identify the top-right corner point from your 4-point array
+    // Assuming corners are: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]
+    const topRight = cornerPoints[1]; 
+
+    // Position the text anchor near the top-right corner point
+    // Adjust dx/dy offsets if needed so the emoji doesn't bleed outside the box
+    const offsetX = -18; 
+    const offsetY = 16;
+
+    badge.setAttribute("x", topRight.x + offsetX);
+    badge.setAttribute("y", topRight.y + offsetY);
+  
     Object.assign(badge.style, {
-      position: "absolute",
-      top: "2px",
-      right: "2px",
       fontSize: "18px",
-      lineHeight: "14px",
       pointerEvents: "none",
       zIndex: "2"
     });
 
-    frameEl.appendChild(badge);
+    // Append it to the main SVG layer alongside the polygon, not inside it
+    _annotationLayer.appendChild(badge);
   }
-
   
   /**
    * Triggers pulse animation on annotation if it matches incoming WT profile

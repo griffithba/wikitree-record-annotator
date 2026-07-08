@@ -55,7 +55,10 @@
   }
   function getPageKey(href) {
     let match = href.match(/\/bildvisning\/([^/?#]+)/i);
-    const [book, page] = match[1]?.split("_") || [null, null];
+    let [book, page] = match[1]?.split("_") || [null, null];
+    if (book === "Folk") {
+      [book, page] = match[1]?.split("-") || [null, null];
+    }
     return { site, book, page };
   }
 
@@ -152,8 +155,8 @@
         points: [
           {x: frameData.x, y: frameData.y},  // top-left
           {x: frameData.x + frameData.w, y: frameData.y},  // top-right
-          {x: frameData.x, y: frameData.y + frameData.h},  // bottom-left
-          {x: frameData.x + frameData.w, y: frameData.y + frameData.h}  // bottom-right
+          {x: frameData.x + frameData.w, y: frameData.y + frameData.h},  // bottom-right
+          {x: frameData.x, y: frameData.y + frameData.h}  // bottom-left
         ]
       });
     });
@@ -204,13 +207,6 @@
         _syncViewport(e.data.viewport);
 
         overlay.renderAnnotations();
-                
-//        if (!_firstViewportRenderDone) {
-
-//          ui.updateToolUI();
-
-//          _firstViewportRenderDone = true;
-//        }
       }
     });
   }

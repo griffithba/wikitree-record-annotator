@@ -116,14 +116,13 @@
   }
   
   
-  async function updateExistingAnnotation(wtId) {
+  async function updateAnnotation(wtId) {
     const a = getAnnotationByWtId(wtId);
     if (!a) return;
     // loop through all frames in the annotation
     a.frames.forEach(async frame => {
       // if changes were made
       if (frame._dirty) {
-console.log("Updating existing frame for", wtId, "frame:", frame);
         const oldFrameId = frame.frameid;
         // save a new copy of the frame
         const newFrameId = await wtplusAPI.addFrame(wtId, frame);
@@ -134,7 +133,9 @@ console.log("Updating existing frame for", wtId, "frame:", frame);
           if (oldFrameId) {
             // delete the old version
             const success = await wtplusAPI.deleteFrame(wtId, oldFrameId);
+            console.log("Updated existing frame for", wtId, "frame:", frame);
           }
+          else console.log("Added new frame for", wtId, "frame:", frame);
         }
         delete frame._dirty;
       }
@@ -156,7 +157,7 @@ console.log("Updating existing frame for", wtId, "frame:", frame);
   window.annotationsAPI = {
     addFrame,
     deleteFrame,
-    updateExistingAnnotation,
+    updateAnnotation,
     getAnnotationByWtId,
     getAnnotations,
     loadAnnotationsIfNeeded

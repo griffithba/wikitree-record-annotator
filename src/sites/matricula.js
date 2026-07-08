@@ -153,6 +153,80 @@
     return _currentViewport;
   }
 
+
+  async function projectImagePoints(frameData) {
+    const vp = getCurrentViewport();
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
+
+    const imagePoints = [
+      {x: frameData.x, y: frameData.y},  // top-left
+      {x: frameData.x + frameData.w, y: frameData.y},  // top-right
+      {x: frameData.x + frameData.w, y: frameData.y + frameData.h},  // bottom-right
+      {x: frameData.x, y: frameData.y + frameData.h}  // bottom-left
+    ]
+
+    const screenFrameData = imagePoints.map(({x, y}) => {
+      let ix = x;
+      let iy = y;
+
+      // 1. Re-apply viewer rotation (Forward rotation around the viewport center)
+      if (vp.rotation) {
+        // Use positive rotation angle to match the viewer's current state
+        const theta = vp.rotation * Math.PI / 180;
+
+        const cx = vp.x + vp.w / 2;
+        const cy = vp.y + vp.h / 2;
+
+        const dx = ix - cx;
+        const dy = iy - cy;
+
+        // Standard rotation matrix around the center
+        ix = cx + dx * Math.cos(theta) - dy * Math.sin(theta);
+        iy = cy + dx * Math.sin(theta) + dy * Math.cos(theta);
+      }
+
+      // 2. Convert viewport coordinates back to screen pixels
+      // (Isolate 'x' and 'y' from your original algebraic formulas)
+      const sx = ((ix - vp.x) / vp.w) * rect.width;
+      const sy = ((iy - vp.y) / vp.h) * rect.height;
+
+      return { x: sx, y: sy };
+    });
+
+    return screenFrameData;
+  }
+
+
+  async function unprojectScreenPoints(screenFrameData) {
+    const vp = getCurrentViewport();
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
+
+    const imagePoints = screenFrameData.map(({x, y}) => {
+
+      // Convert screen pixel to viewport-relative coordinates
+      let ix = vp.x + (x / rect.width) * vp.w;
+      let iy = vp.y + (y / rect.height) * vp.h;
+
+      // Undo viewer rotation
+      if (vp.rotation) {
+
+        const theta = -vp.rotation * Math.PI / 180;
+
+        const cx = vp.x + vp.w / 2;
+        const cy = vp.y + vp.h / 2;
+
+        const dx = ix - cx;
+        const dy = iy - cy;
+
+        ix = cx + dx * Math.cos(theta) - dy * Math.sin(theta);
+        iy = cy + dx * Math.sin(theta) + dy * Math.cos(theta);
+      }
+
+      return { x: ix, y: iy };
+    });
+
+    return imagePoints;
+  }
   
   /**
    * Generates a clean URL string.
@@ -213,15 +287,7 @@
             );
           }
         }
-
-        overlay.renderAnnotations();
-                
-        if (!_firstViewportRenderDone) {
-
-          ui.updateToolUI();
-
-          _firstViewportRenderDone = true;
-        }
+        overlay.renderAnnotations();        
       }
     });
   }
@@ -237,7 +303,9 @@
     initializeViewportTracking,
     site,
     getPageKey,
-    buildUrlFromBookPage
+    buildUrlFromBookPage,
+    projectImagePoints,
+    unprojectScreenPoints
   };
 
   window.archiveProviders ??= [];

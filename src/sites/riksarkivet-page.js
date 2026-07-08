@@ -63,7 +63,7 @@
 
 
   function quantize(v) {
-    return Math.round(v * 10) / 10;   // nearest 0.1 image pixel
+    return Math.round(v * 4) / 4;   // nearest quarter image pixel
   }
 
 
@@ -83,7 +83,7 @@
     const key = JSON.stringify(vp);
     if (key === lastVp) return;
     lastVp = key;
-console.log("Sending viewport:", vp);
+
     window.postMessage({
         type: "RIKSARKIVET_VIEW_CHANGED",
         viewport: vp
