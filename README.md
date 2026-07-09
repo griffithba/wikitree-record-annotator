@@ -48,7 +48,8 @@ To add a new provider module, the following functions and objects will need to b
 + function **getPageKey(href)** - Returns the page identifier for the passed in URL. 
 + function **getReferenceFromPage()** - Returns citation reference text from the page.
 + function **getCleanPageUrl()** - Returns URL with any position/zoom or other data stripped off. 
-+ function **buildUrlFromBookPage(book, page)** - Builds a URL that points to the supplied record book and page.  
++ function **buildUrlFromBookPage(book, page)** - Builds a URL that points to the supplied record book and page.
++ *optional* function **getToolbarPosition()** - Overrides the default bottom center location for the toolbar.
 + const **site** - Name to differentiate between different archive providers. Needs to match a unique part of the site URL. 
 
 Each provider module needs to add itself to the list of providers like this: 
