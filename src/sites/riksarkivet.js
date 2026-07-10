@@ -3,8 +3,6 @@
 
   const site = "riksarkivet";
 
-  let _currentViewport = null;
-
   let _firstViewportRenderDone = false;
 
   /**
@@ -12,9 +10,9 @@
    * Polls every 200ms until container is found
    */
   function waitForViewerReady() {
-    const el = document.querySelector(".openseadragon-canvas");
+    const container = getViewerContainer();
 
-    if (el) {
+    if (container) {
       _injectPageScript();
       initOverlay();
       return;
@@ -36,7 +34,6 @@
 
     (document.head || document.documentElement).appendChild(script);
 
-
   }
 
 
@@ -55,19 +52,16 @@
   }
   function getPageKey(href) {
     let match = href.match(/\/bildvisning\/([^/?#]+)/i);
+    if (!match) return null;
     let [book, page] = match[1]?.split("_") || [null, null];
+    if (!book || !page) return null;
     if (book === "Folk") {
       [book, page] = match[1]?.split("-") || [null, null];
+      if (!book || !page) return null;
     }
     return { site, book, page };
   }
 
-  /**
-   * Builds a URL from the passed in book and page
-   */
-  function buildUrlFromBookPage(book, page) {
-    return (`https://sok.riksarkivet.se/bildvisning/${book}_${page}`);
-  }
 
   /**
    * Extracts source reference text from page
@@ -120,20 +114,7 @@
   }
 
 
-  /**
-   * Syncs _currentViewport
-   * Call when viewport changes
-   */
-  async function _syncViewport(viewport) {
-    _currentViewport = viewport;
-  }
-
-  function getCurrentViewport() {
-    return _currentViewport;
-  }
-
-
-  async function projectImagePoints(frameData) {
+  async function projectImagePoints(imagePoints) {
     const requestId = crypto.randomUUID();
 
     return new Promise((resolve) => {
@@ -152,18 +133,13 @@
       window.postMessage({
         type: "WT_PROJECT_IMAGE_POINTS",
         requestId,
-        points: [
-          {x: frameData.x, y: frameData.y},  // top-left
-          {x: frameData.x + frameData.w, y: frameData.y},  // top-right
-          {x: frameData.x + frameData.w, y: frameData.y + frameData.h},  // bottom-right
-          {x: frameData.x, y: frameData.y + frameData.h}  // bottom-left
-        ]
+        points: imagePoints
       });
     });
   }
 
 
-  async function unprojectScreenPoints(screenFrameData) {
+  async function unprojectScreenPoints(screenPoints) {
     return new Promise((resolve) => {
       function onMessage(event) {
         if (event.source !== window) return;
@@ -177,7 +153,7 @@
 
       window.postMessage({
         type: "WT_UNPROJECT_SCREEN_POINTS",
-        points: screenFrameData
+        points: screenPoints
       });
     })
   }
@@ -199,13 +175,10 @@
 
   // Tracks viewport changes (pan/zoom/rotate) and re-renders annotations to maintain alignment
   function initializeViewportTracking() {
-
     window.addEventListener("message", e => {
       if (e.source !== window) return;
 
       if (e.data?.type === "RIKSARKIVET_VIEW_CHANGED") {
-        _syncViewport(e.data.viewport);
-
         overlay.renderAnnotations();
       }
     });
@@ -215,14 +188,13 @@
   const _provider = {
     waitForViewerReady,
     getViewerContainer,
-    getCurrentPageKey,
     getReferenceFromPage,
-    getCurrentViewport,
     getCleanPageUrl,
     initializeViewportTracking,
     site,
     getPageKey,
-    buildUrlFromBookPage,
+    getCurrentPageKey,
+    buildUrlFromBookPage: (book, page) => (`https://sok.riksarkivet.se/bildvisning/${book}_${page}`),
     projectImagePoints,
     unprojectScreenPoints
   };

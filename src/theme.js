@@ -13,7 +13,6 @@
     style.textContent = `
       :root {
         --wt-draw-overlay-bg: rgba(255, 0, 0, 0.1);
-        --wt-draw-overlay-border: 2px solid red;
         --wt-draw-bg: rgba(25, 0, 255, 0.1);
         --wt-draw-stroke: red;
         --wt-draw-stroke-width: 2px;
@@ -53,6 +52,10 @@
         stroke: orange;
         stroke-width: 3px;
         fill: rgba(255, 165, 0, 0.15);
+      }
+
+      .wt-annotation.wt-selected.wt-unsaved-changes {
+        stroke-dasharray: 8 4;
       }
 
       .wt-ref-highlight {

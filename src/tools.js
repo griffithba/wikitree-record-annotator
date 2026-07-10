@@ -2,6 +2,8 @@
 
   "use strict";
 
+  const svgNS = "http://www.w3.org/2000/svg";
+
   let _currentTool = null;               // Active tool: null | "draw" | "select"
   function getTool() {
     return _currentTool;
@@ -103,7 +105,7 @@
     _startY = e.clientY - rect.top;
 
     // Create temporary visual feedback box using the SVG Namespace
-    _box = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    _box = document.createElementNS(svgNS, "rect");
 
     // Instead of inline absolute layout properties, assign classes or SVG-specific styles
     _box.setAttribute("class", "wt-drawing-feedback");
@@ -271,8 +273,7 @@
       return { x, y };
     });
   
-    // Map points to corners safely based on your polygon's wound order:
-    // Assuming order is: [0: nw, 1: ne, 2: se, 3: sw]
+    // Map points to corners safely based on the polygon's wound order:
     const cornerMapping = {
       nw: points[0],
       ne: points[1],
@@ -280,18 +281,22 @@
       sw: points[3]
     };
 
+    const group = document.createElementNS(svgNS, "g");
+    group.classList.add("resize-handle-group");
+    group.dataset.annotationId = id;
+    group.dataset.frameIndex = box.dataset.frameIndex;
+
     corners.forEach(corner => {
       const pt = cornerMapping[corner];
       if (!pt) return;
 
       // Create an SVG circle for the handle
-      const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      const handle = document.createElementNS(svgNS, "circle");
       handle.setAttribute("cx", pt.x);
       handle.setAttribute("cy", pt.y);
       handle.setAttribute("r", "5"); // 5px radius handle
       handle.setAttribute("class", `resize-handle ${corner}`);
     
-      // SVG datasets are natively supported!
       handle.dataset.corner = corner;
       handle.dataset.annotationId = id;
       handle.dataset.frameIndex = box.dataset.frameIndex;
@@ -300,10 +305,10 @@
         e.stopPropagation();
         _startResize(e, box, corner); 
       });
-
-      // CRITICAL: Append to the parent SVG layer, not inside the polygon
-      box.parentNode.appendChild(handle);
+      group.appendChild(handle);
     });
+    // Append to the parent SVG layer, not inside the polygon
+    box.parentNode.appendChild(group);
   }
 
   /**
@@ -321,16 +326,32 @@
     const frameIndex = Number(frameEl.dataset.frameIndex);
     const frame = annotation.frames[frameIndex];
 
-    const rect = overlay.getOverlayElement().getBoundingClientRect();
+    const { x, y, w, h } = frame;
   
+    const corners = {
+      nw: { x: x,     y: y     },
+      ne: { x: x + w, y: y     },
+      sw: { x: x,     y: y + h },
+      se: { x: x + w, y: y + h }
+    };
+
+    // Lookup table
+    const oppositeCorners = {
+      nw: "se",
+      ne: "sw",
+      se: "nw",
+      sw: "ne"
+    };
+
     _resizing = {
       id,
       frameIndex,
-      corner,
-      startX: e.clientX - rect.left,
-      startY: e.clientY - rect.top,
-      startFrame: { ...frame }  // Save original for delta calculations
+      fixedCorner:  corners[oppositeCorners[corner]]
     };
+
+    // Prevent text selection during drag
+    document.body.style.userSelect = "none";
+    document.body.style.webkitUserSelect = "none";
 
     document.addEventListener("mousemove", _onResizeMove);
     document.addEventListener("mouseup", _stopResize);
@@ -342,26 +363,19 @@
    * Converts screen deltas to image space and updates box dimensions
    * @param {MouseEvent} e - mousemove event
    */
-  function _onResizeMove(e) {
+  async function _onResizeMove(e) {
     if (!_resizing) return;
-
     const rect = overlay.getOverlayElement().getBoundingClientRect();
-    const vp = archiveProvider.getCurrentViewport();
-
-    // STEP 1: Compute mouse delta in overlay (screen) space
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
-
-    const dx = currentX - _resizing.startX;
-    const dy = currentY - _resizing.startY;
-
-    // STEP 2: Convert delta to image space
-    // The scale factor relates overlay pixels to image coordinates
-    const scaleX = vp.w / rect.width;
-    const scaleY = vp.h / rect.height;
-
-    const dxImg = dx * scaleX;
-    const dyImg = dy * scaleY;
+    
+    const [imagePoint] = await archiveProvider.unprojectScreenPoints([
+      {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      }
+    ]);
+    
+    const fixed = _resizing.fixedCorner;
+    const moving = imagePoint;
 
     // STEP 3: Apply delta to annotation box in image space
     const annotation = annotationsAPI.getAnnotationByWtId(_resizing.id);
@@ -369,50 +383,22 @@
 
     const frame = annotation.frames[_resizing.frameIndex];
 
-    // Start from original coordinates
-    let { x, y, w, h } = _resizing.startFrame;
-    const corner = _resizing.corner;
-
-    // Apply resize based on which corner is being dragged
-    if (corner.includes("e")) w += dxImg;      // East: expand width
-    if (corner.includes("s")) h += dyImg;      // South: expand height
-    if (corner.includes("w")) {                // West: move left edge
-      x += dxImg;
-      w -= dxImg;
-    }
-    if (corner.includes("n")) {                // North: move top edge
-      y += dyImg;
-      h -= dyImg;
-    }
-
-    // Normalize negative sizes (when dragging past opposite corner)
-    if (w < 0) {
-      x = x + w;
-      w = Math.abs(w);
-    }
-
-    if (h < 0) {
-      y = y + h;
-      h = Math.abs(h);
-    }
+    frame.x = Math.min(fixed.x, moving.x);
+    frame.y = Math.min(fixed.y, moving.y);
+    frame.w = Math.abs(moving.x - fixed.x);
+    frame.h = Math.abs(moving.y - fixed.y);
 
     // Enforce minimum box size
-    w = Math.max(20, w);
-    h = Math.max(20, h);
+    frame.w = Math.max(20, frame.w);
+    frame.h = Math.max(20, frame.h);
 
-    // Update box coordinates
-    frame.x = x;
-    frame.y = y;
-    frame.w = w;
-    frame.h = h;
-
-    // mark this frame as needing to be saved
+    // Mark this frame as needing to be saved
     frame._dirty = true;
 
     overlay.renderAnnotations();
   }
 
-  
+
   /**
    * Finalizes resize drag and cleans up
    */
@@ -420,6 +406,10 @@
     if (!_resizing) return;
 
     _resizing = null;
+
+    // Restore text selection
+    document.body.style.userSelect = "";
+    document.body.style.webkitUserSelect = "";
 
     document.removeEventListener("mousemove", _onResizeMove);
     document.removeEventListener("mouseup", _stopResize);

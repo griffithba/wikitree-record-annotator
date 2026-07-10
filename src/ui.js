@@ -21,18 +21,24 @@
     const toolbar = document.createElement("div");
     toolbar.id = "wt-toolbar";
 
-    Object.assign(toolbar.style, {
+    // Get positioning styles from the active provider, or fallback to default
+    const providerStyles = archiveProvider.getToolbarPosition ? 
+      archiveProvider.getToolbarPosition() : 
+      { bottom: "5px", left: "50%", transform: "translateX(-50%)" };
+
+    // Build baseline styles
+    const baseStyles = {
       position: "fixed",
-      bottom: "5px",
-      left: "50%",
-      transform: "translateX(-50%)",
       zIndex: "100000",
       display: "flex",
       gap: "6px",
       padding: "6px",
       background: "var(--wt-toolbar-bg)",
       borderRadius: "8px"
-    });
+    };
+
+    // Merge them together cleanly
+    Object.assign(toolbar.style, baseStyles, providerStyles);
 
     //
     // Header

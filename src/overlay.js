@@ -3,6 +3,8 @@
 
   "use strict";
 
+  const svgNS = "http://www.w3.org/2000/svg";
+
   let _renderCount = 0;
 
   // Transparent interaction layer (captures mouse input)
@@ -14,7 +16,7 @@
 
 
   // Visual layer for rendered annotations
-  const _annotationLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const _annotationLayer = document.createElementNS(svgNS, "svg");
 
   _annotationLayer.id = "wt-annotation-layer";
   function getAnnotationLayerElement() {
@@ -102,8 +104,14 @@
       );
        
       if (String(id) === String(tools.getSelectedAnnotationId())) {
+        const annotation = annotationsAPI.getAnnotationByWtId(id);
+        const frameData = annotation.frames[Number(frameIndex)];
+
         frame.classList.add("wt-selected");
-        
+        if (frameData?._dirty) {
+          frame.classList.add("wt-unsaved-changes");
+        }
+
         if (!toolbarWrapper) {
           if (tools.getActiveFrameIndex() === Number(frameIndex)) {
             // 1. Calculate a bounding box from the polygon points to anchor the HTML toolbar
@@ -118,11 +126,11 @@
             const maxY = Math.max(...ys);
 
             const boxWidth = maxX - minX;
-            const MIN_TOOLBAR_WIDTH = 120; // Minimum width for the toolbar
+            const MIN_TOOLBAR_WIDTH = 120; 
             const toolbarWidth = Math.max(boxWidth, MIN_TOOLBAR_WIDTH);
             const xOffset = boxWidth < MIN_TOOLBAR_WIDTH ? (MIN_TOOLBAR_WIDTH - boxWidth) / 2 : 0;
             // 2. Create the foreignObject portal wrapper
-            toolbarWrapper = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+            toolbarWrapper = document.createElementNS(svgNS, "foreignObject");
             toolbarWrapper.setAttribute("data-annotation-id", id);
             toolbarWrapper.setAttribute("data-toolbar-for", frameIndex);
             toolbarWrapper.setAttribute("x", minX - xOffset);
@@ -143,11 +151,15 @@
 
             toolbarWrapper.appendChild(toolbar);
             layer.appendChild(toolbarWrapper);
+            tools.addResizeHandles(frame, id);
           } 
           
-          tools.addResizeHandles(frame, id);
         } else if (tools.getActiveFrameIndex() !== Number(frameIndex)) {
-            toolbarWrapper?.remove();
+          // Remove the toolbar and handles if this frame is not the active one
+          toolbarWrapper?.remove();
+          layer.querySelector(
+            `.resize-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+          )?.remove();
         }
       } else {
         frame.classList.remove("wt-selected");
@@ -161,6 +173,7 @@
     });
   }
   
+
   function createLayers() {
     // remove any stale overlays first
     document.getElementById("wt-overlay")?.remove();
@@ -261,6 +274,9 @@
     updateSelectionStyles();
     ui.updateToolUI();
   
+    // Reset incoming WT ID after first render to avoid repeated highlighting
+    incomingWtId = null;
+
   }
 
 
@@ -272,28 +288,30 @@
    * @param {number} index - Frame index within annotation
    */
   async function _renderFrame(a, frameData, index) {
-    // 1. Create an SVG polygon instead of a div
-    const frame = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    // 1. Create an SVG polygon
+    const frame = document.createElementNS(svgNS, "polygon");
     frame.setAttribute("class", "wt-annotation");
 
+    const imageFrameCorners = [          
+          {x: frameData.x, y: frameData.y},  // top-left
+          {x: frameData.x + frameData.w, y: frameData.y},  // top-right
+          {x: frameData.x + frameData.w, y: frameData.y + frameData.h},  // bottom-right
+          {x: frameData.x, y: frameData.y + frameData.h}  // bottom-left
+    ];
+
     // 2. Project all 4 true corner coordinates
-    const cornerPoints = await archiveProvider.projectImagePoints(frameData);
+    const screenFrameCorners = await archiveProvider.projectImagePoints(imageFrameCorners);
   
     // 3. Map corners straight into the SVG 'points' attribute
-    const pointsString = cornerPoints.map(p => `${p.x},${p.y}`).join(" ");
+    const pointsString = screenFrameCorners.map(p => `${p.x},${p.y}`).join(" ");
     frame.setAttribute("points", pointsString);
-
-    // Add selection styling if needed
-    if (a.id === tools.getSelectedAnnotationId()) {
-      frame.classList.add("wt-selected");
-    }
 
     // 4. Set tooltip 
     let tooltipText = personAPI.formatDisplayName(a.wikitreeid);
     if (frameData.note) {
       tooltipText += "\n" + frameData.note;
     }
-    const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    const titleEl = document.createElementNS(svgNS, "title");
     titleEl.textContent = tooltipText;
     frame.appendChild(titleEl);
     
@@ -351,7 +369,7 @@
     });
 
     if (!a.wtIdFound) {
-      _addInvalidBadge(cornerPoints);
+      _addInvalidBadge(screenFrameCorners);
     } 
 
     _annotationLayer.appendChild(frame);
@@ -359,7 +377,7 @@
 
 
   function _addInvalidBadge(cornerPoints) {
-    const badge = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    const badge = document.createElementNS(svgNS, "text");
     badge.textContent = "⛓️‍💥";
 
     // Identify the top-right corner point from your 4-point array

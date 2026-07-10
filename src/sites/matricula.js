@@ -34,7 +34,7 @@
     else setTimeout(waitForViewerReady, 200);
   }
 
-
+  
   function getViewerContainer() {
     return document.querySelector(".ol-viewport");
   }
@@ -63,13 +63,6 @@
     } catch (e) {
       return "unknown_matricula_page";
     }
-  }
-
-  /**
-   * Builds a URL from the passed in book and page
-   */
-  function buildUrlFromBookPage(book, page) {
-    return (`https://data.matricula-online.eu/${book}/?pg=${page}`);
   }
 
   
@@ -149,21 +142,11 @@
     };
 
   }
-  function getCurrentViewport() {
-    return _currentViewport;
-  }
 
 
-  async function projectImagePoints(frameData) {
-    const vp = getCurrentViewport();
+  async function projectImagePoints(imagePoints) {
+    const vp = _currentViewport;
     const rect = overlay.getOverlayElement().getBoundingClientRect();
-
-    const imagePoints = [
-      {x: frameData.x, y: frameData.y},  // top-left
-      {x: frameData.x + frameData.w, y: frameData.y},  // top-right
-      {x: frameData.x + frameData.w, y: frameData.y + frameData.h},  // bottom-right
-      {x: frameData.x, y: frameData.y + frameData.h}  // bottom-left
-    ]
 
     const screenFrameData = imagePoints.map(({x, y}) => {
       let ix = x;
@@ -197,11 +180,11 @@
   }
 
 
-  async function unprojectScreenPoints(screenFrameData) {
-    const vp = getCurrentViewport();
+  async function unprojectScreenPoints(screenPoints) {
+    const vp = _currentViewport;
     const rect = overlay.getOverlayElement().getBoundingClientRect();
 
-    const imagePoints = screenFrameData.map(({x, y}) => {
+    const imagePoints = screenPoints.map(({x, y}) => {
 
       // Convert screen pixel to viewport-relative coordinates
       let ix = vp.x + (x / rect.width) * vp.w;
@@ -296,16 +279,16 @@
   const _provider = {
     waitForViewerReady,
     getViewerContainer,
-    getCurrentPageKey,
     getReferenceFromPage,
-    getCurrentViewport,
     getCleanPageUrl,
     initializeViewportTracking,
     site,
     getPageKey,
-    buildUrlFromBookPage,
+    getCurrentPageKey,
+    buildUrlFromBookPage: (book, page) => (`https://data.matricula-online.eu/${book}/?pg=${page}`),
     projectImagePoints,
-    unprojectScreenPoints
+    unprojectScreenPoints,
+    getToolbarPosition: () => ({ top: "7px", left: "50%" })
   };
 
   window.archiveProviders ??= [];
