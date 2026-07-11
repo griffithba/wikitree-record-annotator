@@ -3,8 +3,6 @@
 
   const site = "riksarkivet";
 
-  let _firstViewportRenderDone = false;
-
   /**
    * Waits for OpenSeadragon container to load, then initializes overlay
    * Polls every 200ms until container is found

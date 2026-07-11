@@ -167,8 +167,9 @@
         const specificToolbar = layer.querySelector(`foreignObject[data-annotation-id="${id}"]`);
         specificToolbar?.remove();
         
-        // Target handles by data-annotation-id since they are side-by-side siblings now
-        layer.querySelectorAll(`.resize-handle[data-annotation-id="${id}"]`).forEach(h => h.remove());
+        layer.querySelector(
+          `.resize-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+        )?.remove();
       }
     });
   }
@@ -274,7 +275,7 @@
     updateSelectionStyles();
     ui.updateToolUI();
   
-    // Reset incoming WT ID after first render to avoid repeated highlighting
+    // Reset incoming WT ID after first render to avoid highlighting a new frame later
     incomingWtId = null;
 
   }
@@ -380,7 +381,7 @@
     const badge = document.createElementNS(svgNS, "text");
     badge.textContent = "⛓️‍💥";
 
-    // Identify the top-right corner point from your 4-point array
+    // Identify the top-right corner point from the 4-point array
     // Assuming corners are: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]
     const topRight = cornerPoints[1]; 
 
