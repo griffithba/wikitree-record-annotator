@@ -3,7 +3,7 @@
 
   const site = "matricula";
   let _currentViewport = null; 
-  let _firstViewportRenderDone = false;
+
   let _currentViewerContainer = null;
   
   function _injectPageScript() {
