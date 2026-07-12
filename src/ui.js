@@ -132,7 +132,7 @@
         updateToolUI();
       }
     ));
-    buttonRow.appendChild(_makeToolButton("Select", "select"));
+    buttonRow.appendChild(_makeToolButton("Edit", "edit"));
 
     // Button for toggling show/hide annotations
     const toggleBtn = document.createElement("button");
@@ -428,7 +428,7 @@
   /**
    * Creates a button for tool selection
    * @param {string} label - Button label text
-   * @param {string} toolName - Tool identifier ("draw" | "select")
+   * @param {string} toolName - Tool identifier ("draw" | "edit")
    * @param {Function} onClick - Optional custom click handler
    * @returns {HTMLElement} Button element
    */

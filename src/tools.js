@@ -4,7 +4,7 @@
 
   const svgNS = "http://www.w3.org/2000/svg";
 
-  let _currentTool = null;               // Active tool: null | "draw" | "select"
+  let _currentTool = null;               // Active tool: null | "draw" | "edit"
   function getTool() {
     return _currentTool;
   }
@@ -12,7 +12,7 @@
     return _currentTool === "draw";
   }
   function isSelecting() {
-    return _currentTool === "select";
+    return _currentTool === "edit";
   }
 
 
@@ -190,7 +190,7 @@
     _selectedAnnotationId = _activeDrawingPerson;
     _activeFrameIndex = await annotationsAPI.addFrame(_activeDrawingPerson, newFrame);
     clearActiveDrawingPerson();
-    setTool("select");
+    setTool("edit");
     ui.updateToolUI();
   }
 
@@ -230,9 +230,9 @@
 
 
   /**
-   * Switch between tools (draw/select) with toggle behavior
-   * When switching away from "select", clears selection
-   * @param {string} nextTool - Tool to switch to: "draw" | "select"
+   * Switch between tools (draw/edit) with toggle behavior
+   * When switching away from "edit", clears selection
+   * @param {string} nextTool - Tool to switch to: "draw" | "edit"
    */
   function setTool(nextTool) {
     const prevTool = _currentTool;
@@ -241,7 +241,7 @@
     _currentTool = (_currentTool === nextTool) ? null : nextTool;
 
     // Clean up when leaving select mode
-    if (prevTool === "select" && _currentTool !== "select") {
+    if (prevTool === "edit" && _currentTool !== "edit") {
       if (_activeDrawingPerson !== _selectedAnnotationId) clearSelection();
       ui.closeWtEditor();
     }
