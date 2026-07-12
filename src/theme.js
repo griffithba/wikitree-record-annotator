@@ -12,62 +12,86 @@
 
     style.textContent = `
       :root {
-        --wt-draw-overlay-bg: rgba(255,0,0,0.1);
-        --wt-draw-overlay-border: 2px solid red;
+        --wt-draw-overlay-bg: rgba(255, 0, 0, 0.1);
         --wt-draw-bg: rgba(25, 0, 255, 0.1);
-        --wt-draw-border: 2px dashed red;
+        --wt-draw-stroke: red;
+        --wt-draw-stroke-width: 2px;
+        --wt-draw-stroke-dash: 6, 4;
         --wt-toolbar-bg: rgba(255, 171, 15, 0.85);
       }
-  
+
+      /* Style rule for temporary drawing box primitive */
+      .wt-drawing-feedback {
+        fill: var(--wt-draw-bg);
+        stroke: var(--wt-draw-stroke);
+        stroke-width: var(--wt-draw-stroke-width);
+        stroke-dasharray: var(--wt-draw-stroke-dash);
+      }  
+
       .wt-annotation {
-        border: 2px solid lime;
-        background: rgba(0,255,0,0.1);
-        position: absolute;
-        pointer-events: auto;
-        transition: border 0.05s ease;
+        /* SVG Properties */
+        stroke: lime;
+        stroke-width: 2px;
+        fill: rgba(0, 255, 0, 0.1);
+  
+        /* Crucial for SVG Mouse Events */
+        pointer-events: visiblePainted; 
+        cursor: pointer;
+  
+        /* Smooth outline transition */
+        transition: stroke-width 0.05s ease, stroke 0.05s ease;
       }
 
       .wt-annotation.wt-hover {
-        border: 4px solid lime;
-        background: rgba(0,255,0,0.1);
-        position: absolute;
-        pointer-events: auto;
-        transition: border 0.05s ease;
+        stroke: lime;
+        stroke-width: 4px;
+        fill: rgba(0, 255, 0, 0.1);
       }
 
       .wt-annotation.wt-selected {
-        border: 3px solid orange;
-        background: rgba(255,165,0,0.15);
+        stroke: orange;
+        stroke-width: 3px;
+        fill: rgba(255, 165, 0, 0.15);
       }
-      
+
+      .wt-annotation.wt-selected.wt-unsaved-changes {
+        stroke-dasharray: 8 4;
+      }
+
       .wt-ref-highlight {
         animation: wtPulse 1.5s ease-out 5;
       }
 
       @keyframes wtPulse {
-        0%   { box-shadow: 0 0 0 0 rgba(255, 171, 15, 0.85); }
-        100% { box-shadow: 0 0 0 12px rgba(0,255,255,0); }
+        0% { 
+          /* Start with a noticeable orange border */
+          stroke: rgba(255, 171, 15, 0.85); 
+          stroke-width: 2px; 
+        }
+        100% { 
+          /* Expand the line outward and fade it completely out */
+          stroke: rgba(0, 255, 255, 0); 
+          stroke-width: 14px; 
+        }
       }
-
+  
       .annotation {
         position: absolute;
       }
 
-      .annotation-toolbar {
-        position: absolute;
-        top: -40px;
+      foreignObject .annotation-toolbar {
+        position: relative;
+        top: 0;
         right: 0;
+        width: max-content;
+        height: max-content;
 
-        display: flex;
-        gap: 4px;
-
-        background: rgba(38, 35, 32, 0.8);
+        background: rgb(38, 35, 32);
         padding: 4px 6px;
         border-radius: 6px;
 
-        z-index: 10;
-
-        pointer-events: auto;
+        border: 2px solid rgb(255, 171, 15); 
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
       }
 
       .annotation-toolbar button {
@@ -79,20 +103,16 @@
       }
 
       .resize-handle {
-        position: absolute;
-        width: 10px;
-        height: 10px;
-        background: white;
-        border: 2px solid black;
-        border-radius: 50%;
-        z-index: 20;
+        fill: white;
+        stroke: black;
+        stroke-width: 2px;
+        pointer-events: visiblePainted;
       }
 
-      .resize-handle.nw { top: -6px; left: -6px; cursor: nwse-resize; }
-      .resize-handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
-      .resize-handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
-      .resize-handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
-    
+      .resize-handle.nw { cursor: nwse-resize; }
+      .resize-handle.ne { cursor: nesw-resize; }
+      .resize-handle.sw { cursor: nesw-resize; }
+      .resize-handle.se { cursor: nwse-resize; }
     `;
     document.head.appendChild(style);
   }

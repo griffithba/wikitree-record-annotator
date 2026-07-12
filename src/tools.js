@@ -2,6 +2,8 @@
 
   "use strict";
 
+  const svgNS = "http://www.w3.org/2000/svg";
+
   let _currentTool = null;               // Active tool: null | "draw" | "select"
   function getTool() {
     return _currentTool;
@@ -56,7 +58,7 @@
   function selectAnnotation(id, index) {
     // Save changes from previously selected frame
     if (_selectedAnnotationId && (_selectedAnnotationId !== id)) {
-      annotationsAPI.updateExistingAnnotation(_selectedAnnotationId);
+      annotationsAPI.updateAnnotation(_selectedAnnotationId);
     }
     _selectedAnnotationId = id;
     _activeFrameIndex = index;
@@ -71,7 +73,7 @@
   function clearSelection() {
     // Save changes from previously selected frame
     if (_selectedAnnotationId) {
-      annotationsAPI.updateExistingAnnotation(_selectedAnnotationId);
+      annotationsAPI.updateAnnotation(_selectedAnnotationId);
     }
     _selectedAnnotationId = null;
     _activeFrameIndex = null;
@@ -102,11 +104,11 @@
     _startX = e.clientX - rect.left;
     _startY = e.clientY - rect.top;
 
-    // Create temporary visual feedback box
-    _box = document.createElement("div");
-    _box.style.position = "absolute";
-    _box.style.border = "var(--wt-draw-border)";
-    _box.style.background = "var(--wt-draw-bg)";
+    // Create temporary visual feedback box using the SVG Namespace
+    _box = document.createElementNS(svgNS, "rect");
+
+    // Instead of inline absolute layout properties, assign classes or SVG-specific styles
+    _box.setAttribute("class", "wt-drawing-feedback");
     _box.style.pointerEvents = "none";
 
     overlay.getAnnotationLayerElement().appendChild(_box);
@@ -135,10 +137,10 @@
     const width = Math.abs(_endX - _startX);
     const height = Math.abs(_endY - _startY);
 
-    _box.style.left = left + "px";
-    _box.style.top = top + "px";
-    _box.style.width = width + "px";
-    _box.style.height = height + "px";
+    _box.setAttribute("x", left);
+    _box.setAttribute("y", top);
+    _box.setAttribute("width", width);
+    _box.setAttribute("height", height);
   }
 
 
@@ -157,24 +159,26 @@
 
     _isDragging = false;
 
-    const rect = overlay.getOverlayElement().getBoundingClientRect();
-    const vp = archiveProvider.getCurrentViewport();
-    if (!vp) return;
+    // Convert screen pixels to image space coordinates
+    const imagePoints = await archiveProvider.unprojectScreenPoints([
+        { x: _startX, y: _startY },
+        { x: _endX,   y: _startY },
+        { x: _endX,   y: _endY },
+        { x: _startX, y: _endY }
+    ]);
 
-    // Convert overlay pixels to image space
-    // Formula: imageCoord = viewport.origin + (screenPixel / screenSize) * viewport.size
-    const x1 = vp.x + (_startX / rect.width) * vp.w;
-    const y1 = vp.y + (_startY / rect.height) * vp.h;
-    const x2 = vp.x + (_endX / rect.width) * vp.w;
-    const y2 = vp.y + (_endY / rect.height) * vp.h;
+    // Convert image points to bounding box (xywh)
+    const frameLeft = Math.min(...imagePoints.map(p => p.x));
+    const frameTop = Math.min(...imagePoints.map(p => p.y));
+    const frameWidth = Math.max(...imagePoints.map(p => p.x)) - frameLeft;
+    const frameHeight = Math.max(...imagePoints.map(p => p.y)) - frameTop;
 
-    // Normalize rectangle in image space
     const newFrame = {
       frameid: null, 
-      x: Math.min(x1, x2),
-      y: Math.min(y1, y2),
-      w: Math.abs(x2 - x1),
-      h: Math.abs(y2 - y1), 
+      x: frameLeft,
+      y: frameTop,
+      w: frameWidth,
+      h: frameHeight,
       note: null,
       _dirty: true
     };
@@ -256,26 +260,56 @@
 
   /**
    * Creates corner resize handles (nw, ne, sw, se) on selected box
-   * @param {HTMLElement} box - Annotation box DOM element
+   * @param {SVGPolygonElement} box - Annotation box SVG polygon element
    * @param {string} id - Annotation ID
    */
   function addResizeHandles(box, id) {
     const corners = ["nw", "ne", "sw", "se"];
+  
+    // Extract the raw points array directly from the polygon attributes
+    // e.g., ["x1,y1", "x2,y2", "x3,y3", "x4,y4"]
+    const points = box.getAttribute("points").split(" ").map(p => {
+      const [x, y] = p.split(",").map(Number);
+      return { x, y };
+    });
+  
+    // Map points to corners safely based on the polygon's wound order:
+    const cornerMapping = {
+      nw: points[0],
+      ne: points[1],
+      se: points[2],
+      sw: points[3]
+    };
+
+    const group = document.createElementNS(svgNS, "g");
+    group.classList.add("resize-handle-group");
+    group.dataset.annotationId = id;
+    group.dataset.frameIndex = box.dataset.frameIndex;
 
     corners.forEach(corner => {
-      const handle = document.createElement("div");
-      handle.className = `resize-handle ${corner}`;
+      const pt = cornerMapping[corner];
+      if (!pt) return;
+
+      // Create an SVG circle for the handle
+      const handle = document.createElementNS(svgNS, "circle");
+      handle.setAttribute("cx", pt.x);
+      handle.setAttribute("cy", pt.y);
+      handle.setAttribute("r", "5"); // 5px radius handle
+      handle.setAttribute("class", `resize-handle ${corner}`);
+    
       handle.dataset.corner = corner;
+      handle.dataset.annotationId = id;
+      handle.dataset.frameIndex = box.dataset.frameIndex;
 
       handle.addEventListener("mousedown", (e) => {
         e.stopPropagation();
-        _startResize(e, box, corner);
+        _startResize(e, box, corner); 
       });
-
-      box.appendChild(handle);
+      group.appendChild(handle);
     });
+    // Append to the parent SVG layer, not inside the polygon
+    box.parentNode.appendChild(group);
   }
-
 
   /**
    * Initiates resize drag from a handle
@@ -292,16 +326,32 @@
     const frameIndex = Number(frameEl.dataset.frameIndex);
     const frame = annotation.frames[frameIndex];
 
-    const rect = overlay.getOverlayElement().getBoundingClientRect();
+    const { x, y, w, h } = frame;
   
+    const corners = {
+      nw: { x: x,     y: y     },
+      ne: { x: x + w, y: y     },
+      sw: { x: x,     y: y + h },
+      se: { x: x + w, y: y + h }
+    };
+
+    // Lookup table
+    const oppositeCorners = {
+      nw: "se",
+      ne: "sw",
+      se: "nw",
+      sw: "ne"
+    };
+
     _resizing = {
       id,
       frameIndex,
-      corner,
-      startX: e.clientX - rect.left,
-      startY: e.clientY - rect.top,
-      startFrame: { ...frame }  // Save original for delta calculations
+      fixedCorner:  corners[oppositeCorners[corner]]
     };
+
+    // Prevent text selection during drag
+    document.body.style.userSelect = "none";
+    document.body.style.webkitUserSelect = "none";
 
     document.addEventListener("mousemove", _onResizeMove);
     document.addEventListener("mouseup", _stopResize);
@@ -313,26 +363,19 @@
    * Converts screen deltas to image space and updates box dimensions
    * @param {MouseEvent} e - mousemove event
    */
-  function _onResizeMove(e) {
+  async function _onResizeMove(e) {
     if (!_resizing) return;
-
     const rect = overlay.getOverlayElement().getBoundingClientRect();
-    const vp = archiveProvider.getCurrentViewport();
-
-    // STEP 1: Compute mouse delta in overlay (screen) space
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
-
-    const dx = currentX - _resizing.startX;
-    const dy = currentY - _resizing.startY;
-
-    // STEP 2: Convert delta to image space
-    // The scale factor relates overlay pixels to image coordinates
-    const scaleX = vp.w / rect.width;
-    const scaleY = vp.h / rect.height;
-
-    const dxImg = dx * scaleX;
-    const dyImg = dy * scaleY;
+    
+    const [imagePoint] = await archiveProvider.unprojectScreenPoints([
+      {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      }
+    ]);
+    
+    const fixed = _resizing.fixedCorner;
+    const moving = imagePoint;
 
     // STEP 3: Apply delta to annotation box in image space
     const annotation = annotationsAPI.getAnnotationByWtId(_resizing.id);
@@ -340,50 +383,22 @@
 
     const frame = annotation.frames[_resizing.frameIndex];
 
-    // Start from original coordinates
-    let { x, y, w, h } = _resizing.startFrame;
-    const corner = _resizing.corner;
-
-    // Apply resize based on which corner is being dragged
-    if (corner.includes("e")) w += dxImg;      // East: expand width
-    if (corner.includes("s")) h += dyImg;      // South: expand height
-    if (corner.includes("w")) {                // West: move left edge
-      x += dxImg;
-      w -= dxImg;
-    }
-    if (corner.includes("n")) {                // North: move top edge
-      y += dyImg;
-      h -= dyImg;
-    }
-
-    // Normalize negative sizes (when dragging past opposite corner)
-    if (w < 0) {
-      x = x + w;
-      w = Math.abs(w);
-    }
-
-    if (h < 0) {
-      y = y + h;
-      h = Math.abs(h);
-    }
+    frame.x = Math.min(fixed.x, moving.x);
+    frame.y = Math.min(fixed.y, moving.y);
+    frame.w = Math.abs(moving.x - fixed.x);
+    frame.h = Math.abs(moving.y - fixed.y);
 
     // Enforce minimum box size
-    w = Math.max(20, w);
-    h = Math.max(20, h);
+    frame.w = Math.max(20, frame.w);
+    frame.h = Math.max(20, frame.h);
 
-    // Update box coordinates
-    frame.x = x;
-    frame.y = y;
-    frame.w = w;
-    frame.h = h;
-
-    // mark this frame as needing to be saved
+    // Mark this frame as needing to be saved
     frame._dirty = true;
 
     overlay.renderAnnotations();
   }
 
-  
+
   /**
    * Finalizes resize drag and cleans up
    */
@@ -391,6 +406,10 @@
     if (!_resizing) return;
 
     _resizing = null;
+
+    // Restore text selection
+    document.body.style.userSelect = "";
+    document.body.style.webkitUserSelect = "";
 
     document.removeEventListener("mousemove", _onResizeMove);
     document.removeEventListener("mouseup", _stopResize);

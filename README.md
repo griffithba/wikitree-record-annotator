@@ -41,13 +41,15 @@ Archive-specific functionality is encapsulated in provider modules that implemen
 To add a new provider module, the following functions and objects will need to be provided: 
 + function **waitForViewerReady()** - Once the page is loaded, calls initOverlay() and then returns.
 + function **getViewerContainer()** - Returns the element that the annotation overlay should attach to.
-+ function **getCurrentViewport()** - Returns current viewport as xywh.
-+ function **initializeViewportTracking()** - Adds an event listener that will update the stored current viewport and trigger annotation re-rendering after pan/zoom.+
++ function **initializeViewportTracking()** - Adds an event listener that will update the stored current viewport and trigger annotation re-rendering after pan/zoom/rotate.
++ function **projectImagePoints(imagePoints)** - Converts an array of points from image coordinates to screen coordinates.
++ function **unprojectScreenPoints(screenPoints)** - Converts an array of points from screen coordinates to image coordinates.
 + function **getCurrentPageKey()** - Returns page identifier for the current page as {site, book, page}.
 + function **getPageKey(href)** - Returns the page identifier for the passed in URL. 
 + function **getReferenceFromPage()** - Returns citation reference text from the page.
 + function **getCleanPageUrl()** - Returns URL with any position/zoom or other data stripped off. 
-+ function **buildUrlFromBookPage(book, page)** - Builds a URL that points to the supplied record book and page.  
++ function **buildUrlFromBookPage(book, page)** - Builds a URL that points to the supplied record book and page.
++ *optional* function **getToolbarPosition()** - Overrides the default bottom center location for the toolbar.
 + const **site** - Name to differentiate between different archive providers. Needs to match a unique part of the site URL. 
 
 Each provider module needs to add itself to the list of providers like this: 

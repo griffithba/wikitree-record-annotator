@@ -3,16 +3,16 @@
 
   const site = "matricula";
   let _currentViewport = null; 
-  let _firstViewportRenderDone = false;
+
   let _currentViewerContainer = null;
   
   function _injectPageScript() {
-      if (document.getElementById("wbe-matricula-page-script")) {
+      if (document.getElementById("wta-matricula-page-script")) {
         return;
       }
 
       const script = document.createElement("script");
-      script.id = "wbe-matricula-page-script";
+      script.id = "wta-matricula-page-script";
       script.src = chrome.runtime.getURL("src/sites/matricula-page.js");
       script.onload = () => script.remove();
 
@@ -34,7 +34,7 @@
     else setTimeout(waitForViewerReady, 200);
   }
 
-
+  
   function getViewerContainer() {
     return document.querySelector(".ol-viewport");
   }
@@ -65,44 +65,37 @@
     }
   }
 
+  
   /**
-   * Builds a URL from the passed in book and page
+   * Scrapes metadata directly from Matricula's structural table cells.
+   * Operates independently of the active interface language.
+   * @returns {string|null} The formatted reference citation string
    */
-  function buildUrlFromBookPage(book, page) {
-    return (`https://data.matricula-online.eu/${book}/?pg=${page}`);
-  }
-
+  async function getReferenceFromPage() {
+    // Target rows inside the modal table component context frame
+    const rows = document.querySelectorAll(".modal-body table.table tbody tr");
   
-/**
- * Scrapes metadata directly from Matricula's structural table cells.
- * Operates independently of the active interface language.
- * @returns {string|null} The formatted reference citation string
- */
-async function getReferenceFromPage() {
-  // Target rows inside the modal table component context frame
-  const rows = document.querySelectorAll(".modal-body table.table tbody tr");
-  
-  // Ensure the table structure has the expected 5 data rows
-  if (!rows || rows.length < 5) return null;
+    // Ensure the table structure has the expected 5 data rows
+    if (!rows || rows.length < 5) return null;
 
-  try {
-    // Extract text directly from the second cell (td) of each index position
-    const parish = rows[0].querySelector("td")?.innerText.trim() || "";
-    const identifier = rows[1].querySelector("td")?.innerText.trim() || "";
-    const registerType = rows[2].querySelector("td")?.innerText.trim() || "";
-    const dateStart = rows[3].querySelector("td")?.innerText.trim() || "";
-    const dateEnd = rows[4].querySelector("td")?.innerText.trim() || "";
+    try {
+      // Extract text directly from the second cell (td) of each index position
+      const parish = rows[0].querySelector("td")?.innerText.trim() || "";
+      const identifier = rows[1].querySelector("td")?.innerText.trim() || "";
+      const registerType = rows[2].querySelector("td")?.innerText.trim() || "";
+      const dateStart = rows[3].querySelector("td")?.innerText.trim() || "";
+      const dateEnd = rows[4].querySelector("td")?.innerText.trim() || "";
 
-    if (parish && identifier && registerType && dateStart && dateEnd) {
-      // Assemble formatting chain: Parish, Register type, Identifier, Date range start - Date range end
-      return `${parish}, ${registerType}, ${identifier}, ${dateStart} - ${dateEnd}`;
+      if (parish && identifier && registerType && dateStart && dateEnd) {
+        // Assemble formatting chain: Parish, Register type, Identifier, Date range start - Date range end
+        return `${parish}, ${registerType}, ${identifier}, ${dateStart} - ${dateEnd}`;
+      }
+    } catch (e) {
+      console.error("Failed to scrape reference layout matrix data cells:", e);
     }
-  } catch (e) {
-    console.error("Failed to scrape reference layout matrix data cells:", e);
-  }
 
-  return null;
-}
+    return null;
+  }
 
   
   /**
@@ -145,14 +138,78 @@ async function getReferenceFromPage() {
       y: Math.round(y), 
       w: Math.round(w), 
       h: Math.round(h),
-      rotation: rotation 
+      rotation: rotation * (180 / Math.PI)
     };
 
   }
-  function getCurrentViewport() {
-    return _currentViewport;
+
+
+  async function projectImagePoints(imagePoints) {
+    const vp = _currentViewport;
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
+
+    const screenFrameData = imagePoints.map(({x, y}) => {
+      let ix = x;
+      let iy = y;
+
+      // 1. Re-apply viewer rotation (Forward rotation around the viewport center)
+      if (vp.rotation) {
+        // Use positive rotation angle to match the viewer's current state
+        const theta = vp.rotation * Math.PI / 180;
+
+        const cx = vp.x + vp.w / 2;
+        const cy = vp.y + vp.h / 2;
+
+        const dx = ix - cx;
+        const dy = iy - cy;
+
+        // Standard rotation matrix around the center
+        ix = cx + dx * Math.cos(theta) - dy * Math.sin(theta);
+        iy = cy + dx * Math.sin(theta) + dy * Math.cos(theta);
+      }
+
+      // 2. Convert viewport coordinates back to screen pixels
+      // (Isolate 'x' and 'y' from your original algebraic formulas)
+      const sx = ((ix - vp.x) / vp.w) * rect.width;
+      const sy = ((iy - vp.y) / vp.h) * rect.height;
+
+      return { x: sx, y: sy };
+    });
+
+    return screenFrameData;
   }
 
+
+  async function unprojectScreenPoints(screenPoints) {
+    const vp = _currentViewport;
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
+
+    const imagePoints = screenPoints.map(({x, y}) => {
+
+      // Convert screen pixel to viewport-relative coordinates
+      let ix = vp.x + (x / rect.width) * vp.w;
+      let iy = vp.y + (y / rect.height) * vp.h;
+
+      // Undo viewer rotation
+      if (vp.rotation) {
+
+        const theta = -vp.rotation * Math.PI / 180;
+
+        const cx = vp.x + vp.w / 2;
+        const cy = vp.y + vp.h / 2;
+
+        const dx = ix - cx;
+        const dy = iy - cy;
+
+        ix = cx + dx * Math.cos(theta) - dy * Math.sin(theta);
+        iy = cy + dx * Math.sin(theta) + dy * Math.cos(theta);
+      }
+
+      return { x: ix, y: iy };
+    });
+
+    return imagePoints;
+  }
   
   /**
    * Generates a clean URL string.
@@ -213,15 +270,7 @@ async function getReferenceFromPage() {
             );
           }
         }
-
-        overlay.renderAnnotations();
-                
-        if (!_firstViewportRenderDone) {
-
-          ui.updateToolUI();
-
-          _firstViewportRenderDone = true;
-        }
+        overlay.renderAnnotations();        
       }
     });
   }
@@ -230,14 +279,16 @@ async function getReferenceFromPage() {
   const _provider = {
     waitForViewerReady,
     getViewerContainer,
-    getCurrentPageKey,
     getReferenceFromPage,
-    getCurrentViewport,
     getCleanPageUrl,
     initializeViewportTracking,
     site,
     getPageKey,
-    buildUrlFromBookPage
+    getCurrentPageKey,
+    buildUrlFromBookPage: (book, page) => (`https://data.matricula-online.eu/${book}/?pg=${page}`),
+    projectImagePoints,
+    unprojectScreenPoints,
+    getToolbarPosition: () => ({ top: "7px", left: "50%" })
   };
 
   window.archiveProviders ??= [];

@@ -71,6 +71,14 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "src/sites/riksarkivet-page.js"
+      ],
+      "matches": [
+        "https://sok.riksarkivet.se/*"
+      ]
+    },
+    {
+      "resources": [
         "src/sites/matricula-page.js"
       ],
       "matches": [

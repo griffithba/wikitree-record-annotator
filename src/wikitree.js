@@ -28,6 +28,7 @@
       
         for (const link of links) {
           const keyObj = provider.getPageKey(link.href);
+          if (!keyObj) continue;  // skip if we can't extract a key from the link
           const key = `${keyObj.site}|${keyObj.book}|${keyObj.page}`
 
           citedPages.add(key);
