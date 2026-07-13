@@ -44,7 +44,6 @@
 
   function setVisible(v) {
     _visible = v;
-    renderAnnotations();
   }
 
   function isVisible() {
@@ -261,7 +260,7 @@
 
     for (const a of annotations) {
       for (const [index, frameData] of a.frames.entries()) {
-        promises.push(_renderFrame(a, frameData, index));
+        promises.push(_renderFrame(a, frameData, index, id));
       }
     }
 
@@ -288,7 +287,7 @@
    * @param {Object} frameData - Frame coordinates {x, y, w, h} in image space
    * @param {number} index - Frame index within annotation
    */
-  async function _renderFrame(a, frameData, index) {
+  async function _renderFrame(a, frameData, index, renderId) {
     // 1. Create an SVG polygon
     const frame = document.createElementNS(svgNS, "polygon");
     frame.setAttribute("class", "wt-annotation");
@@ -372,6 +371,11 @@
     if (!a.wtIdFound) {
       _addInvalidBadge(screenFrameCorners);
     } 
+
+    // Check to make sure this render is still the latest one; if not, abort to avoid stacked frames
+    if (renderId !== _renderCount) {
+      return;
+    }
 
     _annotationLayer.appendChild(frame);
   }

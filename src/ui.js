@@ -136,12 +136,20 @@
 
     // Button for toggling show/hide annotations
     const toggleBtn = document.createElement("button");
+        
+    Object.assign(toggleBtn.style, {
+      padding: "6px 10px",
+      fontSize: "14px",
+      cursor: "pointer"
+    });
+
     // initial button label
     toggleBtn.textContent = overlay.isVisible() ? "Hide" : "Show";
 
     toggleBtn.addEventListener("click", () => {
-      overlay.setVisible(!overlay.isVisible());
-      toggleBtn.textContent = overlay.isVisible() ? "Hide" : "Show";
+      const visible = !overlay.isVisible();
+      overlay.setVisible(visible);
+      toggleBtn.textContent = visible ? "Hide" : "Show";
       overlay.renderAnnotations();
     });
 
@@ -440,7 +448,7 @@
 
     Object.assign(btn.style, {
       padding: "6px 10px",
-      fontSize: "12px",
+      fontSize: "14px",
       cursor: "pointer"
     });
 
