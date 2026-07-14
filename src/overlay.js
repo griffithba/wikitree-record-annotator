@@ -36,10 +36,6 @@
   }
 
 
-  let _renderInProgress = false;
-  let _renderQueued = false;
-
-
   let _visible = true;
 
   function setVisible(v) {

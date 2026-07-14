@@ -12,12 +12,27 @@
   // Dialog element for editing annotation WT ID and notes
   let _wtEditor = null;
 
-  // Utility panel for import/export (created in createToolbar)
-  let _utilPanel = null; 
 
   function createToolbar() {
     // Make sure there is no stale toolbar from a previous page instance
     document.getElementById("wt-toolbar")?.remove();
+    
+    const toolbar = _createToolbarElement();
+
+    const header = _createToolbarHeader(toolbar);
+
+    toolbar.appendChild(header);
+
+    const content = _createNormalToolbarContent();
+    
+    toolbar.appendChild(content);
+    
+    // attach the toolbar
+    document.body.appendChild(toolbar);
+  }
+
+
+  function _createToolbarElement() {
     const toolbar = document.createElement("div");
     toolbar.id = "wt-toolbar";
 
@@ -39,12 +54,14 @@
 
     // Merge them together cleanly
     Object.assign(toolbar.style, baseStyles, providerStyles);
+    return toolbar;
+  }
 
-    //
-    // Header
-    //
 
+  function _createToolbarHeader(toolbar) {
     const header = document.createElement("div");
+
+    header.id = "wt-toolbar-header";
 
     Object.assign(header.style, {
       display: "flex",
@@ -61,108 +78,177 @@
     );
 
     Object.assign(icon.style, {
-      width: "24px",
-      height: "24px"
+      width: "32px",
+      height: "32px"
     });
 
-    const title = document.createElement("div");
-    title.textContent = "WikiTree Annotator";
-
     header.appendChild(icon);
-    header.appendChild(title);
-    header.addEventListener("mousedown", startDrag);
+    header.addEventListener("mousedown", (e) => {_enableToolbarDragging(e, toolbar)});
 
-    toolbar.appendChild(header);
+    return header;
+  }
 
-    // Make the toolbar draggable
-    function startDrag(e) {
-      const rect = toolbar.getBoundingClientRect();
 
-      // Convert from bottom-centered positioning
-      // to top-left positioning.
-      toolbar.style.left = `${rect.left}px`;
-      toolbar.style.top = `${rect.top}px`;
+  function _enableToolbarDragging(e, toolbar) {
+    const rect = toolbar.getBoundingClientRect();
 
-      toolbar.style.bottom = "auto";
-      toolbar.style.transform = "none";
+    // Convert from bottom-centered positioning
+    // to top-left positioning.
+    toolbar.style.left = `${rect.left}px`;
+    toolbar.style.top = `${rect.top}px`;
 
-      const offsetX = e.clientX - rect.left;
-      const offsetY = e.clientY - rect.top;
+    toolbar.style.bottom = "auto";
+    toolbar.style.transform = "none";
 
-      function drag(e) {
-        toolbar.style.left = `${e.clientX - offsetX}px`;
-        toolbar.style.top = `${e.clientY - offsetY}px`;
-      }
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
 
-      function stop() {
-        document.removeEventListener("mousemove", drag);
-        document.removeEventListener("mouseup", stop);
-      }
-
-      document.addEventListener("mousemove", drag);
-      document.addEventListener("mouseup", stop);
+    function drag(e) {
+      toolbar.style.left = `${e.clientX - offsetX}px`;
+      toolbar.style.top = `${e.clientY - offsetY}px`;
     }
 
-    //
-    // Button row
-    //
+    function stop() {
+      document.removeEventListener("mousemove", drag);
+      document.removeEventListener("mouseup", stop);
+    }
 
-    const buttonRow = document.createElement("div");
+    document.addEventListener("mousemove", drag);
+    document.addEventListener("mouseup", stop);
+  }
 
-    Object.assign(buttonRow.style, {
+
+  function _createNormalToolbarContent() {
+
+    const content = document.createElement("div");
+
+    content.id = "wt-toolbar-content";
+
+    Object.assign(content.style, {
       display: "flex",
       gap: "6px",
       flexWrap: "wrap"
     });
 
-    // Add tool buttons to button row
-    buttonRow.appendChild(_makeToolButton(
-      "Draw", 
-      "draw", 
-      async () => {
-        const person = await _showDrawDialog();
+    const title = document.createElement("div");
+    title.innerHTML = "WikiTree<br>Annotator";
+    content.appendChild(title);
 
-        if (!person) {
-          console.log("Draw cancelled");
-          return;
-        }
+    // Add tool buttons
+    content.appendChild(_makeButton({
+      label: "Draw",
+      tool: "draw",
+      onClick: async () => {
+        const person = await _showDrawDialog();
+        if (!person) return;
 
         tools.setActiveDrawingPerson(person.wikitreeid);
         tools.setTool("draw");
         updateToolUI();
       }
-    ));
-    buttonRow.appendChild(_makeToolButton("Edit", "edit"));
+    }));
+
+    content.appendChild(_makeButton({
+      label: "Edit",
+      tool: "edit"
+    }));
 
     // Button for toggling show/hide annotations
-    const toggleBtn = document.createElement("button");
-        
-    Object.assign(toggleBtn.style, {
+    content.appendChild(_makeButton({
+      label: overlay.isVisible() ? "Hide" : "Show",
+
+      onClick: (btn) => {
+        const visible = !overlay.isVisible();
+
+        overlay.setVisible(visible);
+        btn.textContent = visible ? "Hide" : "Show";
+
+        overlay.renderAnnotations();
+      }
+    }));
+
+    return content;
+  }
+
+
+  /**
+   * Creates a button for the toolbar
+   * @param {string} label - Button label text
+   * @param {string} toolName - Optional tool identifier
+   * @param {Function} onClick - Optional custom click handler
+   * @returns {HTMLElement} Button element
+   */
+  function _makeButton({
+    label,
+    tool = null,
+    onClick = null,
+    initialize = null
+  }) {
+    const btn = document.createElement("button");
+
+    btn.textContent = label;
+
+    if (tool) {
+      btn.dataset.tool = tool;
+    }
+
+    Object.assign(btn.style, {
       padding: "6px 10px",
       fontSize: "14px",
       cursor: "pointer"
     });
 
-    // initial button label
-    toggleBtn.textContent = overlay.isVisible() ? "Hide" : "Show";
-
-    toggleBtn.addEventListener("click", () => {
-      const visible = !overlay.isVisible();
-      overlay.setVisible(visible);
-      toggleBtn.textContent = visible ? "Hide" : "Show";
-      overlay.renderAnnotations();
+    btn.addEventListener("click", async () => {
+      if (onClick) {
+        await onClick(btn);
+      } else if (tool) {
+        tools.setTool(tool);
+        updateToolUI();
+      }
     });
 
-    // Add toggle button to button row
-    buttonRow.appendChild(toggleBtn);
-    
-    // Add button row to toolbar
-    toolbar.appendChild(buttonRow);
-    
-    // attach the toolbar
-    document.body.appendChild(toolbar);
+    return btn;
   }
 
+
+  function setToolbarMode(mode) {
+    const content = document.getElementById("wt-toolbar-content");
+    content.replaceChildren();
+
+    switch (mode) {
+        case "normal":
+            content.appendChild(_createNormalToolbarContent());
+            break;
+
+        case "edit":
+            content.appendChild(_createEditToolbarContent());
+            break;
+    }
+  }
+
+
+  function _createEditToolbarContent() {
+    const content = document.createElement("div");
+
+    content.id = "wt-toolbar-content";
+
+    Object.assign(content.style, {
+      display: "flex",
+      gap: "6px",
+      flexWrap: "wrap"
+    });
+
+    const title = document.createElement("div");
+    const id = tools.getSelectedAnnotationId();
+    const name = personAPI.getName(id);
+    const birth = personAPI.getBirthDate(id);
+    const birthString = birth ? `b. ${birth}` : "";
+    const death = personAPI.getDeathDate(id);
+    const deathString = death ? `d. ${death}` : "";
+    title.innerHTML = `Editing Annotation for ${name}.<br>${birthString}  ${deathString}`;
+    content.appendChild(title);
+
+  }
 
   // Display a dialog with list of annotated and unannotated profiles for the current page, and 
   // let user select one to start drawing annotation frames for that profile. Returns the selected 
@@ -306,8 +392,8 @@
       let toolTip = null;
 
       unannotatedIds.forEach(id => {
-        const exactBirth = personAPI.getExactBirth(id);
-        if (exactBirth) toolTip = `Born ${exactBirth}`;
+        const exactBirth = personAPI.getBirthDate(id);
+        if (exactBirth && exactBirth.length > 4) toolTip = `Born ${exactBirth}`;
         else toolTip = null;
 
         addRadioRow(left, id, personAPI.formatDisplayName(id), toolTip);
@@ -349,8 +435,8 @@
       // --------------------------------------------------
 
       annotatedIds.forEach(id => {
-        const exactBirth = personAPI.getExactBirth(id);
-        if (exactBirth) toolTip = `Born ${exactBirth}`;
+        const exactBirth = personAPI.getBirthDate(id);
+        if (exactBirth && exactBirth.length > 4) toolTip = `Born ${exactBirth}`;
         else toolTip = null;
 
         addRadioRow(right, id, personAPI.formatDisplayName(id), toolTip);
@@ -431,38 +517,6 @@
       document.body.appendChild(backdrop);
     });
   } 
-
-
-  /**
-   * Creates a button for tool selection
-   * @param {string} label - Button label text
-   * @param {string} toolName - Tool identifier ("draw" | "edit")
-   * @param {Function} onClick - Optional custom click handler
-   * @returns {HTMLElement} Button element
-   */
-  function _makeToolButton(label, toolName, onClick = null) {
-    const btn = document.createElement("button");
-
-    btn.textContent = label;
-    btn.dataset.tool = toolName;
-
-    Object.assign(btn.style, {
-      padding: "6px 10px",
-      fontSize: "14px",
-      cursor: "pointer"
-    });
-
-    btn.addEventListener("click", async () => {
-      if (onClick) {
-        await onClick();
-      } else {
-        tools.setTool(toolName);
-        updateToolUI();
-      }
-    });
-
-    return btn;
-  }
 
 
   /**
