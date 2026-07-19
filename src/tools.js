@@ -32,6 +32,9 @@
   function setActiveDrawingPerson(person) {
     _activeDrawingPerson = person;
   }
+  function getActiveDrawingPerson() {
+    return _activeDrawingPerson;
+  }
   function clearActiveDrawingPerson() {
     _activeDrawingPerson = null;
   }
@@ -62,7 +65,8 @@
     }
     _selectedAnnotationId = id;
     _activeFrameIndex = index;
-    overlay.updateSelectionStyles();
+    ui.setToolbarMode("edit");
+    overlay.renderAnnotations();
   }
 
 
@@ -79,8 +83,22 @@
     _activeFrameIndex = null;
     overlay.updateSelectionStyles();
     ui.closeWtEditor();
+    setTool(null);
+    ui.setToolbarMode("normal");
   }
 
+
+  function cancelChanges() {
+    if (_selectedAnnotationId) {
+      annotationsAPI.cancelAnnotationChanges(_selectedAnnotationId);
+    }
+    _selectedAnnotationId = null;
+    _activeFrameIndex = null;
+    ui.closeWtEditor();
+    setTool(null);
+    ui.setToolbarMode("normal");
+    overlay.renderAnnotations();
+  }
 
   // ============================================================
   // MOUSE HANDLERS (DRAWING BOXES)
@@ -187,10 +205,12 @@
     _box = null;
 
     // Set up to have the frame be selected in case of further editing
-    _selectedAnnotationId = _activeDrawingPerson;
-    _activeFrameIndex = await annotationsAPI.addFrame(_activeDrawingPerson, newFrame);
+    if (_activeDrawingPerson) _selectedAnnotationId = _activeDrawingPerson;
+    _activeFrameIndex = await annotationsAPI.addFrame(_selectedAnnotationId, newFrame);
+console.log("Added frame", _selectedAnnotationId, _activeFrameIndex);
     clearActiveDrawingPerson();
     setTool("edit");
+    ui.setToolbarMode("edit");
     ui.updateToolUI();
   }
 
@@ -218,6 +238,8 @@
       initialNote: frameData.note || "",
 
       onSave: async ({note}) => {
+        annotationsAPI.ensureUndoSnapshot(id);
+
         frameData.note = note;
 
         // Mark this frame as having unsaved changes
@@ -323,6 +345,8 @@
     const annotation = annotationsAPI.getAnnotationByWtId(id);
     if (!annotation) return;
 
+    annotationsAPI.ensureUndoSnapshot(id);
+
     const frameIndex = Number(frameEl.dataset.frameIndex);
     const frame = annotation.frames[frameIndex];
 
@@ -422,9 +446,11 @@
     isDrawing,
     isSelecting,
     setActiveDrawingPerson,
+    getActiveDrawingPerson,
     clearActiveDrawingPerson,
     selectAnnotation,
     clearSelection,
+    cancelChanges,
     addResizeHandles,
     getSelectedAnnotationId,
     getActiveFrameIndex,

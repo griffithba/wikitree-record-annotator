@@ -106,6 +106,9 @@
         if (frameData?._dirty) {
           frame.classList.add("wt-unsaved-changes");
         }
+        if (frameData?._delete) {
+          frame.classList.add("wt-pending-delete");
+        }
 
         if (!toolbarWrapper) {
           if (tools.getActiveFrameIndex() === Number(frameIndex)) {
@@ -212,7 +215,7 @@
     _overlay.addEventListener("mousemove", tools.onMouseMove);
     _overlay.addEventListener("mouseup", tools.onMouseUp);
 
-    // Container click: clear selection when clicking empty space
+/*     // Container click: clear selection when clicking empty space
     const host = _container.parentElement; 
     host.addEventListener("click", (e) => {
       if (!tools.isSelecting() || _shouldIgnoreClick()) return;
@@ -222,6 +225,7 @@
 
       tools.clearSelection();
     });
+ */  
   }
 
 
@@ -324,10 +328,12 @@
     // Click handler: select in select mode, or open WikiTree profile
     frame.addEventListener("click", (e) => {
       if (tools.isSelecting()) {
-        e.stopPropagation();
-        const id = frame.dataset.annotationId;
-        const frameIndex = Number(frame.dataset.frameIndex);
-        tools.selectAnnotation(id, frameIndex);
+        if (!tools.getSelectedAnnotationId()) {
+          e.stopPropagation();
+          const id = frame.dataset.annotationId;
+          const frameIndex = Number(frame.dataset.frameIndex);
+          tools.selectAnnotation(id, frameIndex);
+        }
         return;
       }
 

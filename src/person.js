@@ -52,7 +52,14 @@
     return text; 
   }
 
+
+  function getName(wtId) {
+    if (_people.has(wtId)) {
+      return _people.get(wtId).name;
+    }
+  }
   
+
   function getBirthDate(wtId) {
     if (_people.has(wtId)) {
       const person = _people.get(wtId);
@@ -74,6 +81,7 @@
   window.personAPI = {
     prefetch,
     formatDisplayName,
+    getName,
     getBirthDate, 
     getDeathDate
   }

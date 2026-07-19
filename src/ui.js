@@ -23,9 +23,12 @@
 
     toolbar.appendChild(header);
 
+    const container = _createToolbarContainer();
+
     const content = _createNormalToolbarContent();
     
-    toolbar.appendChild(content);
+    container.appendChild(content);
+    toolbar.appendChild(container);
     
     // attach the toolbar
     document.body.appendChild(toolbar);
@@ -117,9 +120,7 @@
     document.addEventListener("mouseup", stop);
   }
 
-
-  function _createNormalToolbarContent() {
-
+  function _createToolbarContainer() {
     const content = document.createElement("div");
 
     content.id = "wt-toolbar-content";
@@ -130,12 +131,19 @@
       flexWrap: "wrap"
     });
 
+    return content;
+  }
+
+  function _createNormalToolbarContent() {
+
+    const fragment = document.createDocumentFragment();
+
     const title = document.createElement("div");
     title.innerHTML = "WikiTree<br>Annotator";
-    content.appendChild(title);
+    fragment.appendChild(title);
 
     // Add tool buttons
-    content.appendChild(_makeButton({
+    fragment.appendChild(_makeButton({
       label: "Draw",
       tool: "draw",
       onClick: async () => {
@@ -143,18 +151,19 @@
         if (!person) return;
 
         tools.setActiveDrawingPerson(person.wikitreeid);
-        tools.setTool("draw");
+        setToolbarMode("edit");
+        tools.setTool("draw")
         updateToolUI();
       }
     }));
 
-    content.appendChild(_makeButton({
+    fragment.appendChild(_makeButton({
       label: "Edit",
       tool: "edit"
     }));
 
     // Button for toggling show/hide annotations
-    content.appendChild(_makeButton({
+    fragment.appendChild(_makeButton({
       label: overlay.isVisible() ? "Hide" : "Show",
 
       onClick: (btn) => {
@@ -167,7 +176,7 @@
       }
     }));
 
-    return content;
+    return fragment;
   }
 
 
@@ -181,8 +190,7 @@
   function _makeButton({
     label,
     tool = null,
-    onClick = null,
-    initialize = null
+    onClick = null
   }) {
     const btn = document.createElement("button");
 
@@ -213,42 +221,58 @@
 
   function setToolbarMode(mode) {
     const content = document.getElementById("wt-toolbar-content");
-    content.replaceChildren();
 
     switch (mode) {
         case "normal":
-            content.appendChild(_createNormalToolbarContent());
+            content.replaceChildren(_createNormalToolbarContent());
             break;
 
         case "edit":
-            content.appendChild(_createEditToolbarContent());
+            content.replaceChildren(_createEditPanel());
             break;
     }
   }
 
 
-  function _createEditToolbarContent() {
-    const content = document.createElement("div");
-
-    content.id = "wt-toolbar-content";
-
-    Object.assign(content.style, {
-      display: "flex",
-      gap: "6px",
-      flexWrap: "wrap"
-    });
+  function _createEditPanel() {
+    const fragment = document.createDocumentFragment();
 
     const title = document.createElement("div");
-    const id = tools.getSelectedAnnotationId();
+    let id = tools.getSelectedAnnotationId();
+    let actionWord = "Editing";
+    if (!id) {
+      id = tools.getActiveDrawingPerson();
+      actionWord = "Drawing";
+    }
     const name = personAPI.getName(id);
     const birth = personAPI.getBirthDate(id);
     const birthString = birth ? `b. ${birth}` : "";
     const death = personAPI.getDeathDate(id);
     const deathString = death ? `d. ${death}` : "";
-    title.innerHTML = `Editing Annotation for ${name}.<br>${birthString}  ${deathString}`;
-    content.appendChild(title);
+    title.innerHTML = `${actionWord} Annotation for ${name}<br>${birthString}  ${deathString}`;
+    fragment.appendChild(title);
 
+    fragment.appendChild(_makeButton({
+      label: "Cancel",
+      onClick: (btn) => {
+        tools.cancelChanges();
+        tools.setTool(null)
+      }
+    }));
+
+    if (actionWord === "Editing") {
+      fragment.appendChild(_makeButton({
+        label: "Done",
+        onClick: (btn) => {
+          tools.clearSelection();
+          tools.setTool(null)
+        }
+      }))
+    }
+
+    return fragment;
   }
+
 
   // Display a dialog with list of annotated and unannotated profiles for the current page, and 
   // let user select one to start drawing annotation frames for that profile. Returns the selected 
@@ -524,7 +548,7 @@
    */
   function updateToolUI() {
     document.querySelectorAll(".wt-annotation").forEach(el => {
-      if (tools.isSelecting()) {
+      if (tools.isSelecting() && !tools.getSelectedAnnotationId()) {
         el.style.cursor = "pointer";
         el.style.pointerEvents = "auto";
       } else {
@@ -744,7 +768,8 @@
       const wtId = frameEl.dataset.annotationId;
       const frameIndex = Number(frameEl.dataset.frameIndex);
 
-      annotationsAPI.deleteFrame(wtId, frameIndex);
+      annotationsAPI.markFrameForDeletion(wtId, frameIndex);
+      overlay.renderAnnotations();
     };
 
     toolbar.append(addBtn, editBtn, deleteBtn);
@@ -754,6 +779,7 @@
 
   window.ui = {
     createToolbar,
+    setToolbarMode,
     updateToolUI,
     createAnnotationToolbar,
     createWtEditor,

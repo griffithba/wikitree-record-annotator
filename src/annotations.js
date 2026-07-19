@@ -66,10 +66,12 @@
       annotation = {
         frames: [frame],
         wikitreeid: wtId,
-        wtIdFound: await personAPI.prefetch(wtId) // pre-fetch person data for this ID
+        wtIdFound: await personAPI.prefetch(wtId), // pre-fetch person data for this ID
+        _new: true
       }
       _annotations.push(annotation);
     } else {
+      ensureUndoSnapshot(wtId);
       frameIndex = annotation.frames.push(frame) - 1;
     }
 
@@ -80,7 +82,7 @@
 
 
   /**
-   * Deletes a specific frame from an annotation
+   * Deletes a specific frame from an annotation (deletes from WT+)
    * If last frame, deletes entire annotation
    * @param {string} wtId - WikiTree ID
    * @param {number} frameIndex - Index of frame to delete
@@ -115,12 +117,21 @@
     overlay.renderAnnotations();
   }
   
+
+  function markFrameForDeletion(wtId, frameIndex) {
+    const annotation = getAnnotationByWtId(wtId);
+    if (!annotation) return;
+    ensureUndoSnapshot(wtId);
+    annotation.frames[frameIndex]._delete = true;
+  }
+
   
   async function updateAnnotation(wtId) {
     const a = getAnnotationByWtId(wtId);
     if (!a) return;
+    if (a?._new) delete a._new;
     // loop through all frames in the annotation
-    a.frames.forEach(async frame => {
+    a.frames.forEach(async (frame, index) => {
       // if changes were made
       if (frame._dirty) {
         const oldFrameId = frame.frameid;
@@ -139,7 +150,40 @@
         }
         delete frame._dirty;
       }
+      if (frame._delete) {
+        deleteFrame(wtId, index);
+      }
     });
+  }
+
+
+  function ensureUndoSnapshot(wtId) {
+    const a = getAnnotationByWtId(wtId);
+    if (!a) { console.log("No annotation");return; }
+    if (a._new) { console.log("Already marked as new"); return; }
+    if (a.originalFrames) {console.log("Undo snapshot already saved"); return; }
+console.log("Creating undo snapshot");
+    a.originalFrames = structuredClone(a.frames);
+  }
+
+
+  function cancelAnnotationChanges(annotationId) {
+    const annotation = getAnnotationByWtId(annotationId);
+    if (annotation._new) _deleteAnnotation(annotation);
+    else if (annotation.originalFrames) {
+      annotation.frames = structuredClone(annotation.originalFrames);
+      delete annotation.originalFrames;
+    } else {
+      console.warn("Cancel requested without an undo snapshot", annotation);
+    }
+  }
+
+  
+  function _deleteAnnotation(annotation) {
+    const index = _annotations.indexOf(annotation);
+    if (index >= 0) {
+      _annotations.splice(index, 1);
+    }
   }
 
 
@@ -157,6 +201,9 @@
   window.annotationsAPI = {
     addFrame,
     deleteFrame,
+    markFrameForDeletion,
+    ensureUndoSnapshot,
+    cancelAnnotationChanges,
     updateAnnotation,
     getAnnotationByWtId,
     getAnnotations,

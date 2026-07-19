@@ -58,6 +58,12 @@
         stroke-dasharray: 8 4;
       }
 
+      .wt-annotation.wt-selected.wt-pending-delete {
+        stroke-dasharray: 8 4;
+        stroke-opacity: 0.3;
+        fill-opacity: 0.05;
+      }
+
       .wt-ref-highlight {
         animation: wtPulse 1.5s ease-out 5;
       }
