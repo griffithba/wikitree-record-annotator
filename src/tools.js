@@ -59,9 +59,9 @@
    * @param {number} index - Index of the frame within the annotation
    */
   function selectAnnotation(id, index) {
-    // Save changes from previously selected frame
+    // We shouldn't be switching from one annotation to another via this routine.  
     if (_selectedAnnotationId && (_selectedAnnotationId !== id)) {
-      annotationsAPI.updateAnnotation(_selectedAnnotationId);
+      console.warn("Changing selection from one annotation to another without cleanly de-selecting the first.");
     }
     _selectedAnnotationId = id;
     _activeFrameIndex = index;
@@ -207,7 +207,6 @@
     // Set up to have the frame be selected in case of further editing
     if (_activeDrawingPerson) _selectedAnnotationId = _activeDrawingPerson;
     _activeFrameIndex = await annotationsAPI.addFrame(_selectedAnnotationId, newFrame);
-console.log("Added frame", _selectedAnnotationId, _activeFrameIndex);
     clearActiveDrawingPerson();
     setTool("edit");
     ui.setToolbarMode("edit");

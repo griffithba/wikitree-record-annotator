@@ -118,7 +118,7 @@
   }
   
 
-  function markFrameForDeletion(wtId, frameIndex) {
+  function markForDeletion(wtId, frameIndex) {
     const annotation = getAnnotationByWtId(wtId);
     if (!annotation) return;
     ensureUndoSnapshot(wtId);
@@ -126,12 +126,24 @@
   }
 
   
+  function unmarkForDeletion(wtId, frameIndex) {
+    const annotation = getAnnotationByWtId(wtId);
+    if (!annotation) return;
+    delete annotation.frames[frameIndex]._delete;
+  }
+
+  
   async function updateAnnotation(wtId) {
     const a = getAnnotationByWtId(wtId);
-    if (!a) return;
+    if (!a) return; 
     if (a?._new) delete a._new;
+    const promises = [];
     // loop through all frames in the annotation
-    a.frames.forEach(async (frame, index) => {
+    for (const [index, frame] of a.frames.entries()) {
+      if (frame._delete) {
+        await deleteFrame(wtId, index);
+        return; // equivalent to "continue"
+      }
       // if changes were made
       if (frame._dirty) {
         const oldFrameId = frame.frameid;
@@ -150,10 +162,7 @@
         }
         delete frame._dirty;
       }
-      if (frame._delete) {
-        deleteFrame(wtId, index);
-      }
-    });
+    }
   }
 
 
@@ -167,15 +176,13 @@ console.log("Creating undo snapshot");
   }
 
 
-  function cancelAnnotationChanges(annotationId) {
-    const annotation = getAnnotationByWtId(annotationId);
+  function cancelAnnotationChanges(wtId) {
+    const annotation = getAnnotationByWtId(wtId);
     if (annotation._new) _deleteAnnotation(annotation);
     else if (annotation.originalFrames) {
       annotation.frames = structuredClone(annotation.originalFrames);
       delete annotation.originalFrames;
-    } else {
-      console.warn("Cancel requested without an undo snapshot", annotation);
-    }
+    } 
   }
 
   
@@ -201,7 +208,8 @@ console.log("Creating undo snapshot");
   window.annotationsAPI = {
     addFrame,
     deleteFrame,
-    markFrameForDeletion,
+    markForDeletion,
+    unmarkForDeletion,
     ensureUndoSnapshot,
     cancelAnnotationChanges,
     updateAnnotation,

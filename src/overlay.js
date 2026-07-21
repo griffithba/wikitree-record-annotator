@@ -85,6 +85,8 @@
   function updateSelectionStyles() {
     const layer = overlay.getAnnotationLayerElement();
 
+    const selectedId = tools.getSelectedAnnotationId();
+
     document.querySelectorAll(".wt-annotation").forEach(frame => {
       // Skip the loop if this element is an HTML toolbar
       if (frame.tagName.toLowerCase() !== "polygon") {
@@ -97,8 +99,8 @@
       let toolbarWrapper = layer.querySelector(
         `foreignObject[data-annotation-id="${id}"][data-toolbar-for="${frameIndex}"]`
       );
-       
-      if (String(id) === String(tools.getSelectedAnnotationId())) {
+
+      if (id === selectedId) {
         const annotation = annotationsAPI.getAnnotationByWtId(id);
         const frameData = annotation.frames[Number(frameIndex)];
 
@@ -139,7 +141,7 @@
             toolbarWrapper.style.overflow = "visible";
 
             // 3. Generate HTML toolbar and inject it
-            const toolbar = ui.createAnnotationToolbar(id);
+            const toolbar = ui.createAnnotationToolbar(id, frameIndex);
 
             // attach the datasets to the toolbar 
             // so e.target.closest(".wt-annotation") inside button actions can still resolve it!
@@ -149,7 +151,9 @@
 
             toolbarWrapper.appendChild(toolbar);
             layer.appendChild(toolbarWrapper);
-            tools.addResizeHandles(frame, id);
+            if (!frameData?._delete) {
+              tools.addResizeHandles(frame, id);
+            }
           } 
           
         } else if (tools.getActiveFrameIndex() !== Number(frameIndex)) {
@@ -328,9 +332,10 @@
     // Click handler: select in select mode, or open WikiTree profile
     frame.addEventListener("click", (e) => {
       if (tools.isSelecting()) {
-        if (!tools.getSelectedAnnotationId()) {
+        const id = frame.dataset.annotationId;
+        // if there isn't currently a selected annotation, or if current and new are the same
+        if (!tools.getSelectedAnnotationId() || tools.getSelectedAnnotationId() === id) {
           e.stopPropagation();
-          const id = frame.dataset.annotationId;
           const frameIndex = Number(frame.dataset.frameIndex);
           tools.selectAnnotation(id, frameIndex);
         }
