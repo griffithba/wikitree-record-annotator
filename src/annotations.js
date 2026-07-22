@@ -169,9 +169,8 @@
   function ensureUndoSnapshot(wtId) {
     const a = getAnnotationByWtId(wtId);
     if (!a) { console.log("No annotation");return; }
-    if (a._new) { console.log("Already marked as new"); return; }
-    if (a.originalFrames) {console.log("Undo snapshot already saved"); return; }
-console.log("Creating undo snapshot");
+    if (a._new) return;  // frame already flagged as new
+    if (a.originalFrames) return;  // undo snapshot already exists
     a.originalFrames = structuredClone(a.frames);
   }
 
