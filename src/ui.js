@@ -157,7 +157,10 @@
         const person = await _showDrawDialog();
         if (!person) return;
 
-        tools.setActiveDrawingPerson(person.wikitreeid);
+        // if an annotation already exists go into add-a-frame mode
+        if (person.hasAnnotation) tools.selectAnnotation(person.wikitreeid);
+        // otherwise go into draw-new-annotation mode
+        else tools.setActiveDrawingPerson(person.wikitreeid);
         setToolbarMode("edit");
         tools.setTool("draw")
         updateToolUI();
@@ -180,7 +183,10 @@
         const visible = !overlay.isVisible();
 
         overlay.setVisible(visible);
-        btn.textContent = visible ? "Hide" : "Show";
+
+        const label = visible ? "Hide" : "Show";
+        btn.textContent = label;
+        btn.title = `${label} all Annotations`;
 
         overlay.renderAnnotations();
       }
@@ -216,6 +222,7 @@
     Object.assign(btn.style, {
       padding: "6px 10px",
       fontSize: "14px",
+      borderRadius: "6px",
       cursor: "pointer"
     });
 
@@ -411,7 +418,7 @@
       // helper for radio rows
       // --------------------------------------------------
 
-      function addRadioRow(parent, wtId, displayText, tooltipText) {
+      function addRadioRow(parent, wtId, displayText, tooltipText, showLink = false) {
 
         const label = document.createElement("label");
 
@@ -433,6 +440,24 @@
         label.appendChild(radio);
         label.append(" " + displayText);
 
+        if (showLink) {
+          label.append(" ");
+
+          const link = document.createElement("a");
+          link.href = `https://www.wikitree.com/wiki/${encodeURIComponent(wtId)}`;
+          link.textContent = "🔗profile";
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.style.fontSize = "0.85em";
+
+          // Prevent clicking the link from selecting the radio button.
+          link.addEventListener("click", e => {
+            e.stopPropagation();
+          });
+
+          label.appendChild(link);
+        }
+
         parent.appendChild(label);
 
         return radio;
@@ -448,7 +473,7 @@
         if (exactBirth && exactBirth.length > 4) toolTip = `Born ${exactBirth}`;
         else toolTip = null;
 
-        addRadioRow(left, id, personAPI.formatDisplayName(id), toolTip);
+        addRadioRow(left, id, personAPI.formatDisplayName(id), toolTip, true);
       });
 
       // --------------------------------------------------
@@ -559,10 +584,13 @@
           return;
         }
 
+        const hasAnnotation = annotatedIds.includes(selectedId);
+
         backdrop.remove();
 
         resolve({
-          wikitreeid: selectedId
+          wikitreeid: selectedId,
+          hasAnnotation
         });
       });
 
