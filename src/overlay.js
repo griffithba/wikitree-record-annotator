@@ -367,12 +367,9 @@
             { x: x,     y: y + h }];
     }
 
-    // Convert degrees to radians
-    const radians = a * (Math.PI / 180);
-
     // Pre-calculate trigonometry
-    const cos = Math.cos(radians);
-    const sin = Math.sin(radians);
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
 
     // Top-Left corner (Pivot)
     const x0 = x;

@@ -586,7 +586,7 @@
     const annotation = annotationsAPI.getAnnotationByWtId(_rotating.annotationId);
     const frame = annotation.frames[_rotating.frameIndex];
     
-    frame.a = Math.round(_rotating.initialRotation + delta * 180 / Math.PI);
+    frame.a = _rotating.initialRotation + delta;
 
     // Mark this frame as needing to be saved
     frame._dirty = true;
