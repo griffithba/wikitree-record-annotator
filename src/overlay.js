@@ -152,7 +152,7 @@
             toolbarWrapper.appendChild(toolbar);
             layer.appendChild(toolbarWrapper);
             if (!frameData?._delete) {
-              tools.addResizeHandles(frame, id);
+              tools.addManipulationHandles(frame, id);
             }
           } 
           
@@ -162,6 +162,10 @@
           layer.querySelector(
             `.resize-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
           )?.remove();
+          layer.querySelector(
+            `.rotate-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+          )?.remove();
+
         }
       } else {
         frame.classList.remove("wt-selected");
@@ -172,7 +176,10 @@
         layer.querySelector(
           `.resize-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
         )?.remove();
-      }
+        layer.querySelector(
+          `.rotate-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+        )?.remove();
+     }
     });
   }
   
@@ -260,12 +267,7 @@
     const frame = document.createElementNS(svgNS, "polygon");
     frame.setAttribute("class", "wt-annotation");
 
-    const imageFrameCorners = [          
-          {x: frameData.x, y: frameData.y},  // top-left
-          {x: frameData.x + frameData.w, y: frameData.y},  // top-right
-          {x: frameData.x + frameData.w, y: frameData.y + frameData.h},  // bottom-right
-          {x: frameData.x, y: frameData.y + frameData.h}  // bottom-left
-    ];
+    const imageFrameCorners = _getRotatedRectangle(frameData);
 
     // 2. Project all 4 true corner coordinates
     const screenFrameCorners = await archiveProvider.projectImagePoints(imageFrameCorners);
@@ -351,6 +353,49 @@
     _annotationLayer.appendChild(frame);
   }
 
+
+  function _getRotatedRectangle(frameData) {
+    // Default angle to 0 if it's not present
+    const { x, y, w, h, a = 0 } = frameData;
+
+    // Optimization: Return unrotated corners instantly
+    if (a === 0 || a === 360 || a === -360) {
+        return [
+            { x: x,     y: y },
+            { x: x + w, y: y },
+            { x: x + w, y: y + h },
+            { x: x,     y: y + h }];
+    }
+
+    // Convert degrees to radians
+    const radians = a * (Math.PI / 180);
+
+    // Pre-calculate trigonometry
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+
+    // Top-Left corner (Pivot)
+    const x0 = x;
+    const y0 = y;
+
+    // Top-Right corner
+    const x1 = x + w * cos;
+    const y1 = y + w * sin;
+
+    // Bottom-Right corner
+    const x2 = x + w * cos - h * sin;
+    const y2 = y + w * sin + h * cos;
+
+    // Bottom-Left corner
+    const x3 = x - h * sin;
+    const y3 = y + h * cos;
+
+    return [
+        { x: x0, y: y0 },
+        { x: x1, y: y1 },
+        { x: x2, y: y2 },
+        { x: x3, y: y3 }];
+  }
 
   function _addInvalidBadge(cornerPoints) {
     const badge = document.createElementNS(svgNS, "text");

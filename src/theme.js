@@ -137,6 +137,11 @@
       .resize-handle.ne { cursor: nesw-resize; }
       .resize-handle.sw { cursor: nesw-resize; }
       .resize-handle.se { cursor: nwse-resize; }
+
+      .rotate-handle {
+        pointer-events: visiblePainted;
+        cursor: grab;
+      }
     `;
     document.head.appendChild(style);
   }

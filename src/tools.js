@@ -46,6 +46,7 @@
   let _endX = 0, _endY = 0;               // Box end (in overlay pixels)
   let _box = null;                       // Temporary DOM element while dragging
   let _resizing = null;                  // Resize state (when dragging resize handles)
+  let _rotating = null;
 
 
   // ============================================================
@@ -276,15 +277,21 @@
   }
 
   // ============================================================
-  // RESIZING ANNOTATION BOXES
+  // RESIZING and ROTATING ANNOTATION BOXES
   // ============================================================
+
+  function addManipulationHandles(box, wtId) {
+    _addResizeHandles(box, wtId);
+    _addRotateHandle(box, wtId); 
+  }
+
 
   /**
    * Creates corner resize handles (nw, ne, sw, se) on selected box
    * @param {SVGPolygonElement} box - Annotation box SVG polygon element
    * @param {string} id - Annotation ID
    */
-  function addResizeHandles(box, id) {
+  function _addResizeHandles(box, id) {
     const corners = ["nw", "ne", "sw", "se"];
   
     // Extract the raw points array directly from the polygon attributes
@@ -331,6 +338,7 @@
     // Append to the parent SVG layer, not inside the polygon
     box.parentNode.appendChild(group);
   }
+
 
   /**
    * Initiates resize drag from a handle
@@ -438,7 +446,169 @@
     document.removeEventListener("mouseup", _stopResize);
   }
 
+
+  function _addRotateHandle(box, wtId) {
+    const group = document.createElementNS(svgNS, "g");
+    group.classList.add("rotate-handle-group");
+    group.dataset.annotationId = wtId;
+    group.dataset.frameIndex = box.dataset.frameIndex;
+
+    const points = box.getAttribute("points").split(" ").map(p => {
+      const [x, y] = p.split(",").map(Number);
+      return { x, y };
+    });
+
+    // Compute the angle of the line for the handle
+    const nw = points[0];
+    const se = points[2];
+    const dx = se.x - nw.x;
+    const dy = se.y - nw.y;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len;
+    const uy = dy / len;
+
+    // Length of the line
+    const extension = Math.max(25, Math.min(50, len * 0.2));
+
+    // End of the line
+    const handleX = se.x + ux * extension;
+    const handleY = se.y + uy * extension;
+
+    // Draw the line
+    const line = document.createElementNS(svgNS, "line");
+
+    line.setAttribute("x1", se.x);
+    line.setAttribute("y1", se.y);
+    line.setAttribute("x2", handleX);
+    line.setAttribute("y2", handleY);
+
+    line.setAttribute("stroke", "black");
+    line.setAttribute("stroke-width", "2");
+
+    // Draw the circular handle
+    const circle = document.createElementNS(svgNS, "circle");
+    circle.classList.add("rotate-handle");
+
+    circle.setAttribute("cx", handleX);
+    circle.setAttribute("cy", handleY);
+    circle.setAttribute("r", "12");
+
+    circle.setAttribute("fill", "white");
+    circle.setAttribute("stroke", "black");
+    circle.setAttribute("stroke-width", "2");
+
+    // Add the icon
+    const icon = document.createElementNS(svgNS, "text");
+
+    icon.setAttribute("x", handleX);
+    icon.setAttribute("y", handleY);
+
+    icon.setAttribute("text-anchor", "middle");
+    icon.setAttribute("dominant-baseline", "central");
+
+    icon.style.fontSize = "16px";
+    icon.style.userSelect = "none";
+
+    icon.textContent = "↺";
+    icon.style.pointerEvents = "none";
+
+    // Add the tooltip
+    const title = document.createElementNS(svgNS, "title");
+    title.textContent = "Rotate frame";
+
+    circle.appendChild(title);
+
+    group.appendChild(line);
+    group.appendChild(circle);
+    group.appendChild(icon);
+
+    circle.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+      _startRotate(e, box); 
+    });
+
+    // Append to the parent SVG layer, not inside the polygon
+    box.parentNode.appendChild(group);
+
+  }
   
+
+  async function _startRotate(e, box) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const id = box.dataset.annotationId;
+    const frameIndex = Number(box.dataset.frameIndex);
+
+    const annotation = annotationsAPI.getAnnotationByWtId(id);
+    const frame = annotation.frames[frameIndex];
+
+    // Save undo snapshot if needed
+    annotationsAPI.ensureUndoSnapshot(id);
+
+    // Retrieve the pivot (upper-left corner)
+    const pivot = {
+      x: frame.x,
+      y: frame.y
+    };
+
+    const mousePt = await archiveProvider.unprojectScreenPoints([{x:e.clientX, y:e.clientY}]);
+
+    // Initial mouse angle
+    const startAngle = Math.atan2(
+      mousePt[0].y - pivot.y,
+      mousePt[0].x - pivot.x
+    );
+
+    _rotating = {
+      annotationId: id,
+      frameIndex,
+      pivot,
+      startAngle,
+      initialRotation: frame.a || 0
+    };
+
+    document.addEventListener("mousemove", _onRotateMove);
+    document.addEventListener("mouseup", _stopRotate);
+  }
+
+
+  async function _onRotateMove(e) {
+    const mousePt = await archiveProvider.unprojectScreenPoints([{x:e.clientX, y:e.clientY}]);
+
+    const angle = Math.atan2(
+      mousePt[0].y - _rotating.pivot.y,
+      mousePt[0].x - _rotating.pivot.x
+    );
+
+    const delta = angle - _rotating.startAngle;
+
+    const annotation = annotationsAPI.getAnnotationByWtId(_rotating.annotationId);
+    const frame = annotation.frames[_rotating.frameIndex];
+    
+    frame.a = Math.round(_rotating.initialRotation + delta * 180 / Math.PI);
+
+    // Mark this frame as needing to be saved
+    frame._dirty = true;
+
+    overlay.renderAnnotations();
+  }
+
+
+  function _stopRotate() {
+    if (!_rotating) return;
+
+    _rotating = null;
+
+    // Restore text selection
+    //document.body.style.userSelect = "";
+    //document.body.style.webkitUserSelect = "";
+
+    document.removeEventListener("mousemove", _onRotateMove);
+    document.removeEventListener("mouseup", _stopRotate);
+
+  }
+
   window.tools = {
     setTool,
     getTool,
@@ -450,7 +620,7 @@
     selectAnnotation,
     clearSelection,
     cancelChanges,
-    addResizeHandles,
+    addManipulationHandles,
     getSelectedAnnotationId,
     getActiveFrameIndex,
     editFrame,
