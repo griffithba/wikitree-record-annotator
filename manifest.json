@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WikiTree Record Annotator",
-  "version": "0.3.2.2",
+  "version": "0.3.2.3",
   "description": "Annotate record images with WikiTree profiles",
   "action": {
     "default_title": "WikiTree Record Annotator",
