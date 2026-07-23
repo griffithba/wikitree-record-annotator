@@ -32,6 +32,9 @@
     
     // attach the toolbar
     document.body.appendChild(toolbar);
+
+    _prepareForDragging(toolbar);
+    _makeDraggable(header, toolbar);
   }
 
 
@@ -75,7 +78,7 @@
       borderRadius: "6px",
       fontWeight: "bold",
       fontSize: "14px",
-      cursor: "move"
+      cursor: "grab"
     });
 
     const icon = document.createElement("img");
@@ -96,39 +99,56 @@
     title.innerHTML = "WikiTree<br>Annotator";
     header.appendChild(title);
 
-    header.addEventListener("mousedown", (e) => {_enableToolbarDragging(e, toolbar)});
+    const versionText = document.createElement("div");
+    versionText.textContent = `v${chrome.runtime.getManifest().version}`;
+
+    Object.assign(versionText.style, {
+      fontSize: "10px",
+      color: "#272727",
+      marginTop: "2px"
+    });
+
+    header.appendChild(versionText);
 
     return header;
   }
 
 
-  function _enableToolbarDragging(e, toolbar) {
-    const rect = toolbar.getBoundingClientRect();
+  function _prepareForDragging(element) {
+    const rect = element.getBoundingClientRect();
 
-    // Convert from bottom-centered positioning
-    // to top-left positioning.
-    toolbar.style.left = `${rect.left}px`;
-    toolbar.style.top = `${rect.top}px`;
+    element.style.left = `${rect.left}px`;
+    element.style.top = `${rect.top}px`;
 
-    toolbar.style.bottom = "auto";
-    toolbar.style.transform = "none";
+    element.style.bottom = "auto";
+    element.style.right = "auto";
 
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
-
-    function drag(e) {
-      toolbar.style.left = `${e.clientX - offsetX}px`;
-      toolbar.style.top = `${e.clientY - offsetY}px`;
-    }
-
-    function stop() {
-      document.removeEventListener("mousemove", drag);
-      document.removeEventListener("mouseup", stop);
-    }
-
-    document.addEventListener("mousemove", drag);
-    document.addEventListener("mouseup", stop);
+    element.style.transform = "none";
   }
+  
+  function _makeDraggable(handle, element) {
+    handle.addEventListener("mousedown", e => {
+      e.preventDefault();
+
+       const rect = element.getBoundingClientRect();
+       const offsetX = e.clientX - rect.left;
+       const offsetY = e.clientY - rect.top;
+
+       function drag(e) {
+         element.style.left = `${e.clientX - offsetX}px`;
+         element.style.top = `${e.clientY - offsetY}px`;
+       }
+
+       function stop() {
+         document.removeEventListener("mousemove", drag);
+         document.removeEventListener("mouseup", stop);
+       }
+
+       document.addEventListener("mousemove", drag);
+       document.addEventListener("mouseup", stop);
+     });
+  }
+
 
   function _createToolbarContainer() {
     const content = document.createElement("div");
@@ -269,7 +289,7 @@
     const birthString = birth ? `b. ${birth}` : "";
     const death = personAPI.getDeathDate(id);
     const deathString = death ? `d. ${death}` : "";
-    title.innerHTML = `${actionWord} Annotation for ${name}<br>${birthString}  ${deathString}`;
+    title.innerHTML = `${actionWord} annotation for ${name}<br>${birthString}  ${deathString}`;
     fragment.appendChild(title);
 
     if (actionWord === "Editing") {
@@ -347,14 +367,14 @@
       const dialog = document.createElement("div");
 
       Object.assign(dialog.style, {
-        position: "absolute",
+        position: "fixed",
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
         background: "white",
         padding: "16px",
         borderRadius: "8px",
-        minWidth: "500px",
+        minWidth: annotatedIds.length > 0 ? "500px" : "320px",
         maxHeight: "80vh",
         overflowY: "auto"
       });
@@ -367,6 +387,9 @@
 
       const title = document.createElement("h3");
       title.textContent = "Select profile for annotation";
+      title.style.cursor = "grab"; 
+      title.style.userSelect = "none";
+
       dialog.appendChild(title);
 
       // --------------------------------------------------
@@ -376,7 +399,7 @@
       const columns = document.createElement("div");
 
       Object.assign(columns.style, {
-        display: "flex",
+        display: annotatedIds.length > 0 ? "flex" : "block",
         gap: "24px"
       });
 
@@ -403,16 +426,17 @@
       // --------------------------------------------------
 
       const right = document.createElement("div");
+      if (annotatedIds.length > 0) {
+        Object.assign(right.style, {
+          flex: "1"
+        });
 
-      Object.assign(right.style, {
-        flex: "1"
-      });
+        columns.appendChild(right);
 
-      columns.appendChild(right);
-
-      const rightHeader = document.createElement("h4");
-      rightHeader.textContent = "Add frame to:";
-      right.appendChild(rightHeader);
+        const rightHeader = document.createElement("h4");
+        rightHeader.textContent = "Add frame to:";
+        right.appendChild(rightHeader);
+      }
 
       // --------------------------------------------------
       // helper for radio rows
@@ -595,6 +619,9 @@
       });
 
       document.body.appendChild(backdrop);
+
+      _prepareForDragging(dialog);
+      _makeDraggable(title, dialog);
     });
   } 
 

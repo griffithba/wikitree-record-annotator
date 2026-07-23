@@ -20,13 +20,32 @@
         --wt-toolbar-bg: rgba(255, 171, 15, 0.85);
       }
 
+      #wt-annotation-layer {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 99998;
+        pointer-events: none;
+      }
+
+      #wt-overlay {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 99999;
+        cursor: default;
+        pointer-events: none;
+      }
+
       /* Style rule for temporary drawing box primitive */
       .wt-drawing-feedback {
         fill: var(--wt-draw-bg);
         stroke: var(--wt-draw-stroke);
         stroke-width: var(--wt-draw-stroke-width);
         stroke-dasharray: var(--wt-draw-stroke-dash);
-      }  
+      }
 
       .wt-annotation {
         /* SVG Properties */
@@ -45,7 +64,7 @@
       .wt-annotation.wt-hover {
         stroke: lime;
         stroke-width: 4px;
-        fill: rgba(0, 255, 0, 0.1);
+        cursor: pointer !important;
       }
 
       .wt-annotation.wt-selected {
@@ -96,7 +115,6 @@
         padding: 4px 6px;
         border-radius: 6px;
 
-        border: 2px solid rgb(255, 171, 15); 
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
       }
 

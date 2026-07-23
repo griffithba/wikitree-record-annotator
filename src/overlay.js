@@ -182,29 +182,6 @@
     document.getElementById("wt-overlay")?.remove();
     document.getElementById("wt-annotation-layer")?.remove();
     
-    // Annotation layer: visual only, no interaction
-    Object.assign(_annotationLayer.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      width: "100%",
-      height: "100%",
-      zIndex: "99998",
-      pointerEvents: "none"
-    });
-
-    // Overlay layer: interaction capture, no visuals
-    Object.assign(_overlay.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      width: "100%",
-      height: "100%",
-      zIndex: "99999",
-      cursor: "default",
-      pointerEvents: "none"
-    });
-
     // Insert layers in order (annotation below overlay)
     const host = _container.parentElement; 
 
@@ -218,18 +195,6 @@
     _overlay.addEventListener("mousedown", tools.onMouseDown);
     _overlay.addEventListener("mousemove", tools.onMouseMove);
     _overlay.addEventListener("mouseup", tools.onMouseUp);
-
-/*     // Container click: clear selection when clicking empty space
-    const host = _container.parentElement; 
-    host.addEventListener("click", (e) => {
-      if (!tools.isSelecting() || _shouldIgnoreClick()) return;
-
-      // If click was on an annotation, ignore
-      if (e.target.closest(".wt-annotation")) return;
-
-      tools.clearSelection();
-    });
- */  
   }
 
 
@@ -280,7 +245,6 @@
   
     // Reset incoming WT ID after first render to avoid highlighting a new frame later
     incomingWtId = null;
-
   }
 
 
