@@ -17,7 +17,7 @@
         --wt-draw-stroke: red;
         --wt-draw-stroke-width: 2px;
         --wt-draw-stroke-dash: 6, 4;
-        --wt-toolbar-bg: rgba(255, 171, 15, 0.85);
+        --wt-toolbar-bg: rgba(255, 171, 15, 0.9);
       }
 
       #wt-annotation-layer {

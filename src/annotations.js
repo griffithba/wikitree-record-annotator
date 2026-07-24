@@ -29,12 +29,14 @@
     const key = archiveProvider.getCurrentPageKey();
 
     if (samePage(key, _lastPageKey)) return;  // Already loaded
-    _lastPageKey = key;
 
     _annotations = await _getAnnotationsForCurrentPage() || [];
 
     console.log(`Loaded ${_annotations.length} annotations for page ${key.book} ${key.page}`, 
                 _annotations);
+    
+    _lastPageKey = key;
+
     // pre-fetch person data for all annotations simultaneously
     await Promise.all(
       _annotations.map(async a => {

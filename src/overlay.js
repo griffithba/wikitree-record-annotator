@@ -242,10 +242,8 @@
 
     await Promise.all(promises);
 
-    if (id !== _renderCount) {
-      console.log("Render interrupted by newer render request, aborting");
-      return;
-    }
+    // If a new render started then abort this one to avoid stacked frames
+    if (id !== _renderCount) return;
 
     updateSelectionStyles();
     ui.updateToolUI();
@@ -267,7 +265,7 @@
     const frame = document.createElementNS(svgNS, "polygon");
     frame.setAttribute("class", "wt-annotation");
 
-    const imageFrameCorners = _getRotatedRectangle(frameData);
+    const imageFrameCorners = tools.getRotatedRectangle(frameData);
 
     // 2. Project all 4 true corner coordinates
     const screenFrameCorners = await archiveProvider.projectImagePoints(imageFrameCorners);
@@ -353,46 +351,6 @@
     _annotationLayer.appendChild(frame);
   }
 
-
-  function _getRotatedRectangle(frameData) {
-    // Default angle to 0 if it's not present
-    const { x, y, w, h, a = 0 } = frameData;
-
-    // Optimization: Return unrotated corners instantly
-    if (a === 0 || a === 360 || a === -360) {
-        return [
-            { x: x,     y: y },
-            { x: x + w, y: y },
-            { x: x + w, y: y + h },
-            { x: x,     y: y + h }];
-    }
-
-    // Pre-calculate trigonometry
-    const cos = Math.cos(a);
-    const sin = Math.sin(a);
-
-    // Top-Left corner (Pivot)
-    const x0 = x;
-    const y0 = y;
-
-    // Top-Right corner
-    const x1 = x + w * cos;
-    const y1 = y + w * sin;
-
-    // Bottom-Right corner
-    const x2 = x + w * cos - h * sin;
-    const y2 = y + w * sin + h * cos;
-
-    // Bottom-Left corner
-    const x3 = x - h * sin;
-    const y3 = y + h * cos;
-
-    return [
-        { x: x0, y: y0 },
-        { x: x1, y: y1 },
-        { x: x2, y: y2 },
-        { x: x3, y: y3 }];
-  }
 
   function _addInvalidBadge(cornerPoints) {
     const badge = document.createElementNS(svgNS, "text");
