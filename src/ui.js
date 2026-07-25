@@ -12,12 +12,33 @@
   // Dialog element for editing annotation WT ID and notes
   let _wtEditor = null;
 
-  // Utility panel for import/export (created in createToolbar)
-  let _utilPanel = null; 
 
   function createToolbar() {
     // Make sure there is no stale toolbar from a previous page instance
     document.getElementById("wt-toolbar")?.remove();
+    
+    const toolbar = _createToolbarElement();
+
+    const header = _createToolbarHeader(toolbar);
+
+    toolbar.appendChild(header);
+
+    const container = _createToolbarContainer();
+
+    const content = _createNormalToolbarContent();
+    
+    container.appendChild(content);
+    toolbar.appendChild(container);
+    
+    // attach the toolbar
+    document.body.appendChild(toolbar);
+
+    _prepareForDragging(toolbar);
+    _makeDraggable(header, toolbar);
+  }
+
+
+  function _createToolbarElement() {
     const toolbar = document.createElement("div");
     toolbar.id = "wt-toolbar";
 
@@ -39,120 +60,272 @@
 
     // Merge them together cleanly
     Object.assign(toolbar.style, baseStyles, providerStyles);
+    return toolbar;
+  }
 
-    //
-    // Header
-    //
 
+  function _createToolbarHeader(toolbar) {
     const header = document.createElement("div");
+
+    header.id = "wt-toolbar-header";
 
     Object.assign(header.style, {
       display: "flex",
       alignItems: "center",
       gap: "8px",
+      padding: "4px 8px",
+      border: "1px solid #888",
+      borderRadius: "6px",
       fontWeight: "bold",
-      fontSize: "14px"
+      fontSize: "14px",
+      cursor: "grab"
     });
 
     const icon = document.createElement("img");
-
+    icon.draggable = false;
     icon.src = chrome.runtime.getURL(
       "icons/icon32.png"
     );
 
     Object.assign(icon.style, {
-      width: "24px",
-      height: "24px"
+      width: "32px",
+      height: "32px",
+      pointerEvents: "none"
     });
 
-    const title = document.createElement("div");
-    title.textContent = "WikiTree Annotator";
-
     header.appendChild(icon);
+
+    const title = document.createElement("div");
+    title.innerHTML = "WikiTree<br>Annotator";
     header.appendChild(title);
-    header.addEventListener("mousedown", startDrag);
 
-    toolbar.appendChild(header);
+    const versionText = document.createElement("div");
+    versionText.textContent = `v${chrome.runtime.getManifest().version}`;
 
-    // Make the toolbar draggable
-    function startDrag(e) {
-      const rect = toolbar.getBoundingClientRect();
+    Object.assign(versionText.style, {
+      fontSize: "10px",
+      color: "#272727",
+      marginTop: "2px"
+    });
 
-      // Convert from bottom-centered positioning
-      // to top-left positioning.
-      toolbar.style.left = `${rect.left}px`;
-      toolbar.style.top = `${rect.top}px`;
+    header.appendChild(versionText);
 
-      toolbar.style.bottom = "auto";
-      toolbar.style.transform = "none";
+    return header;
+  }
 
-      const offsetX = e.clientX - rect.left;
-      const offsetY = e.clientY - rect.top;
 
-      function drag(e) {
-        toolbar.style.left = `${e.clientX - offsetX}px`;
-        toolbar.style.top = `${e.clientY - offsetY}px`;
-      }
+  function _prepareForDragging(element) {
+    const rect = element.getBoundingClientRect();
 
-      function stop() {
-        document.removeEventListener("mousemove", drag);
-        document.removeEventListener("mouseup", stop);
-      }
+    element.style.left = `${rect.left}px`;
+    element.style.top = `${rect.top}px`;
 
-      document.addEventListener("mousemove", drag);
-      document.addEventListener("mouseup", stop);
-    }
+    element.style.bottom = "auto";
+    element.style.right = "auto";
 
-    //
-    // Button row
-    //
+    element.style.transform = "none";
+  }
+  
+  function _makeDraggable(handle, element) {
+    handle.addEventListener("mousedown", e => {
+      e.preventDefault();
 
-    const buttonRow = document.createElement("div");
+       const rect = element.getBoundingClientRect();
+       const offsetX = e.clientX - rect.left;
+       const offsetY = e.clientY - rect.top;
 
-    Object.assign(buttonRow.style, {
+       function drag(e) {
+         element.style.left = `${e.clientX - offsetX}px`;
+         element.style.top = `${e.clientY - offsetY}px`;
+       }
+
+       function stop() {
+         document.removeEventListener("mousemove", drag);
+         document.removeEventListener("mouseup", stop);
+       }
+
+       document.addEventListener("mousemove", drag);
+       document.addEventListener("mouseup", stop);
+     });
+  }
+
+
+  function _createToolbarContainer() {
+    const content = document.createElement("div");
+
+    content.id = "wt-toolbar-content";
+
+    Object.assign(content.style, {
       display: "flex",
       gap: "6px",
       flexWrap: "wrap"
     });
 
-    // Add tool buttons to button row
-    buttonRow.appendChild(_makeToolButton(
-      "Draw", 
-      "draw", 
-      async () => {
+    return content;
+  }
+
+  function _createNormalToolbarContent() {
+
+    const fragment = document.createDocumentFragment();
+
+    // Add tool buttons
+    fragment.appendChild(_makeButton({
+      label: "Draw",
+      title: "Draw a new frame",
+      tool: "draw",
+      onClick: async () => {
         const person = await _showDrawDialog();
+        if (!person) return;
 
-        if (!person) {
-          console.log("Draw cancelled");
-          return;
-        }
-
-        tools.setActiveDrawingPerson(person.wikitreeid);
-        tools.setTool("draw");
+        // if an annotation already exists go into add-a-frame mode
+        if (person.hasAnnotation) tools.selectAnnotation(person.wikitreeid);
+        // otherwise go into draw-new-annotation mode
+        else tools.setActiveDrawingPerson(person.wikitreeid);
+        setToolbarMode("edit");
+        tools.setTool("draw")
         updateToolUI();
       }
-    ));
-    buttonRow.appendChild(_makeToolButton("Select", "select"));
+    }));
+
+    fragment.appendChild(_makeButton({
+      label: "Edit",
+      title: "Edit existing frames",
+      tool: "edit"
+    }));
 
     // Button for toggling show/hide annotations
-    const toggleBtn = document.createElement("button");
-    // initial button label
-    toggleBtn.textContent = overlay.isVisible() ? "Hide" : "Show";
+    fragment.appendChild(_makeButton({
+      label: overlay.isVisible() ? "Hide" : "Show",
 
-    toggleBtn.addEventListener("click", () => {
-      overlay.setVisible(!overlay.isVisible());
-      toggleBtn.textContent = overlay.isVisible() ? "Hide" : "Show";
-      overlay.renderAnnotations();
+      title: overlay.isVisible() ? "Hide all Annotations" : "Show all Annotations",
+
+      onClick: (btn) => {
+        const visible = !overlay.isVisible();
+
+        overlay.setVisible(visible);
+
+        const label = visible ? "Hide" : "Show";
+        btn.textContent = label;
+        btn.title = `${label} all Annotations`;
+
+        overlay.renderAnnotations();
+      }
+    }));
+
+    return fragment;
+  }
+
+
+  /**
+   * Creates a button for the toolbar
+   * @param {string} label - Button label text
+   * @param {string} toolName - Optional tool identifier
+   * @param {Function} onClick - Optional custom click handler
+   * @returns {HTMLElement} Button element
+   */
+  function _makeButton({
+    label,
+    title = null,
+    tool = null,
+    onClick = null
+  }) {
+    const btn = document.createElement("button");
+
+    btn.textContent = label;
+
+    if (title) btn.title = title;
+
+    if (tool) {
+      btn.dataset.tool = tool;
+    }
+
+    Object.assign(btn.style, {
+      padding: "6px 10px",
+      fontSize: "14px",
+      borderRadius: "6px",
+      cursor: "pointer"
     });
 
-    // Add toggle button to button row
-    buttonRow.appendChild(toggleBtn);
-    
-    // Add button row to toolbar
-    toolbar.appendChild(buttonRow);
-    
-    // attach the toolbar
-    document.body.appendChild(toolbar);
+    btn.addEventListener("click", async () => {
+      if (onClick) {
+        await onClick(btn);
+      } else if (tool) {
+        tools.setTool(tool);
+        updateToolUI();
+      }
+    });
+
+    return btn;
+  }
+
+
+  function setToolbarMode(mode) {
+    const content = document.getElementById("wt-toolbar-content");
+
+    switch (mode) {
+        case "normal":
+            content.replaceChildren(_createNormalToolbarContent());
+            break;
+
+        case "edit":
+            content.replaceChildren(_createEditPanel());
+            break;
+    }
+  }
+
+
+  function _createEditPanel() {
+    const fragment = document.createDocumentFragment();
+
+    const title = document.createElement("div");
+    let id = tools.getSelectedAnnotationId();
+    let actionWord = "Editing";
+    if (!id) {
+      id = tools.getActiveDrawingPerson();
+      actionWord = "Drawing";
+    }
+    const name = personAPI.getName(id);
+    const birth = personAPI.getBirthDate(id);
+    const birthString = birth ? `b. ${birth}` : "";
+    const death = personAPI.getDeathDate(id);
+    const deathString = death ? `d. ${death}` : "";
+    title.innerHTML = `${actionWord} annotation for ${name}<br>${birthString}  ${deathString}`;
+    fragment.appendChild(title);
+
+    if (actionWord === "Editing") {
+      fragment.appendChild(_makeButton({
+        label: "➕",
+        title: "Add another frame to this annotation",
+        onClick: (btn) => {
+          // Toggle behavior              
+          tools.setActiveDrawingPerson(tools.getSelectedAnnotationId());
+          tools.setTool("draw");
+          updateToolUI();
+        }
+      }));
+    }
+
+    fragment.appendChild(_makeButton({
+      label: "Cancel",
+      title: "Cancel without saving", 
+      onClick: (btn) => {
+        tools.cancelChanges();
+        tools.setTool(null)
+      }
+    }));
+
+    if (actionWord === "Editing") {
+      fragment.appendChild(_makeButton({
+        label: "Done",
+        title: "Save changes",
+        onClick: (btn) => {
+          tools.clearSelection();
+          tools.setTool(null)
+        }
+      }))
+    }
+
+    return fragment;
   }
 
 
@@ -194,14 +367,14 @@
       const dialog = document.createElement("div");
 
       Object.assign(dialog.style, {
-        position: "absolute",
+        position: "fixed",
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
         background: "white",
         padding: "16px",
         borderRadius: "8px",
-        minWidth: "500px",
+        minWidth: annotatedIds.length > 0 ? "500px" : "320px",
         maxHeight: "80vh",
         overflowY: "auto"
       });
@@ -214,6 +387,9 @@
 
       const title = document.createElement("h3");
       title.textContent = "Select profile for annotation";
+      title.style.cursor = "grab"; 
+      title.style.userSelect = "none";
+
       dialog.appendChild(title);
 
       // --------------------------------------------------
@@ -223,7 +399,7 @@
       const columns = document.createElement("div");
 
       Object.assign(columns.style, {
-        display: "flex",
+        display: annotatedIds.length > 0 ? "flex" : "block",
         gap: "24px"
       });
 
@@ -250,22 +426,23 @@
       // --------------------------------------------------
 
       const right = document.createElement("div");
+      if (annotatedIds.length > 0) {
+        Object.assign(right.style, {
+          flex: "1"
+        });
 
-      Object.assign(right.style, {
-        flex: "1"
-      });
+        columns.appendChild(right);
 
-      columns.appendChild(right);
-
-      const rightHeader = document.createElement("h4");
-      rightHeader.textContent = "Add frame to:";
-      right.appendChild(rightHeader);
+        const rightHeader = document.createElement("h4");
+        rightHeader.textContent = "Add frame to:";
+        right.appendChild(rightHeader);
+      }
 
       // --------------------------------------------------
       // helper for radio rows
       // --------------------------------------------------
 
-      function addRadioRow(parent, wtId, displayText, tooltipText) {
+      function addRadioRow(parent, wtId, displayText, tooltipText, showLink = false) {
 
         const label = document.createElement("label");
 
@@ -287,6 +464,24 @@
         label.appendChild(radio);
         label.append(" " + displayText);
 
+        if (showLink) {
+          label.append(" ");
+
+          const link = document.createElement("a");
+          link.href = `https://www.wikitree.com/wiki/${encodeURIComponent(wtId)}`;
+          link.textContent = "🔗profile";
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.style.fontSize = "0.85em";
+
+          // Prevent clicking the link from selecting the radio button.
+          link.addEventListener("click", e => {
+            e.stopPropagation();
+          });
+
+          label.appendChild(link);
+        }
+
         parent.appendChild(label);
 
         return radio;
@@ -298,11 +493,11 @@
       let toolTip = null;
 
       unannotatedIds.forEach(id => {
-        const exactBirth = personAPI.getExactBirth(id);
-        if (exactBirth) toolTip = `Born ${exactBirth}`;
+        const exactBirth = personAPI.getBirthDate(id);
+        if (exactBirth && exactBirth.length > 4) toolTip = `Born ${exactBirth}`;
         else toolTip = null;
 
-        addRadioRow(left, id, personAPI.formatDisplayName(id), toolTip);
+        addRadioRow(left, id, personAPI.formatDisplayName(id), toolTip, true);
       });
 
       // --------------------------------------------------
@@ -341,8 +536,8 @@
       // --------------------------------------------------
 
       annotatedIds.forEach(id => {
-        const exactBirth = personAPI.getExactBirth(id);
-        if (exactBirth) toolTip = `Born ${exactBirth}`;
+        const exactBirth = personAPI.getBirthDate(id);
+        if (exactBirth && exactBirth.length > 4) toolTip = `Born ${exactBirth}`;
         else toolTip = null;
 
         addRadioRow(right, id, personAPI.formatDisplayName(id), toolTip);
@@ -413,64 +608,41 @@
           return;
         }
 
+        const hasAnnotation = annotatedIds.includes(selectedId);
+
         backdrop.remove();
 
         resolve({
-          wikitreeid: selectedId
+          wikitreeid: selectedId,
+          hasAnnotation
         });
       });
 
       document.body.appendChild(backdrop);
+
+      _prepareForDragging(dialog);
+      _makeDraggable(title, dialog);
     });
   } 
-
-
-  /**
-   * Creates a button for tool selection
-   * @param {string} label - Button label text
-   * @param {string} toolName - Tool identifier ("draw" | "select")
-   * @param {Function} onClick - Optional custom click handler
-   * @returns {HTMLElement} Button element
-   */
-  function _makeToolButton(label, toolName, onClick = null) {
-    const btn = document.createElement("button");
-
-    btn.textContent = label;
-    btn.dataset.tool = toolName;
-
-    Object.assign(btn.style, {
-      padding: "6px 10px",
-      fontSize: "12px",
-      cursor: "pointer"
-    });
-
-    btn.addEventListener("click", async () => {
-      if (onClick) {
-        await onClick();
-      } else {
-        tools.setTool(toolName);
-        updateToolUI();
-      }
-    });
-
-    return btn;
-  }
 
 
   /**
    * Updates cursor style on annotation boxes based on active tool
    */
   function updateToolUI() {
+    const selectedId = tools.getSelectedAnnotationId();
+
     document.querySelectorAll(".wt-annotation").forEach(el => {
-      if (tools.isSelecting()) {
+      const id = el.dataset.annotationId;
+      if (tools.isSelecting() &&
+          (!selectedId || id === selectedId)) {
         el.style.cursor = "pointer";
-        el.style.pointerEvents = "auto";
       } else {
         el.style.cursor = "default";
-        el.style.pointerEvents = "auto";
       }
+      el.style.pointerEvents = "auto";
     });
-
+ 
     _updateToolbarButtons();
 
     overlay.setDrawingState(tools.isDrawing());
@@ -621,77 +793,62 @@
   // ============================================================
 
   /**
-   * Creates toolbar with ➕, 📝, 🗑️ buttons for selected annotation
+   * Creates toolbar with 📝, 🗑️/↩️ buttons for selected annotation
    * @param {string} id - Annotation ID
    * @returns {HTMLElement} Toolbar div
    */
-  function createAnnotationToolbar(id) {
+  function createAnnotationToolbar(id, frameIndex) {
+
     const toolbar = document.createElement("div");
     toolbar.className = "annotation-toolbar";
 
-    const addBtn = document.createElement("button");
-    addBtn.textContent = "➕";
-    addBtn.title = "Add box";
-
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "📝";
-    editBtn.title = "Notes";
-
+    const annotation = annotationsAPI.getAnnotationByWtId(id);
+    const frame = annotation.frames[frameIndex];
     const deleteBtn = document.createElement("button");
-    deleteBtn.textContent = "🗑️";
-    deleteBtn.title = "Delete";
-  
-    // "➕" button: toggle "add box to annotation" mode
-    addBtn.onclick = (e) => {
-      e.stopPropagation();
+    const editBtn = document.createElement("button");
 
-      if (!tools.getSelectedAnnotationId()) return;
+    if (frame._delete) {
+      deleteBtn.textContent = "↩️";
+      deleteBtn.title = "Restore";
+    } else {
+      deleteBtn.textContent = "🗑️";
+      deleteBtn.title = "Delete";
 
-      // Toggle behavior              
-      tools.setActiveDrawingPerson(tools.getSelectedAnnotationId());
-      tools.setTool("draw");
-      updateToolUI();
-    };
+      editBtn.textContent = "📝";
+      editBtn.title = "Notes";
 
-    // "📝" button: open annotation note editor
-    editBtn.onclick = (e) => {
-      e.stopPropagation();
-      const frame = e.target.closest(".wt-annotation");
-      if (!frame) return;
-      const rect = frame.getBoundingClientRect();
-      const frameIndex = Number(frame.dataset.frameIndex);
-      tools.editFrame(id, frameIndex, rect.left + rect.width, rect.top + rect.height);
-    };
+      // "📝" button: open annotation note editor
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        const frame = e.target.closest(".wt-annotation");
+        if (!frame) return;
+        const rect = frame.getBoundingClientRect();
+        const frameIndex = Number(frame.dataset.frameIndex);
+        tools.editFrame(id, frameIndex, rect.left + rect.width, rect.top + rect.height);
+      };
+    }
 
-    // "🗑️" button: delete with confirmation
+    // 🗑️/↩️ button: delete/restore annotation frame
     deleteBtn.onclick = (e) => {
       e.stopPropagation();
 
-      if (!deleteBtn.dataset.armed) {
-        // First click: arm for deletion
-        deleteBtn.dataset.armed = "true";
-        deleteBtn.textContent = "⚠";
-        deleteBtn.style.color = "yellow";
-        deleteBtn.style.fontsize = "22px";
-        deleteBtn.title = "Click again to delete";
-        return;
+      if (frame._delete) {
+        annotationsAPI.unmarkForDeletion(id, frameIndex);
+      } else {
+        annotationsAPI.markForDeletion(id, frameIndex);
       }
+      overlay.renderAnnotations();
 
-      // Second click: execute deletion
-      const frameEl = deleteBtn.closest(".wt-annotation");
-      const wtId = frameEl.dataset.annotationId;
-      const frameIndex = Number(frameEl.dataset.frameIndex);
-
-      annotationsAPI.deleteFrame(wtId, frameIndex);
     };
 
-    toolbar.append(addBtn, editBtn, deleteBtn);
+    toolbar.append(editBtn, deleteBtn);
     return toolbar;
   }
 
 
   window.ui = {
     createToolbar,
+    setToolbarMode,
     updateToolUI,
     createAnnotationToolbar,
     createWtEditor,

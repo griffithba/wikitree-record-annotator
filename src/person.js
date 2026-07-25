@@ -52,12 +52,28 @@
     return text; 
   }
 
+
+  function getName(wtId) {
+    if (_people.has(wtId)) {
+      return _people.get(wtId).name;
+    }
+  }
   
-  function getExactBirth(wtId) {
+
+  function getBirthDate(wtId) {
     if (_people.has(wtId)) {
       const person = _people.get(wtId);
 
-      return person.birthDate || null;
+      return person.birthDate || person.birth || null;
+    }
+  }
+
+  
+  function getDeathDate(wtId) {
+    if (_people.has(wtId)) {
+      const person = _people.get(wtId);
+
+      return person.deathDate || person.death || null;
     }
   }
 
@@ -65,7 +81,9 @@
   window.personAPI = {
     prefetch,
     formatDisplayName,
-    getExactBirth
+    getName,
+    getBirthDate, 
+    getDeathDate
   }
 
 })();

@@ -4,7 +4,7 @@
 
   const svgNS = "http://www.w3.org/2000/svg";
 
-  let _currentTool = null;               // Active tool: null | "draw" | "select"
+  let _currentTool = null;               // Active tool: null | "draw" | "edit"
   function getTool() {
     return _currentTool;
   }
@@ -12,7 +12,7 @@
     return _currentTool === "draw";
   }
   function isSelecting() {
-    return _currentTool === "select";
+    return _currentTool === "edit";
   }
 
 
@@ -32,6 +32,9 @@
   function setActiveDrawingPerson(person) {
     _activeDrawingPerson = person;
   }
+  function getActiveDrawingPerson() {
+    return _activeDrawingPerson;
+  }
   function clearActiveDrawingPerson() {
     _activeDrawingPerson = null;
   }
@@ -43,6 +46,7 @@
   let _endX = 0, _endY = 0;               // Box end (in overlay pixels)
   let _box = null;                       // Temporary DOM element while dragging
   let _resizing = null;                  // Resize state (when dragging resize handles)
+  let _rotating = null;
 
 
   // ============================================================
@@ -56,13 +60,14 @@
    * @param {number} index - Index of the frame within the annotation
    */
   function selectAnnotation(id, index) {
-    // Save changes from previously selected frame
+    // We shouldn't be switching from one annotation to another via this routine.  
     if (_selectedAnnotationId && (_selectedAnnotationId !== id)) {
-      annotationsAPI.updateAnnotation(_selectedAnnotationId);
+      console.warn("Changing selection from one annotation to another without cleanly de-selecting the first.");
     }
     _selectedAnnotationId = id;
     _activeFrameIndex = index;
-    overlay.updateSelectionStyles();
+    ui.setToolbarMode("edit");
+    overlay.renderAnnotations();
   }
 
 
@@ -79,8 +84,22 @@
     _activeFrameIndex = null;
     overlay.updateSelectionStyles();
     ui.closeWtEditor();
+    setTool(null);
+    ui.setToolbarMode("normal");
   }
 
+
+  function cancelChanges() {
+    if (_selectedAnnotationId) {
+      annotationsAPI.cancelAnnotationChanges(_selectedAnnotationId);
+    }
+    _selectedAnnotationId = null;
+    _activeFrameIndex = null;
+    ui.closeWtEditor();
+    setTool(null);
+    ui.setToolbarMode("normal");
+    overlay.renderAnnotations();
+  }
 
   // ============================================================
   // MOUSE HANDLERS (DRAWING BOXES)
@@ -187,10 +206,11 @@
     _box = null;
 
     // Set up to have the frame be selected in case of further editing
-    _selectedAnnotationId = _activeDrawingPerson;
-    _activeFrameIndex = await annotationsAPI.addFrame(_activeDrawingPerson, newFrame);
+    if (_activeDrawingPerson) _selectedAnnotationId = _activeDrawingPerson;
+    _activeFrameIndex = await annotationsAPI.addFrame(_selectedAnnotationId, newFrame);
     clearActiveDrawingPerson();
-    setTool("select");
+    setTool("edit");
+    ui.setToolbarMode("edit");
     ui.updateToolUI();
   }
 
@@ -218,6 +238,8 @@
       initialNote: frameData.note || "",
 
       onSave: async ({note}) => {
+        annotationsAPI.ensureUndoSnapshot(id);
+
         frameData.note = note;
 
         // Mark this frame as having unsaved changes
@@ -230,9 +252,9 @@
 
 
   /**
-   * Switch between tools (draw/select) with toggle behavior
-   * When switching away from "select", clears selection
-   * @param {string} nextTool - Tool to switch to: "draw" | "select"
+   * Switch between tools (draw/edit) with toggle behavior
+   * When switching away from "edit", clears selection
+   * @param {string} nextTool - Tool to switch to: "draw" | "edit"
    */
   function setTool(nextTool) {
     const prevTool = _currentTool;
@@ -241,7 +263,7 @@
     _currentTool = (_currentTool === nextTool) ? null : nextTool;
 
     // Clean up when leaving select mode
-    if (prevTool === "select" && _currentTool !== "select") {
+    if (prevTool === "edit" && _currentTool !== "edit") {
       if (_activeDrawingPerson !== _selectedAnnotationId) clearSelection();
       ui.closeWtEditor();
     }
@@ -255,15 +277,21 @@
   }
 
   // ============================================================
-  // RESIZING ANNOTATION BOXES
+  // RESIZING and ROTATING ANNOTATION BOXES
   // ============================================================
+
+  function addManipulationHandles(box, wtId) {
+    _addResizeHandles(box, wtId);
+    _addRotateHandle(box, wtId); 
+  }
+
 
   /**
    * Creates corner resize handles (nw, ne, sw, se) on selected box
    * @param {SVGPolygonElement} box - Annotation box SVG polygon element
    * @param {string} id - Annotation ID
    */
-  function addResizeHandles(box, id) {
+  function _addResizeHandles(box, id) {
     const corners = ["nw", "ne", "sw", "se"];
   
     // Extract the raw points array directly from the polygon attributes
@@ -311,6 +339,7 @@
     box.parentNode.appendChild(group);
   }
 
+
   /**
    * Initiates resize drag from a handle
    * Saves initial state and sets up event listeners
@@ -323,19 +352,20 @@
     const annotation = annotationsAPI.getAnnotationByWtId(id);
     if (!annotation) return;
 
+    annotationsAPI.ensureUndoSnapshot(id);
+
     const frameIndex = Number(frameEl.dataset.frameIndex);
     const frame = annotation.frames[frameIndex];
 
-    const { x, y, w, h } = frame;
-  
+    // Get world coordinates for all rotated corners using your helper
+    const unmappedCorners = getRotatedRectangle(frame);
     const corners = {
-      nw: { x: x,     y: y     },
-      ne: { x: x + w, y: y     },
-      sw: { x: x,     y: y + h },
-      se: { x: x + w, y: y + h }
+      nw: unmappedCorners[0],
+      ne: unmappedCorners[1],
+      se: unmappedCorners[2],
+      sw: unmappedCorners[3]
     };
 
-    // Lookup table
     const oppositeCorners = {
       nw: "se",
       ne: "sw",
@@ -346,10 +376,11 @@
     _resizing = {
       id,
       frameIndex,
-      fixedCorner:  corners[oppositeCorners[corner]]
+      draggedCorner: corner,
+      // Store fixed corner position in world space
+      fixedCorner: corners[oppositeCorners[corner]]
     };
 
-    // Prevent text selection during drag
     document.body.style.userSelect = "none";
     document.body.style.webkitUserSelect = "none";
 
@@ -358,43 +389,70 @@
   }
 
 
-  /**
-   * Handles mousemove during resize drag
-   * Converts screen deltas to image space and updates box dimensions
-   * @param {MouseEvent} e - mousemove event
-   */
   async function _onResizeMove(e) {
     if (!_resizing) return;
+
     const rect = overlay.getOverlayElement().getBoundingClientRect();
-    
-    const [imagePoint] = await archiveProvider.unprojectScreenPoints([
+    const [movingWorld] = await archiveProvider.unprojectScreenPoints([
       {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top
       }
     ]);
-    
-    const fixed = _resizing.fixedCorner;
-    const moving = imagePoint;
 
-    // STEP 3: Apply delta to annotation box in image space
     const annotation = annotationsAPI.getAnnotationByWtId(_resizing.id);
     if (!annotation) return;
 
     const frame = annotation.frames[_resizing.frameIndex];
+    const angle = frame.a || 0; 
+    const fixedWorld = _resizing.fixedCorner;
 
-    frame.x = Math.min(fixed.x, moving.x);
-    frame.y = Math.min(fixed.y, moving.y);
-    frame.w = Math.abs(moving.x - fixed.x);
-    frame.h = Math.abs(moving.y - fixed.y);
+    // STEP 1: Un-rotate the mouse vector relative to the fixed corner
+    const dx = movingWorld.x - fixedWorld.x;
+    const dy = movingWorld.y - fixedWorld.y;
 
-    // Enforce minimum box size
-    frame.w = Math.max(20, frame.w);
-    frame.h = Math.max(20, frame.h);
+    const cos = Math.cos(-angle);
+    const sin = Math.sin(-angle);
 
-    // Mark this frame as needing to be saved
+    const localX = dx * cos - dy * sin;
+    const localY = dx * sin + dy * cos;
+
+    // STEP 2: Calculate new dimensions enforcing min dimensions 
+    // (Preserves direction sign before taking absolute size)
+    const MIN_SIZE = 20;
+  
+    // Calculate raw width/height relative to fixed corner
+    let rawW = Math.abs(localX);
+    let rawH = Math.abs(localY);
+
+    // Enforce minimum size while honoring mouse direction
+    const signX = localX >= 0 ? 1 : -1;
+    const signY = localY >= 0 ? 1 : -1;
+
+    if (rawW < MIN_SIZE) rawW = MIN_SIZE;
+    if (rawH < MIN_SIZE) rawH = MIN_SIZE;
+
+    // Re-apply direction signs to account for minimum clamps
+    const effectiveLocalX = rawW * signX;
+    const effectiveLocalY = rawH * signY;
+
+    // STEP 3: Dynamically locate the local NW corner relative to fixed corner
+    // The local NW corner is always the minimum local X and minimum local Y coordinates
+    const localNW = {
+      x: Math.min(0, effectiveLocalX),
+      y: Math.min(0, effectiveLocalY)
+    };
+
+    // STEP 4: Rotate localNW back into World Space to set frame.x and frame.y
+    const cosRot = Math.cos(angle);
+    const sinRot = Math.sin(angle);
+
+    frame.x = fixedWorld.x + (localNW.x * cosRot - localNW.y * sinRot);
+    frame.y = fixedWorld.y + (localNW.x * sinRot + localNW.y * cosRot);
+    frame.w = rawW;
+    frame.h = rawH;
+
     frame._dirty = true;
-
     overlay.renderAnnotations();
   }
 
@@ -415,22 +473,272 @@
     document.removeEventListener("mouseup", _stopResize);
   }
 
+
+  function _addRotateHandle(box, wtId) {
+    const group = document.createElementNS(svgNS, "g");
+    group.classList.add("rotate-handle-group");
+    group.dataset.annotationId = wtId;
+    group.dataset.frameIndex = box.dataset.frameIndex;
+
+    const points = box.getAttribute("points").split(" ").map(p => {
+      const [x, y] = p.split(",").map(Number);
+      return { x, y };
+    });
+
+    // Compute the angle of the line for the handle
+    const nw = points[0];
+    const se = points[2];
+    const dx = se.x - nw.x;
+    const dy = se.y - nw.y;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len;
+    const uy = dy / len;
+
+    // Length of the line
+    const extension = Math.max(25, Math.min(50, len * 0.2));
+
+    // End of the line
+    const handleX = se.x + ux * extension;
+    const handleY = se.y + uy * extension;
+
+    // Draw the line
+    const line = document.createElementNS(svgNS, "line");
+
+    line.setAttribute("x1", se.x);
+    line.setAttribute("y1", se.y);
+    line.setAttribute("x2", handleX);
+    line.setAttribute("y2", handleY);
+
+    line.setAttribute("stroke", "black");
+    line.setAttribute("stroke-width", "2");
+
+    // Draw the circular handle
+    const circle = document.createElementNS(svgNS, "circle");
+    circle.classList.add("rotate-handle");
+
+    circle.setAttribute("cx", handleX);
+    circle.setAttribute("cy", handleY);
+    circle.setAttribute("r", "12");
+
+    circle.setAttribute("fill", "white");
+    circle.setAttribute("stroke", "black");
+    circle.setAttribute("stroke-width", "2");
+
+    // Add the icon
+    const icon = document.createElementNS(svgNS, "text");
+
+    icon.setAttribute("x", handleX);
+    icon.setAttribute("y", handleY);
+
+    icon.setAttribute("text-anchor", "middle");
+    icon.setAttribute("dominant-baseline", "central");
+
+    icon.style.fontSize = "16px";
+    icon.style.userSelect = "none";
+
+    icon.textContent = "↺";
+    icon.style.pointerEvents = "none";
+
+    // Add the tooltip
+    const title = document.createElementNS(svgNS, "title");
+    title.textContent = "Tilt frame";
+
+    circle.appendChild(title);
+
+    group.appendChild(line);
+    group.appendChild(circle);
+    group.appendChild(icon);
+
+    circle.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+      _startRotate(e, box); 
+    });
+
+    // Append to the parent SVG layer, not inside the polygon
+    box.parentNode.appendChild(group);
+
+  }
   
+
+  async function _startRotate(e, box) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const id = box.dataset.annotationId;
+    const frameIndex = Number(box.dataset.frameIndex);
+
+    const annotation = annotationsAPI.getAnnotationByWtId(id);
+    const frame = annotation.frames[frameIndex];
+
+    // Save undo snapshot if needed
+    annotationsAPI.ensureUndoSnapshot(id);
+
+    // Retrieve the pivot (upper-left corner)
+    const pivot = {
+      x: frame.x,
+      y: frame.y
+    };
+
+    // Convert mouse position to be relative to the viewer element
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const mousePt = await archiveProvider.unprojectScreenPoints([{x, y}]);
+
+    // Initial mouse angle
+    const startAngle = Math.atan2(
+      mousePt[0].y - pivot.y,
+      mousePt[0].x - pivot.x
+    );
+
+    _rotating = {
+      annotationId: id,
+      frameIndex,
+      pivot,
+      startAngle,
+      initialRotation: frame.a || 0
+    };
+
+    document.addEventListener("mousemove", _onRotateMove);
+    document.addEventListener("mouseup", _stopRotate);
+  }
+
+
+  async function _onRotateMove(e) {
+    // Convert mouse position to be relative to the viewer element
+    const rect = overlay.getOverlayElement().getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const mousePt = await archiveProvider.unprojectScreenPoints([{x, y}]);
+
+    const angle = Math.atan2(
+      mousePt[0].y - _rotating.pivot.y,
+      mousePt[0].x - _rotating.pivot.x
+    );
+
+    const delta = angle - _rotating.startAngle;
+
+    const annotation = annotationsAPI.getAnnotationByWtId(_rotating.annotationId);
+    const frame = annotation.frames[_rotating.frameIndex];
+    
+    // Limit rotation to +/- pi/2 (90 degrees)
+    const halfPi = Math.PI / 2;
+    const newAngle = _rotating.initialRotation + delta;
+    // Shift range, apply modulo, and shift back
+    frame.a = Math.max(-halfPi, Math.min(halfPi, newAngle));
+
+    // Mark this frame as needing to be saved
+    frame._dirty = true;
+
+    overlay.renderAnnotations();
+  }
+
+
+  function _stopRotate() {
+    if (!_rotating) return;
+
+    const annotation = annotationsAPI.getAnnotationByWtId(_rotating.annotationId);
+    const frame = annotation.frames[_rotating.frameIndex];
+
+    if (frame.a === Math.PI / 2) {
+      const newX = frame.x - frame.h;
+      //const newY = frame.y;
+      const newW = frame.h;
+      const newH = frame.w;
+
+      frame.x = newX;
+      frame.w = newW;
+      frame.h = newH;
+      delete frame.a;
+
+      overlay.renderAnnotations();
+
+    } else if (frame.a === -Math.PI / 2) {
+      //const newX = frame.x;
+      const newY = frame.y - frame.w;
+      const newW = frame.h;
+      const newH = frame.w;
+
+      frame.y = newY;
+      frame.w = newW;
+      frame.h = newH;
+      delete frame.a;
+
+      overlay.renderAnnotations();
+    }
+
+    _rotating = null;
+
+    // Restore text selection
+    //document.body.style.userSelect = "";
+    //document.body.style.webkitUserSelect = "";
+
+    document.removeEventListener("mousemove", _onRotateMove);
+    document.removeEventListener("mouseup", _stopRotate);
+
+  }
+
+
+  function getRotatedRectangle(frameData) {
+    // Default angle to 0 if it's not present
+    const { x, y, w, h, a = 0 } = frameData;
+
+    // Optimization: Return unrotated corners instantly
+    if (a === 0) {
+        return [
+            { x: x,     y: y },
+            { x: x + w, y: y },
+            { x: x + w, y: y + h },
+            { x: x,     y: y + h }];
+    }
+
+    // Pre-calculate trigonometry
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+
+    // Top-Left corner (Pivot)
+    const x0 = x;
+    const y0 = y;
+
+    // Top-Right corner
+    const x1 = x + w * cos;
+    const y1 = y + w * sin;
+
+    // Bottom-Right corner
+    const x2 = x + w * cos - h * sin;
+    const y2 = y + w * sin + h * cos;
+
+    // Bottom-Left corner
+    const x3 = x - h * sin;
+    const y3 = y + h * cos;
+
+    return [
+        { x: x0, y: y0 },
+        { x: x1, y: y1 },
+        { x: x2, y: y2 },
+        { x: x3, y: y3 }];
+  }
+
+
+
   window.tools = {
     setTool,
     getTool,
     isDrawing,
     isSelecting,
     setActiveDrawingPerson,
+    getActiveDrawingPerson,
     clearActiveDrawingPerson,
     selectAnnotation,
     clearSelection,
-    addResizeHandles,
+    cancelChanges,
+    addManipulationHandles,
     getSelectedAnnotationId,
     getActiveFrameIndex,
     editFrame,
     onMouseDown,
     onMouseMove,
-    onMouseUp
+    onMouseUp,
+    getRotatedRectangle
   }
 })();

@@ -83,6 +83,7 @@ export async function addFrame(site, book, page, info, wikitreeid, frame) {
     form.append("y", frame.y);
     form.append("w", frame.w);
     form.append("h", frame.h);
+    if (frame.a) form.append("a", frame.a);
     if (frame.note) form.append("note", frame.note);
 
     const res = await fetch(url, {

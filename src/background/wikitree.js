@@ -61,8 +61,9 @@ async function _fetchWikiTreeProfile(wtId) {
 
     return {
       name: _buildDisplayName(person) || null,
-      birthDate: _formatDate(person.BirthDate), 
+      birthDate: _extractDate(person.BirthDate), 
       birthYear: _extractYear(person.BirthDate),
+      deathDate: _extractDate(person.DeathDate),
       deathYear: _extractYear(person.DeathDate)
     };
   } catch (e) {
@@ -92,11 +93,21 @@ function _extractYear(dateStr) {
   return year === "0000" ? null : year;
 }
 
-function _formatDate(dateStr) {
-  if (!dateStr) return null;
 
-  const [year, month, day] = dateStr.split("-");
+function _extractDate(dateString) {
+  if (!dateString) return "";
 
-  if (year === "0000" || month === "00" || day === "00") return null;
-  return dateStr;
+  const months = [
+    "Jan","Feb","Mar","Apr","May","Jun",
+    "Jul","Aug","Sep","Oct","Nov","Dec"
+  ];
+
+  const [year, month, day] = dateString.split("-");
+
+  const formattedMonth = month === "00" ? null : months[Number(month) - 1];
+  if (!formattedMonth) return null;  // No more specific than the year, so return null
+  const formattedDay = day === "00" ? "" : Number(day);
+  const formattedYear = year === "0000" ? "" : year;
+
+  return `${formattedDay} ${formattedMonth} ${formattedYear}`;
 }

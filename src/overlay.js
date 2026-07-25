@@ -36,15 +36,10 @@
   }
 
 
-  let _renderInProgress = false;
-  let _renderQueued = false;
-
-
   let _visible = true;
 
   function setVisible(v) {
     _visible = v;
-    renderAnnotations();
   }
 
   function isVisible() {
@@ -90,6 +85,8 @@
   function updateSelectionStyles() {
     const layer = overlay.getAnnotationLayerElement();
 
+    const selectedId = tools.getSelectedAnnotationId();
+
     document.querySelectorAll(".wt-annotation").forEach(frame => {
       // Skip the loop if this element is an HTML toolbar
       if (frame.tagName.toLowerCase() !== "polygon") {
@@ -102,14 +99,17 @@
       let toolbarWrapper = layer.querySelector(
         `foreignObject[data-annotation-id="${id}"][data-toolbar-for="${frameIndex}"]`
       );
-       
-      if (String(id) === String(tools.getSelectedAnnotationId())) {
+
+      if (id === selectedId) {
         const annotation = annotationsAPI.getAnnotationByWtId(id);
         const frameData = annotation.frames[Number(frameIndex)];
 
         frame.classList.add("wt-selected");
         if (frameData?._dirty) {
           frame.classList.add("wt-unsaved-changes");
+        }
+        if (frameData?._delete) {
+          frame.classList.add("wt-pending-delete");
         }
 
         if (!toolbarWrapper) {
@@ -141,7 +141,7 @@
             toolbarWrapper.style.overflow = "visible";
 
             // 3. Generate HTML toolbar and inject it
-            const toolbar = ui.createAnnotationToolbar(id);
+            const toolbar = ui.createAnnotationToolbar(id, frameIndex);
 
             // attach the datasets to the toolbar 
             // so e.target.closest(".wt-annotation") inside button actions can still resolve it!
@@ -151,7 +151,9 @@
 
             toolbarWrapper.appendChild(toolbar);
             layer.appendChild(toolbarWrapper);
-            tools.addResizeHandles(frame, id);
+            if (!frameData?._delete) {
+              tools.addManipulationHandles(frame, id);
+            }
           } 
           
         } else if (tools.getActiveFrameIndex() !== Number(frameIndex)) {
@@ -160,6 +162,10 @@
           layer.querySelector(
             `.resize-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
           )?.remove();
+          layer.querySelector(
+            `.rotate-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+          )?.remove();
+
         }
       } else {
         frame.classList.remove("wt-selected");
@@ -170,7 +176,10 @@
         layer.querySelector(
           `.resize-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
         )?.remove();
-      }
+        layer.querySelector(
+          `.rotate-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+        )?.remove();
+     }
     });
   }
   
@@ -180,29 +189,6 @@
     document.getElementById("wt-overlay")?.remove();
     document.getElementById("wt-annotation-layer")?.remove();
     
-    // Annotation layer: visual only, no interaction
-    Object.assign(_annotationLayer.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      width: "100%",
-      height: "100%",
-      zIndex: "99998",
-      pointerEvents: "none"
-    });
-
-    // Overlay layer: interaction capture, no visuals
-    Object.assign(_overlay.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      width: "100%",
-      height: "100%",
-      zIndex: "99999",
-      cursor: "default",
-      pointerEvents: "none"
-    });
-
     // Insert layers in order (annotation below overlay)
     const host = _container.parentElement; 
 
@@ -216,17 +202,6 @@
     _overlay.addEventListener("mousedown", tools.onMouseDown);
     _overlay.addEventListener("mousemove", tools.onMouseMove);
     _overlay.addEventListener("mouseup", tools.onMouseUp);
-
-    // Container click: clear selection when clicking empty space
-    const host = _container.parentElement; 
-    host.addEventListener("click", (e) => {
-      if (!tools.isSelecting() || _shouldIgnoreClick()) return;
-
-      // If click was on an annotation, ignore
-      if (e.target.closest(".wt-annotation")) return;
-
-      tools.clearSelection();
-    });
   }
 
 
@@ -254,30 +229,26 @@
     // Load annotations for current page if not yet loaded
     await annotationsAPI.loadAnnotationsIfNeeded();
 
-    // Render each annotation's frames
     const annotations = annotationsAPI.getAnnotations();
 
     const promises = [];
-
+    // Render each annotation's frames
     for (const a of annotations) {
       for (const [index, frameData] of a.frames.entries()) {
-        promises.push(_renderFrame(a, frameData, index));
+        promises.push(_renderFrame(a, frameData, index, id));
       }
     }
 
     await Promise.all(promises);
 
-    if (id !== _renderCount) {
-      console.log("Render interrupted by newer render request, aborting");
-      return;
-    }
+    // If a new render started then abort this one to avoid stacked frames
+    if (id !== _renderCount) return;
 
     updateSelectionStyles();
     ui.updateToolUI();
   
     // Reset incoming WT ID after first render to avoid highlighting a new frame later
     incomingWtId = null;
-
   }
 
 
@@ -288,17 +259,12 @@
    * @param {Object} frameData - Frame coordinates {x, y, w, h} in image space
    * @param {number} index - Frame index within annotation
    */
-  async function _renderFrame(a, frameData, index) {
+  async function _renderFrame(a, frameData, index, renderId) {
     // 1. Create an SVG polygon
     const frame = document.createElementNS(svgNS, "polygon");
     frame.setAttribute("class", "wt-annotation");
 
-    const imageFrameCorners = [          
-          {x: frameData.x, y: frameData.y},  // top-left
-          {x: frameData.x + frameData.w, y: frameData.y},  // top-right
-          {x: frameData.x + frameData.w, y: frameData.y + frameData.h},  // bottom-right
-          {x: frameData.x, y: frameData.y + frameData.h}  // bottom-left
-    ];
+    const imageFrameCorners = tools.getRotatedRectangle(frameData);
 
     // 2. Project all 4 true corner coordinates
     const screenFrameCorners = await archiveProvider.projectImagePoints(imageFrameCorners);
@@ -329,10 +295,13 @@
     // Click handler: select in select mode, or open WikiTree profile
     frame.addEventListener("click", (e) => {
       if (tools.isSelecting()) {
-        e.stopPropagation();
         const id = frame.dataset.annotationId;
-        const frameIndex = Number(frame.dataset.frameIndex);
-        tools.selectAnnotation(id, frameIndex);
+        // if there isn't currently a selected annotation, or if current and new are the same
+        if (!tools.getSelectedAnnotationId() || tools.getSelectedAnnotationId() === id) {
+          e.stopPropagation();
+          const frameIndex = Number(frame.dataset.frameIndex);
+          tools.selectAnnotation(id, frameIndex);
+        }
         return;
       }
 
@@ -372,6 +341,11 @@
     if (!a.wtIdFound) {
       _addInvalidBadge(screenFrameCorners);
     } 
+
+    // Check to make sure this render is still the latest one; if not, abort to avoid stacked frames
+    if (renderId !== _renderCount) {
+      return;
+    }
 
     _annotationLayer.appendChild(frame);
   }
