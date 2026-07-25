@@ -71,6 +71,7 @@
         stroke: orange;
         stroke-width: 3px;
         fill: rgba(255, 165, 0, 0.15);
+        cursor: default !important;
       }
 
       .wt-annotation.wt-selected.wt-unsaved-changes {
