@@ -229,11 +229,10 @@
     // Load annotations for current page if not yet loaded
     await annotationsAPI.loadAnnotationsIfNeeded();
 
-    // Render each annotation's frames
     const annotations = annotationsAPI.getAnnotations();
 
     const promises = [];
-
+    // Render each annotation's frames
     for (const a of annotations) {
       for (const [index, frameData] of a.frames.entries()) {
         promises.push(_renderFrame(a, frameData, index, id));
