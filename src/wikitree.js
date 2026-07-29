@@ -2,8 +2,9 @@
   const archiveProviders = window.archiveProviders;
 
   const pageData = document.getElementById("pageData")?.dataset;
+  const wtId = pageData?.mnamedb;
+  if (!wtId) return;
   const name = `${pageData.mfirstname} ${pageData.mlastnameatbirth}`; 
-  const wtId = pageData.mnamedb;
 
   async function processCitationLinks() {
 
