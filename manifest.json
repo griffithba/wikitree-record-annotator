@@ -33,6 +33,7 @@
       "matches": ["https://www.wikitree.com/wiki/*"],
       "js": [
         "src/sites/riksarkivet.js", 
+        "src/sites/digitalarkivet.js",
         "src/sites/matricula.js",
         "src/wtplus.js",
         "src/wikitree.js"
@@ -41,7 +42,23 @@
     {
       "matches": ["https://sok.riksarkivet.se/bildvisning/*"],
       "js": [
+        "src/sites/openseadragon.js",
         "src/sites/riksarkivet.js",
+        "src/theme.js",
+        "src/tools.js",
+        "src/wtplus.js",
+        "src/annotations.js",
+        "src/overlay.js",
+        "src/ui.js",
+        "src/person.js",
+        "src/content.js"
+      ]
+    },
+    {
+      "matches": ["https://nye.digitalarkivet.no/source/*"],
+      "js": [
+        "src/sites/openseadragon.js",
+        "src/sites/digitalarkivet.js",
         "src/theme.js",
         "src/tools.js",
         "src/wtplus.js",
@@ -71,10 +88,20 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/sites/riksarkivet-page.js"
+        "src/sites/riksarkivet-page.js",
+        "src/sites/openseadragon-page.js"
       ],
       "matches": [
         "https://sok.riksarkivet.se/*"
+      ]
+    },
+    {
+      "resources": [
+        "src/sites/digitalarkivet-page.js",
+        "src/sites/openseadragon-page.js"
+      ],
+      "matches": [
+        "https://nye.digitalarkivet.se/*"
       ]
     },
     {
@@ -101,6 +128,7 @@
       "matches": [
         "https://www.wikitree.com/*",
         "https://sok.riksarkivet.se/*",
+        "https://nye.digitalarkivet.no/*",
         "https://data.matricula-online.eu/*"
       ]
     }

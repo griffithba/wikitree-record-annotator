@@ -3,12 +3,15 @@
 
   const site = "riksarkivet";
 
+  const openseadragon = window.openseadragon;
+
+
   /**
    * Waits for OpenSeadragon container to load, then initializes overlay
    * Polls every 200ms until container is found
    */
   function waitForViewerReady() {
-    const container = getViewerContainer();
+    const container = openseadragon.getViewerContainer();
 
     if (container) {
       _injectPageScript();
@@ -25,20 +28,24 @@
       return;
     }
 
-    const script = document.createElement("script");
-    script.id = "wta-riksarkivet-page-script";
-    script.src = chrome.runtime.getURL("src/sites/riksarkivet-page.js");
-    script.onload = () => script.remove();
+    const osdScript = document.createElement("script");
+    osdScript.id = "wta-openseadragon-page-script";
+    osdScript.src = chrome.runtime.getURL("src/sites/openseadragon-page.js");
 
-    (document.head || document.documentElement).appendChild(script);
+    osdScript.onload = () => {
+      const siteScript = document.createElement("script");
+      siteScript.id = "wta-riksarkivet-page-script";
+      siteScript.src = chrome.runtime.getURL("src/sites/riksarkivet-page.js");
+      siteScript.onload = () => siteScript.remove();
 
+      (document.head || document.documentElement).appendChild(siteScript);
+
+      osdScript.remove();
+    };
+
+    (document.head || document.documentElement).appendChild(osdScript);
   }
 
-
-  // get the OpenSeadragon container (the element the overlay should attach to)
-  function getViewerContainer() {
-    return document.querySelector(".openseadragon-canvas");
-  }
 
   /**
    * Extracts page identifier from current URL
@@ -112,51 +119,6 @@
   }
 
 
-  async function projectImagePoints(imagePoints) {
-    const requestId = crypto.randomUUID();
-
-    return new Promise((resolve) => {
-
-      function onMessage(event) {
-        if (event.source !== window) return;
-        if (event.data?.type !== "WT_PROJECT_IMAGE_POINTS_RESULT") return;
-        if (event.data.requestId !== requestId) return;
-
-        window.removeEventListener("message", onMessage);
-        resolve(event.data.points);
-      }
-
-      window.addEventListener("message", onMessage);
-
-      window.postMessage({
-        type: "WT_PROJECT_IMAGE_POINTS",
-        requestId,
-        points: imagePoints
-      });
-    });
-  }
-
-
-  async function unprojectScreenPoints(screenPoints) {
-    return new Promise((resolve) => {
-      function onMessage(event) {
-        if (event.source !== window) return;
-        if (event.data?.type !== "WT_UNPROJECT_SCREEN_POINTS_RESULT") return;
-
-        window.removeEventListener("message", onMessage);
-        resolve(event.data.points);
-      }
-
-      window.addEventListener("message", onMessage);
-
-      window.postMessage({
-        type: "WT_UNPROJECT_SCREEN_POINTS",
-        points: screenPoints
-      });
-    })
-  }
-
-
   /**
    * Grabs the page URL and strips off everything after the image ID
    * @returns {string} clean URL
@@ -171,30 +133,18 @@
   }
 
 
-  // Tracks viewport changes (pan/zoom/rotate) and re-renders annotations to maintain alignment
-  function initializeViewportTracking() {
-    window.addEventListener("message", e => {
-      if (e.source !== window) return;
-
-      if (e.data?.type === "RIKSARKIVET_VIEW_CHANGED") {
-        overlay.renderAnnotations();
-      }
-    });
-  }
-
-
   const _provider = {
     waitForViewerReady,
-    getViewerContainer,
+    getViewerContainer: openseadragon.getViewerContainer,
     getReferenceFromPage,
     getCleanPageUrl,
-    initializeViewportTracking,
+    initializeViewportTracking: openseadragon.initializeViewportTracking,
     site,
     getPageKey,
     getCurrentPageKey,
     buildUrlFromBookPage: (book, page) => (`https://sok.riksarkivet.se/bildvisning/${book}_${page}`),
-    projectImagePoints,
-    unprojectScreenPoints
+    projectImagePoints: openseadragon.projectImagePoints,
+    unprojectScreenPoints: openseadragon.unprojectScreenPoints
   };
 
   window.archiveProviders ??= [];
