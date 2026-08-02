@@ -7,7 +7,6 @@
     return document.querySelector(".openseadragon-canvas");
   }
 
-
   async function projectImagePoints(imagePoints) {
     const requestId = crypto.randomUUID();
 

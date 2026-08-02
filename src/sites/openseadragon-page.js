@@ -63,17 +63,13 @@
 
     const debouncedSend = _debounce(() => _sendViewport(viewer), 10);
 
-    viewer.addHandler("animation", debouncedSend);
+    //viewer.addHandler("animation", debouncedSend);
+    viewer.addHandler("animation", () => _sendViewport(viewer));
 
     viewer.addHandler("open", () => _sendViewport(viewer));
 
     // Initial state
     _sendViewport(viewer);
-  }
-  
-
-  function _quantize(v) {
-    return Math.round(v * 4) / 4;   // nearest quarter image pixel
   }
 
 
@@ -81,11 +77,15 @@
     if (!viewer) return;
     const bounds = viewer.viewport.getBounds(true);
 
+    // Keep the full viewport precision. Earlier versions quantized these
+    // values to reduce render frequency, but render cancellation now prevents
+    // overlapping renders, so quantization is unnecessary and can cause visible
+    // lagging and jumping on viewers with different coordinate scales.
     const vp = {
-        x: _quantize(bounds.x),
-        y: _quantize(bounds.y),
-        w: _quantize(bounds.width),
-        h: _quantize(bounds.height),
+        x: (bounds.x),
+        y: (bounds.y),
+        w: (bounds.width),
+        h: (bounds.height),
         rotation: ((viewer.viewport.getRotation(true) % 360) + 360) % 360
     };
 

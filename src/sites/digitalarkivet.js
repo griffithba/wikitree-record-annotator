@@ -9,32 +9,50 @@
 (() => {
   "use strict";
 
+  const openseadragon = window.openseadragon;
+  
   const id = "digitalarkivet";
-
-  let _currentViewport = null; // in image space coordinates
-
-  let _firstViewportRenderDone = false;
 
   /**
    * Waits for OpenSeadragon container to load, then initializes overlay
    * Polls every 200ms until container is found
    */
   function waitForViewerReady() {
-    const el = document.querySelector(".openseadragon-canvas");
+    const container = openseadragon.getViewerContainer();
 
-    if (el) {
+    if (container) {
+      _injectPageScript();
       initOverlay();
-      syncViewport();
       return;
     }
 
     setTimeout(waitForViewerReady, 200);
   }
 
-  // get the OpenSeadragon container (the element the overlay should attach to)
-  function getViewerContainer() {
-    return document.querySelector(".openseadragon-container");
+
+  function _injectPageScript() {
+    if (document.getElementById("wta-digitalarkivet-page-script")) {
+      return;
+    }
+
+    const osdScript = document.createElement("script");
+    osdScript.id = "wta-openseadragon-page-script";
+    osdScript.src = chrome.runtime.getURL("src/sites/openseadragon-page.js");
+
+    osdScript.onload = () => {
+      const siteScript = document.createElement("script");
+      siteScript.id = "wta-digitalarkivet-page-script";
+      siteScript.src = chrome.runtime.getURL("src/sites/digitalarkivet-page.js");
+      siteScript.onload = () => siteScript.remove();
+
+      (document.head || document.documentElement).appendChild(siteScript);
+
+      osdScript.remove();
+    };
+
+    (document.head || document.documentElement).appendChild(osdScript);
   }
+
 
   /**
    * Extracts page identifier from current URL
@@ -46,7 +64,7 @@
   }
   function getPageKey(href) {
     const match = href.match(/\/source\/([^/?#]+)/i);
-    console.log("getPageKey", href, match);
+console.log("getPageKey", href, match);
     return match ? match[1] : "unknown";
   }
 
@@ -95,37 +113,13 @@
       const clone = valueEl.cloneNode(true);
       clone.querySelector('a.toggle')?.remove();
 
-      return clone.innerText.trim();
+      const reference = clone.innerText.trim();
+  console.log("getReferenceFromPage", reference);
+      return(reference);
     }
     return null;
   }
 
-  /**
-   * Parses IIIF xywh viewport from URL hash
-   * @returns {{x, y, w, h}|null} Viewport in image space or null if not found
-   */
-  function _getViewport() {
-    return {
-      x: 0,
-      y: 0,
-      w: 1,
-      h: 1
-    };
-  }
-
-  /**
-   * Syncs currentViewport from URL hash
-   * Call before rendering to pick up any viewer pan/zoom changes
-   */
-  function syncViewport() {
-    console.log("syncViewport");
-    _currentViewport = _getViewport();
-  }
-
-  function getCurrentViewport() {
-    console.log("getCurrentViewport", _currentViewport);
-    return _currentViewport;
-  }
 
   /**
    * Grabs the page URL and strips off everything after the image ID
@@ -140,35 +134,19 @@
     return url.origin + url.pathname;
   }
 
-  // Tracks viewport changes (pan/zoom) and re-renders annotations to maintain alignment
-  function initializeViewportTracking() {
-
-    window.addEventListener(
-      "hashchange",
-      () => {
-        overlay.renderAnnotations();
-
-        if (!_firstViewportRenderDone) {
-
-          ui.updateToolUI();
-
-          _firstViewportRenderDone = true;
-        }
-      }
-    );
-  }
 
   const _provider = {
     waitForViewerReady,
-    getViewerContainer,
+    getViewerContainer: openseadragon.getViewerContainer,
     getCurrentPageKey,
     getReferenceFromPage,
-    syncViewport,
-    getCurrentViewport,
     getCleanPageUrl,
-    initializeViewportTracking,
+    initializeViewportTracking: openseadragon.initializeViewportTracking,
     id,
-    getPageKey
+    getPageKey,
+    projectImagePoints: openseadragon.projectImagePoints,
+    unprojectScreenPoints: openseadragon.unprojectScreenPoints
+
   };
 
   window.archiveProviders ??= [];
