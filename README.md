@@ -39,7 +39,7 @@ The extension currently requires manual installation and is not yet published in
 Archive-specific functionality is encapsulated in provider modules that implement a common interface, allowing the core extension to support multiple archive providers while minimizing provider-specific code.
 ### Archive provider API
 To add a new provider module, the following functions and objects will need to be provided: 
-+ function **waitForViewerReady()** - Once the page is loaded, calls initOverlay() and then returns.
++ function **waitForViewerReady()** - Returns *true* once the page is loaded, or false if the extension shouldn't run on this page.
 + function **getViewerContainer()** - Returns the element that the annotation overlay should attach to.
 + function **initializeViewportTracking()** - Adds an event listener that will update the stored current viewport and trigger annotation re-rendering after pan/zoom/rotate.
 + function **projectImagePoints(imagePoints)** - Converts an array of points from image coordinates to screen coordinates.
@@ -47,10 +47,12 @@ To add a new provider module, the following functions and objects will need to b
 + function **getCurrentPageKey()** - Returns page identifier for the current page as {site, book, page}.
 + function **getPageKey(href)** - Returns the page identifier for the passed in URL. 
 + function **getReferenceFromPage()** - Returns citation reference text from the page.
-+ function **getCleanPageUrl()** - Returns URL with any position/zoom or other data stripped off. 
 + function **buildUrlFromBookPage(book, page)** - Builds a URL that points to the supplied record book and page.
 + *optional* function **getToolbarPosition()** - Overrides the default bottom center location for the toolbar.
 + const **site** - Name to differentiate between different archive providers. Needs to match a unique part of the site URL. 
+
+#### OpenSeadragon API
+Since more than one archive provider uses the OpenSeadragon viewer, common functions have been pulled out into a separate OpenSeadragon module. That module implements the following functions: **waitForViewerReady(_injectPageScript)**, **getViewerContainer()**, **projectImagePoints(imagePoints)**, and **unprojectScreenPoints(screenPoints)**. With the exception of **waitForViewerReady(_injectPageScript)**, these functions can simply be exposed by the provider module. See the Riksarkivet and Digitalarkivet modules for examples.  
 
 Each provider module needs to add itself to the list of providers like this: 
 ```

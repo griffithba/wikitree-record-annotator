@@ -15,17 +15,24 @@ const archiveProvider = window.archiveProviders[0]; // make sure only one provid
 const wtplusAPI = window.wtplusAPI;
 
 let incomingWtId = null;         // ID from incoming WikiTree profile (if navigated from one)
-let preFillWtIdOnCreate = false; // flag to pre-fill the editor with the incoming WikiTree profile ID on annotation creation
 
 
-if (window.__wtOverlayInitialized) {
-  console.log("WikiTree overlay already initialized");
-} else {
+async function initialize() {
+  if (window.__wtOverlayInitialized) {
+    console.log("WikiTree overlay already initialized");
+    return;
+  }
+
   window.__wtOverlayInitialized = true;
 
-  archiveProvider.waitForViewerReady();
+  const viewerReady = await archiveProvider.waitForViewerReady();
+
+  if (viewerReady) {
+    initOverlay();
+  }
 }
 
+initialize();
 
 /**
  * Extracts WikiTree ID from URL search params (from incoming profile)
@@ -55,9 +62,6 @@ function initOverlay() {
 
   // Get incoming WikiTree profile ID if present
   incomingWtId = getWtIdFromUrl();
-
-  // Set flag to pre-fill the editor with the incoming WikiTree profile ID
-  if (incomingWtId) preFillWtIdOnCreate = true;
     
   overlay.initialize(archiveProvider.getViewerContainer());
 

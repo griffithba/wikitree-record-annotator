@@ -2,10 +2,34 @@
   "use strict";
 
 
+  /**
+   * Waits for OpenSeadragon container to load.
+   * Polls every 200ms until container is found
+   */
+  function waitForViewerReady(injectPageScript) {
+    return new Promise(resolve => {
+      function check() {
+        const container = getViewerContainer();
+
+        if (container) {
+          injectPageScript();
+          resolve(true);
+          return;
+        }
+
+        setTimeout(check, 200);
+      }
+
+      check();
+    });
+  }
+
+
   // get the OpenSeadragon container (the element the overlay should attach to)
   function getViewerContainer() {
     return document.querySelector(".openseadragon-canvas");
   }
+
 
   async function projectImagePoints(imagePoints) {
     const requestId = crypto.randomUUID();
@@ -65,6 +89,7 @@
 
 
   window.openseadragon = {
+    waitForViewerReady,
     getViewerContainer,
     projectImagePoints,
     unprojectScreenPoints,

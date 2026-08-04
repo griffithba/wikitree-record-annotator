@@ -6,23 +6,6 @@
   const openseadragon = window.openseadragon;
 
 
-  /**
-   * Waits for OpenSeadragon container to load, then initializes overlay
-   * Polls every 200ms until container is found
-   */
-  function waitForViewerReady() {
-    const container = openseadragon.getViewerContainer();
-
-    if (container) {
-      _injectPageScript();
-      initOverlay();
-      return;
-    }
-
-    setTimeout(waitForViewerReady, 200);
-  }
-
-
   function _injectPageScript() {
     if (document.getElementById("wta-riksarkivet-page-script")) {
       return;
@@ -134,10 +117,9 @@
 
 
   const _provider = {
-    waitForViewerReady,
+    waitForViewerReady: () => openseadragon.waitForViewerReady(_injectPageScript),
     getViewerContainer: openseadragon.getViewerContainer,
     getReferenceFromPage,
-    getCleanPageUrl,
     initializeViewportTracking: openseadragon.initializeViewportTracking,
     site,
     getPageKey,

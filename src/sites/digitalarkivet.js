@@ -1,33 +1,11 @@
-/*  This is copied from riksarkivet.js with a few changes. It's not working yet. Image coordinates aren't in the URL like with RA, so they'll 
- *  have to be pulled from OpenSeadragon. The URL doesn't change on pan/zoom, so another mechanism will be needed for triggering re-rendering 
- *  the annotations. The link that's saved for citations redirects to something different. Page keys should be taken from the permalink, not 
- *  the one that it redirects to, in order for the WikiTree side of the extension to be able to highlight annotated sources and suggest 
- *  citations. Attaching the WT ID to the URL to enable annotation highlighting and pre-filling of the WT ID on a new annotation may not work, 
- *  since the URL redirect will probably cause the attached WT ID to be dropped.  
- */
-
 (() => {
   "use strict";
 
   const openseadragon = window.openseadragon;
   
-  const id = "digitalarkivet";
+  const site = "digitalarkivet";
 
-  /**
-   * Waits for OpenSeadragon container to load, then initializes overlay
-   * Polls every 200ms until container is found
-   */
-  function waitForViewerReady() {
-    const container = openseadragon.getViewerContainer();
-
-    if (container) {
-      _injectPageScript();
-      initOverlay();
-      return;
-    }
-
-    setTimeout(waitForViewerReady, 200);
-  }
+  let _permalinkPromise = null;
 
 
   function _injectPageScript() {
@@ -55,18 +33,85 @@
 
 
   /**
-   * Extracts page identifier from current URL
+   * Extracts page identifier from permalink on current page, not URL.
    * Used as the key for storing/loading annotations per page
    * @returns {string} Page key (e.g., "P123_456")
    */
-  function getCurrentPageKey() {
-    return getPageKey(window.location.href);
+  async function getCurrentPageKey() {
+
+    const link = await _getPermalink();
+
+    const key = getPageKey(link);
+    if (!key) return null;
+    key.book = _getCurrentBook();
+
+    return key;
   }
-  function getPageKey(href) {
-    const match = href.match(/\/source\/([^/?#]+)/i);
-console.log("getPageKey", href, match);
-    return match ? match[1] : "unknown";
+
+  function getPageKey(link) {
+    if (!link) return null;
+
+    const match = link.pathname.match(/^\/(kb\d+)$/i);
+
+    if (!match) return null;
+
+    return {
+      site,
+      book: null,
+      page: match[1]
+    };
   }
+
+
+  async function _getPermalink() {
+    if (_permalinkPromise) {
+      return _permalinkPromise;
+    }
+
+    _permalinkPromise = _findPermalink();
+
+    try {
+      return await _permalinkPromise;
+    } finally {
+      _permalinkPromise = null;
+    }
+  }
+
+
+  async function _findPermalink() {
+    const button = document.querySelector(
+      'button[aria-label="Lenker"]'
+    );
+
+    if (!button) return null;
+
+    const wasExpanded =
+      button.getAttribute("aria-expanded") === "true";
+
+    if (!wasExpanded) {
+      button.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    const link = document.querySelector(
+      'a[href^="https://goto.digitalarkivet.no/"]'
+    );
+
+    return link ? new URL(link.href) : null;
+  }
+
+  function _getCurrentBook() {
+    const labels = document.querySelectorAll("div");
+
+    for (const label of labels) {
+      if (label.textContent.trim() === "Arkivreferanse") {
+        return label.nextElementSibling?.textContent.trim() ?? null;
+      }
+    }
+
+    return null;
+  }
+
 
   /**
    * Extracts source reference text from page
@@ -121,29 +166,14 @@ console.log("getPageKey", href, match);
   }
 
 
-  /**
-   * Grabs the page URL and strips off everything after the image ID
-   * @returns {string} clean URL
-   */
-  function getCleanPageUrl() {
-    const url = new URL(window.location.href);
-
-    // remove everything after the base path
-    url.hash = "";
-
-    return url.origin + url.pathname;
-  }
-
-
   const _provider = {
-    waitForViewerReady,
+    waitForViewerReady: () => openseadragon.waitForViewerReady(_injectPageScript),
     getViewerContainer: openseadragon.getViewerContainer,
     getCurrentPageKey,
-    getReferenceFromPage,
-    getCleanPageUrl,
-    initializeViewportTracking: openseadragon.initializeViewportTracking,
-    id,
     getPageKey,
+    getReferenceFromPage,
+    initializeViewportTracking: openseadragon.initializeViewportTracking,
+    site,
     projectImagePoints: openseadragon.projectImagePoints,
     unprojectScreenPoints: openseadragon.unprojectScreenPoints
 

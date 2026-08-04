@@ -34,7 +34,7 @@
 
 
   async function _getCachedPage() {
-    const keyObject = archiveProvider.getCurrentPageKey();
+    const keyObject = await archiveProvider.getCurrentPageKey();
     _site = keyObject.site;
     _book = keyObject.book;
     _page = keyObject.page;

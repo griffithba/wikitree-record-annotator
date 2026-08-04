@@ -19,21 +19,34 @@
       (document.head || document.documentElement).appendChild(script);
   }
 
+
+  /**
+   * Waits for viewer container to load.
+   * Polls every 200ms until container is found
+   */
   function waitForViewerReady() {
-    // If we're on something other than a record image page then bail out
-    if (!new URL(window.location.href).searchParams.has("pg")) return;
-    
-    const container = getViewerContainer();
-
-    if (container) {
-      _currentViewerContainer = container;
-      _injectPageScript();
-      initOverlay();
-      return;
+    // If we're on something other than a record image page, bail out.
+    if (!new URL(window.location.href).searchParams.has("pg")) {
+      return Promise.resolve(false);
     }
-    else setTimeout(waitForViewerReady, 200);
-  }
 
+    return new Promise(resolve => {
+      function check() {
+        const container = getViewerContainer();
+
+        if (container) {
+          _currentViewerContainer = container;
+          _injectPageScript();
+          resolve(true);
+          return;
+        }
+
+        setTimeout(check, 200);
+      }
+
+      check();
+    });
+  }
   
   function getViewerContainer() {
     return document.querySelector(".ol-viewport");
@@ -280,7 +293,6 @@
     waitForViewerReady,
     getViewerContainer,
     getReferenceFromPage,
-    getCleanPageUrl,
     initializeViewportTracking,
     site,
     getPageKey,

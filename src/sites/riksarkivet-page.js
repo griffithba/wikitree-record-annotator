@@ -33,6 +33,9 @@
   }
 
 
+  // Give the shared OpenSeadragon page-side code a Riksalarkivet-specific
+  // way to find the viewer. Everything after this point—viewport tracking,
+  // image/screen coordinate conversion, etc.—is handled by openseadragon-page.js.
   openseadragonPage.initialize(getViewer);
 
 })();
