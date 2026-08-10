@@ -1,10 +1,10 @@
 # WikiTree Record Annotator
 <img src="icons/icon128.png" align="left" width="128" height="128" style="margin-right: 15px;">
 
-This Chrome/Chromium browser extension overlays WikiTree-linked annotations directly onto online historical record images. It currently supports records hosted by the [Swedish National Archives (Riksarkivet)](https://sok.riksarkivet.se/) and [Matricula Online](https://data.matricula-online.eu/en/), but is designed to be expandable to other archive sites. Annotations are stored in a shared annotation database hosted on WikiTree+.<br clear="left"/>
+This Chrome/Chromium browser extension overlays WikiTree-linked annotations directly onto online historical record images. It currently supports records hosted by the [Swedish National Archives (Riksarkivet)](https://sok.riksarkivet.se/), [Norwegian National Archives (Digitalarkivet)](https://www.digitalarkivet.no/), and [Matricula Online](https://data.matricula-online.eu/en/), but is designed to be expandable to other archive sites. Annotations are stored in a shared annotation database hosted on WikiTree+.<br clear="left"/>
 
 ## Features
-Annotations appear as highlighted frames over the record image. Their size and position are tied to image coordinates, so they remain correctly positioned during zooming and panning. Hovering the mouse over a box displays information about the linked WikiTree profile, and an optional note (see Lena Persdotter in the screenshot), and clicking on the box will open the profile in a new tab. A toolbar enables the user to draw new annotations, select existing annotations (to edit or delete), and toggle between hiding or showing all annotations. 
+Annotations appear as highlighted frames over the record image. Their size and position are tied to image coordinates, so they remain correctly positioned during zooming, panning, and rotating. Hovering the mouse over a box displays information about the linked WikiTree profile and an optional note (see Lena Persdotter in the screenshot), and clicking on the box will open the profile in a new tab. A toolbar enables the user to draw new annotations, select existing annotations (to edit or delete), and toggle between hiding or showing all annotations. 
 
 A single annotation can have several frames, which is useful if a person appears more than once on a record page, or if their name spans two lines. (See Anders Andersson in the screenshot.)
 
@@ -30,9 +30,9 @@ The extension currently requires manual installation and is not yet published in
 6. Select the extracted extension folder
 
 ## Current limitations
-- Currently supports only Riksarkivet and Matricula Online
+- Currently supports Riksarkivet, Digitalarkivet, and Matricula Online
 - Chrome/Chromium-based browsers only
-- Mobile (touchscreen) support is experimental
+- Mobile (touchscreen) support works for viewing annotations, but not for creating or editing
 
 # Technical details
 ## Archive provider architecture
