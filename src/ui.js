@@ -12,14 +12,16 @@
   // Dialog element for editing annotation WT ID and notes
   let _wtEditor = null;
 
+  const _unannotatedCountDisplay = document.createElement("div");
+  _unannotatedCountDisplay.id = "wt-unannotated-count";
 
-  function createToolbar() {
+  async function createToolbar() {
     // Make sure there is no stale toolbar from a previous page instance
     document.getElementById("wt-toolbar")?.remove();
     
     const toolbar = _createToolbarElement();
 
-    const header = _createToolbarHeader(toolbar);
+    const header = await _createToolbarHeader(toolbar);
 
     toolbar.appendChild(header);
 
@@ -64,7 +66,7 @@
   }
 
 
-  function _createToolbarHeader(toolbar) {
+  async function _createToolbarHeader(toolbar) {
     const header = document.createElement("div");
 
     header.id = "wt-toolbar-header";
@@ -99,6 +101,28 @@
     title.innerHTML = "WikiTree<br>Annotator";
     header.appendChild(title);
 
+    const info = document.createElement("div");
+
+    Object.assign(info.style, {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-end",
+      marginLeft: "8px"
+    });
+
+    const { unannotatedIds } = await _getProfilesForCurrentPage();
+    const unannotatedCount = unannotatedIds.length;
+
+    _unannotatedCountDisplay.textContent = unannotatedCount;
+    _unannotatedCountDisplay.title = `${unannotatedCount} unannotated profiles on this page`;
+    Object.assign(_unannotatedCountDisplay.style, {
+      fontSize: "12px",
+      fontWeight: "bold",
+      color: "#c00"
+    });
+
+    info.appendChild(_unannotatedCountDisplay);
+
     const versionText = document.createElement("div");
     versionText.textContent = `v${chrome.runtime.getManifest().version}`;
 
@@ -108,11 +132,21 @@
       marginTop: "2px"
     });
 
-    header.appendChild(versionText);
-
+    info.appendChild(versionText);
+    header.appendChild(info);
+    
     return header;
   }
 
+
+  async function updateUnannotatedCount() {
+    const { unannotatedIds } = await _getProfilesForCurrentPage();
+    const count = unannotatedIds.length;
+
+    _unannotatedCountDisplay.textContent = count || "";
+    _unannotatedCountDisplay.style.display = count ? "" : "none";
+    _unannotatedCountDisplay.title = `${count} unannotated profiles on this page`;
+}
 
   function _prepareForDragging(element) {
     const rect = element.getBoundingClientRect();
@@ -126,6 +160,7 @@
     element.style.transform = "none";
   }
   
+
   function _makeDraggable(handle, element) {
     handle.addEventListener("mousedown", e => {
       e.preventDefault();
@@ -211,6 +246,8 @@
         overlay.renderAnnotations();
       }
     }));
+
+    updateUnannotatedCount();
 
     return fragment;
   }
@@ -329,10 +366,8 @@
   }
 
 
-  // Display a dialog with list of annotated and unannotated profiles for the current page, and 
-  // let user select one to start drawing annotation frames for that profile. Returns the selected 
-  // profile object or null if dialog was cancelled.
-  async function _showDrawDialog() {
+  // Returns the lists of annotated and unannotated profiles for the current page
+  async function _getProfilesForCurrentPage() {
     const key = archiveProvider.getCurrentPageKey();
     const referrers = await wtplusAPI.getPageReferrers(key.site, key.book, key.page);
 
@@ -341,6 +376,16 @@
 
     const unannotatedReferrers = referrers.filter(r => !annotatedIds.includes(r.wikitreeid));
     const unannotatedIds = unannotatedReferrers.map(r => r.wikitreeid);
+
+    return { annotatedIds, unannotatedIds };
+  }
+
+
+  // Display a dialog with list of annotated and unannotated profiles for the current page, and 
+  // let user select one to start drawing annotation frames for that profile. Returns the selected 
+  // profile object or null if dialog was cancelled.
+  async function _showDrawDialog() {
+    const { annotatedIds, unannotatedIds } = await _getProfilesForCurrentPage();
 
     // pre-fetch person data for all unannotated IDs simultaneously (annotated IDs were already pre-fetched)
     await Promise.all(unannotatedIds.map(async wtId => personAPI.prefetch(wtId)));
@@ -850,6 +895,7 @@
     createToolbar,
     setToolbarMode,
     updateToolUI,
+    updateUnannotatedCount,
     createAnnotationToolbar,
     createWtEditor,
     openWtEditor,

@@ -8,6 +8,165 @@
   let _permalinkPromise = null;
 
 
+  // Wrapper for openseadragon.waitForViewerReady that handles the old viewer case
+  async function waitForViewerReady() {
+    if (_isOldViewer()) {
+      await _handleOldViewer();
+      return false;
+    }
+
+    return openseadragon.waitForViewerReady(_injectPageScript);
+  }
+
+
+  function _isOldViewer() {
+    const url = new URL(window.location.href);
+
+    return (
+      url.hostname === "media.digitalarkivet.no" &&
+      /\/view\/\d+\/\d+\/\d+$/.test(url.pathname)
+    );
+  }
+
+
+  async function _handleOldViewer() {
+    const quickLink = document.querySelector("#reader_link")?.value;
+
+    if (!quickLink) {
+      console.warn("Digitalarkivet old viewer: Quick Link not found.");
+      return;
+    }
+
+    let newViewerUrl;
+
+    try {
+      const url = new URL(quickLink);
+
+      if (url.hostname === "www.digitalarkivet.no") {
+        url.hostname = "goto.digitalarkivet.no";
+      }
+
+      newViewerUrl = url.href;
+    } catch (e) {
+      console.error(
+        "Digitalarkivet old viewer: invalid Quick Link:",
+        quickLink,
+        e
+      );
+      return;
+    }
+
+    // Create the modal.
+    const overlay = document.createElement("div");
+
+    Object.assign(overlay.style, {
+      position: "fixed",
+      inset: "0",
+      zIndex: "2147483647",
+      background: "rgba(0, 0, 0, 0.45)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    });
+
+    const dialog = document.createElement("div");
+
+    Object.assign(dialog.style, {
+      background: "white",
+      color: "#222",
+      width: "min(520px, calc(100vw - 40px))",
+      padding: "24px",
+      borderRadius: "8px",
+      boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
+      fontFamily: "Arial, sans-serif",
+      lineHeight: "1.5"
+    });
+
+    const title = document.createElement("h2");
+    title.textContent = "Digitalarkivet link needs updating";
+    title.style.margin = "0 0 16px";
+
+    const message = document.createElement("p");
+    message.textContent =
+      "The link you followed uses Digitalarkivet's old image viewer. " +
+      "The WikiTree Record Annotator only works with the new viewer. " +
+      "Please consider updating the link in the WikiTree profile so that it points to the new viewer.";
+
+    const linkLabel = document.createElement("p");
+    linkLabel.textContent = "New viewer link:";
+    linkLabel.style.marginBottom = "4px";
+
+    const link = document.createElement("a");
+    link.href = newViewerUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = newViewerUrl;
+    link.style.wordBreak = "break-all";
+
+    const buttons = document.createElement("div");
+
+    Object.assign(buttons.style, {
+      display: "flex",
+      gap: "12px",
+      justifyContent: "flex-end",
+      marginTop: "24px"
+    });
+
+    const openButton = document.createElement("a");
+    openButton.href = newViewerUrl;
+    openButton.target = "_blank";
+    openButton.rel = "noopener noreferrer";
+    openButton.textContent = "Open new viewer";
+
+    Object.assign(openButton.style, {
+      padding: "8px 14px",
+      background: "#1769aa",
+      color: "white",
+      textDecoration: "none",
+      borderRadius: "4px"
+    });
+
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.textContent = "Stay here";
+
+    Object.assign(closeButton.style, {
+      padding: "8px 14px",
+      border: "1px solid #aaa",
+      background: "white",
+      borderRadius: "4px",
+      cursor: "pointer"
+    });
+
+    closeButton.addEventListener("click", () => {
+      overlay.remove();
+    });
+
+    buttons.append(closeButton, openButton);
+
+    dialog.append(
+      title,
+      message,
+      linkLabel,
+      link,
+      buttons
+    );
+
+    overlay.append(dialog);
+    document.body.append(overlay);
+
+    // Allow Escape to dismiss the dialog.
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        overlay.remove();
+        document.removeEventListener("keydown", handleKeyDown);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+  }
+
+
   function _injectPageScript() {
     if (document.getElementById("wta-digitalarkivet-page-script")) {
       return;
@@ -50,12 +209,20 @@
 
   function getPageKey(link) {
     if (!link) return null;
+    const parsed = new URL(link);
 
-    const match = link.pathname.match(/^\/(kb\d+)$/i);
+    if (parsed.hostname === "nye.digitalarkivet.no" || parsed.hostname === "media.digitalarkivet.no") {
+      return { status: "needs-fix" };
+    }
 
-    if (!match) return null;
+    const match = link.match(/^\/(kb\d+)$/i);
+
+    if (!match) {
+      return { status: "not-applicable" };
+    }
 
     return {
+      status: "valid",
       site,
       book: null,
       page: match[1]
@@ -97,6 +264,10 @@
       'a[href^="https://goto.digitalarkivet.no/"]'
     );
 
+    if (!wasExpanded) {
+      button.click();
+    }
+    
     return link ? new URL(link.href) : null;
   }
 
@@ -118,66 +289,59 @@
    * @returns {string} source reference
    */
   async function getReferenceFromPage() {
-    const items = document.querySelectorAll('.item');
+    const labels = document.querySelectorAll("div.text-label");
 
-    for (const item of items) {
-      const valueEl = item.querySelector('.value');
-      if (!valueEl) continue;
+    let archive = "";
+    let archiveVolume = "";
+    let timePeriod = "";
 
-      const text = valueEl.innerText.trim();
+    for (const label of labels) {
+      const name = label.innerText.trim();
+      const value = label.nextElementSibling?.innerText.trim() || "";
 
-      // Expand the text so we don't get a truncated version
-      const expandLink =
-        valueEl.querySelector('a.toggle.less');
+      switch (name) {
+        case "Arkiv":
+          archive = value;
+          break;
 
-      if (expandLink) {
+        case "Arkivstykke/Arkivmappe":
+          archiveVolume = value;
+          break;
 
-        expandLink.click();
-
-        await new Promise(r =>
-          setTimeout(r, 50)
-        );
+        case "Tidsrom":
+          timePeriod = value;
+          break;
       }
-
-      // Must contain ID label in either language
-      const hasIdLabel =
-        /bildid:/i.test(text) || /image id:/i.test(text);
-
-      if (!hasIdLabel) continue;
-
-      // Re-read AFTER expansion
-      const fullText =
-        valueEl.innerText.trim();
-
-      // Exclude simple fields (just ID or URL)
-      const looksLikeCitation =
-        fullText.includes(",") && fullText.length > 50;
-
-      if (!looksLikeCitation) continue;
-
-      const clone = valueEl.cloneNode(true);
-      clone.querySelector('a.toggle')?.remove();
-
-      const reference = clone.innerText.trim();
-  console.log("getReferenceFromPage", reference);
-      return(reference);
     }
-    return null;
+
+    if (!archive || !archiveVolume) return null;
+
+    const parts = [
+      archive,
+      archiveVolume,
+      timePeriod ? `(${timePeriod})` : "" 
+    ].filter(Boolean);
+
+    const referenceString = parts.join(", ");
+console.log("Reference string:", referenceString);
+    return referenceString;
   }
 
 
   const _provider = {
-    waitForViewerReady: () => openseadragon.waitForViewerReady(_injectPageScript),
-    getViewerContainer: openseadragon.getViewerContainer,
+    site,
+    waitForViewerReady,
     getCurrentPageKey,
     getPageKey,
-    getReferenceFromPage,
-    initializeViewportTracking: openseadragon.initializeViewportTracking,
-    site,
-    projectImagePoints: openseadragon.projectImagePoints,
-    unprojectScreenPoints: openseadragon.unprojectScreenPoints
-
+    getReferenceFromPage
   };
+
+  if (window.openseadragon) {
+    _provider.getViewerContainer = openseadragon.getViewerContainer;
+    _provider.initializeViewportTracking = openseadragon.initializeViewportTracking;
+    _provider.projectImagePoints = openseadragon.projectImagePoints;
+    _provider.unprojectScreenPoints = openseadragon.unprojectScreenPoints;
+  }
 
   window.archiveProviders ??= [];
   window.archiveProviders.push(_provider);

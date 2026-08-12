@@ -40,14 +40,14 @@
   }
   function getPageKey(href) {
     let match = href.match(/\/bildvisning\/([^/?#]+)/i);
-    if (!match) return null;
+    if (!match) return { status: "not-applicable" };
     let [book, page] = match[1]?.split("_") || [null, null];
-    if (!book || !page) return null;
+    if (!book || !page) return { status: "not-applicable" };
     if (book === "Folk") {
       [book, page] = match[1]?.split("-") || [null, null];
-      if (!book || !page) return null;
+      if (!book || !page) return { status: "not-applicable" };
     }
-    return { site, book, page };
+    return { status: "valid", site, book, page };
   }
 
 
@@ -117,17 +117,20 @@
 
 
   const _provider = {
-    waitForViewerReady: () => openseadragon.waitForViewerReady(_injectPageScript),
-    getViewerContainer: openseadragon.getViewerContainer,
-    getReferenceFromPage,
-    initializeViewportTracking: openseadragon.initializeViewportTracking,
     site,
+    getReferenceFromPage,
     getPageKey,
     getCurrentPageKey,
-    buildUrlFromBookPage: (book, page) => (`https://sok.riksarkivet.se/bildvisning/${book}_${page}`),
-    projectImagePoints: openseadragon.projectImagePoints,
-    unprojectScreenPoints: openseadragon.unprojectScreenPoints
+    buildUrlFromBookPage: (book, page) => (`https://sok.riksarkivet.se/bildvisning/${book}_${page}`)
   };
+
+  if (window.openseadragon) {
+    _provider.waitForViewerReady = () => openseadragon.waitForViewerReady(_injectPageScript);
+    _provider.getViewerContainer = openseadragon.getViewerContainer;
+    _provider.initializeViewportTracking = openseadragon.initializeViewportTracking;
+    _provider.projectImagePoints = openseadragon.projectImagePoints;
+    _provider.unprojectScreenPoints = openseadragon.unprojectScreenPoints;
+  }
 
   window.archiveProviders ??= [];
   window.archiveProviders.push(_provider);

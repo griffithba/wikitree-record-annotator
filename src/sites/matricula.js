@@ -71,10 +71,10 @@
         const book = match[1];
         const page = url.searchParams.get("pg") || "1";
 
-        return { site, book, page };
+        return { status: "valid", site, book, page };
       }
     } catch (e) {
-      return "unknown_matricula_page";
+      return { status: "not-applicable" };
     }
   }
 

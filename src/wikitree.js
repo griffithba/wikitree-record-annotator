@@ -24,12 +24,19 @@
       // only try to fetch all annotations for a profile if there's at least one link for this source already listed on the profile page
       if (links.length > 0) {
         const profileAnnotations = await wtplusAPI.getFramesForProfile(provider.site, wtId);
-        const annotatedPages = new Set(profileAnnotations.map(a => `${a.site}|${a.book}|${a.page}`));
+        const annotatedPages = new Set(profileAnnotations?.map(a => `${a.site}|${a.book}|${a.page}`));
         const citedPages = new Set();
       
         for (const link of links) {
           const keyObj = provider.getPageKey(link.href);
-          if (!keyObj) continue;  // skip if we can't extract a key from the link
+          if (!keyObj || keyObj?.status === "not-applicable") {
+            continue;
+          } else if (keyObj?.status === "needs-fix") {
+            addInvalidLinkMarker(link);
+            continue;
+          } else if (!keyObj?.status === "valid") {
+            continue;
+          }
           const key = `${keyObj.site}|${keyObj.book}|${keyObj.page}`
 
           citedPages.add(key);
@@ -40,9 +47,9 @@
 
           injectWtIdIntoCitationLink(link);
         }
-        const missingAnnotations = profileAnnotations.filter(a => !citedPages.has(`${a.site}|${a.book}|${a.page}`));
+        const missingAnnotations = profileAnnotations?.filter(a => !citedPages.has(`${a.site}|${a.book}|${a.page}`));
 
-        for (const annotation of missingAnnotations) {
+        for (const annotation of missingAnnotations ?? []) {
           const url = provider.buildUrlFromBookPage(annotation.book, annotation.page);
           const citation = { citation:`${annotation.info}, ${url}`, url: url, name: name, gender: pageData.mgender };
           missingCitations.push(citation);
@@ -54,6 +61,23 @@
     recommendMissingCitations(missingCitations);
   }
 
+
+  function addInvalidLinkMarker(link) {
+    const icon = document.createElement("img");
+
+    icon.src = chrome.runtime.getURL("icons/highlighter-invalid32.png");
+    icon.alt = "Archive link needs updating";
+    icon.title = "Archive link cannot be matched to an annotated page";
+
+    Object.assign(icon.style, {
+      width: "24px",
+      height: "24px",
+      marginLeft: "4px",
+      verticalAlign: "middle"
+    });
+
+    link.after(icon);
+  }
 
   function recommendMissingCitations(missingCitations) {
     if (!missingCitations.length) return;

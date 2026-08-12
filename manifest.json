@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WikiTree Record Annotator",
-  "version": "0.3.3.1",
+  "version": "0.3.3.2",
   "description": "Annotate record images with WikiTree profiles",
   "action": {
     "default_title": "WikiTree Record Annotator",
@@ -58,7 +58,10 @@
       ]
     },
     {
-      "matches": ["https://nye.digitalarkivet.no/source/*"],
+      "matches": [
+        "https://nye.digitalarkivet.no/source/*",
+        "https://media.digitalarkivet.no/*"
+      ],
       "js": [
         "src/sites/openseadragon.js",
         "src/sites/digitalarkivet.js",
