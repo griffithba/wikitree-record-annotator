@@ -200,7 +200,7 @@
 
     const link = await _getPermalink();
 
-    const key = getPageKey(link);
+    const key = getPageKey(link.href);
     if (!key) return null;
     key.book = _getCurrentBook();
 
@@ -215,7 +215,7 @@
       return { status: "needs-fix" };
     }
 
-    const match = link.match(/^\/(kb\d+)$/i);
+    const match = parsed.pathname.match(/^\/(kb\d+)$/i);
 
     if (!match) {
       return { status: "not-applicable" };

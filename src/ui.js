@@ -368,7 +368,7 @@
 
   // Returns the lists of annotated and unannotated profiles for the current page
   async function _getProfilesForCurrentPage() {
-    const key = archiveProvider.getCurrentPageKey();
+    const key = await archiveProvider.getCurrentPageKey();
     const referrers = await wtplusAPI.getPageReferrers(key.site, key.book, key.page);
 
     const annotatedProfiles = annotationsAPI.getAnnotations();

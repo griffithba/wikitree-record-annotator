@@ -1,7 +1,6 @@
 (() => {
   "use strict";
 
-  let _viewer = null;
   let _openSeadragon = null;
   let _webpackRequire = null;
 
@@ -93,14 +92,10 @@
    * Returns the Viewer instance, or null if it is not available yet.
    */
   function getViewer() {
-    if (_viewer) return _viewer;
-
     const osd = _findOpenSeadragon();
     if (!osd) return null;
 
-    _viewer = osd.getViewer("openSeaDragon");
-
-    return _viewer;
+    return (osd.getViewer("openSeaDragon"));
   }
 
 

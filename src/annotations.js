@@ -26,7 +26,7 @@
    * Loads annotations for current page if not already loaded
    */
   async function loadAnnotationsIfNeeded() {
-    const key = archiveProvider.getCurrentPageKey();
+    const key = await archiveProvider.getCurrentPageKey();
 
     if (samePage(key, _lastPageKey)) return;  // Already loaded
 

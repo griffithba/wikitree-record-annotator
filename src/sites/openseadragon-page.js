@@ -5,6 +5,8 @@
 
   let lastVp = "";
 
+  const VIEWER_CHECK_INTERVAL = 500;
+
   function _projectImagePoints(viewer, points) {
     const item = viewer.world.getItemAt(0);
     const screenPoints = [];
@@ -101,14 +103,20 @@
 
 
   function initialize(getViewer) {
-    const viewer = getViewer();
-    if (!viewer) return;
-    _attach(viewer);
+    setInterval(() => {
+      const viewer = getViewer();
+      if (!viewer) return;
+
+      if (viewer === _attachedViewer) return;
+
+      _attach(viewer);
+    }, VIEWER_CHECK_INTERVAL);
 
     window.addEventListener("message", event => {
       if (event.source !== window) return;
 
       if (event.data?.type === "WT_PROJECT_IMAGE_POINTS") {
+        const viewer = getViewer();
         const points = _projectImagePoints(
           viewer,
           event.data.points
@@ -123,7 +131,6 @@
 
       if (event.data?.type === "WT_UNPROJECT_SCREEN_POINTS") {
         const viewer = getViewer();
-      
         const imagePoints = _unprojectScreenPoints(
           viewer, 
           event.data.points
