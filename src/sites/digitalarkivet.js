@@ -7,6 +7,43 @@
 
   let _permalinkPromise = null;
 
+  /**
+   * Digitalarkivet Record Viewer Mapping
+   * true  = Supported by the New Image Viewer (ny bildeviser)
+   * false = Legacy Image Viewer Only (gammel bildeviser)
+   */
+  const DIGITALARKIVET_VIEWER_MAP = Object.freeze({
+    // --- NEW VIEWER CHANNELS ---
+    kb: true,   // Kirkebøker (Parish / Church Registers)
+    em: true,   // Emigrasjon (Emigration & Passenger Lists)
+  
+    // --- OLD LEGACY VIEWER ONLY (Awaiting Migration) ---
+    tl: false,  // Tinglysing (Land Registry / Real Estate Books)
+    ft: false,  // Folketellinger (National Population Censuses)
+    sk: false,  // Skifteprotokoller (Probate and Inheritances)
+    pa: false,  // Privatarkiver (Private Business/Org Archives)
+    sa: false,  // Statlige arkiver (State & Ministerial Records)
+    rg: false,  // Rettergang (Court Journals & Litigation logs)
+    po: false,  // Politi og lensmenn (Historical Police Records)
+    pr: false,  // Protokoller (General Administrative Logs)
+    db: false   // Dombøker / Riksarkivets diplomsamling (Medieval Diplomas)
+  });
+
+  /**
+   * Determines if a given Digitalarkivet 16-character code uses the new viewer.
+   * @param {string} rawId - The tracking ID (e.g., "kb20070614610123")
+   * @returns {boolean} - true if new viewer, false if old or unrecognized.
+   */
+  const isNewViewerRecord = (rawId) => {
+    if (typeof rawId !== 'string' || rawId.length < 2) {
+      return false;
+    }
+    const prefix = rawId.slice(0, 2).toLowerCase();
+  
+    // Missing or unknown codes default to false (legacy viewer fallback)
+    return DIGITALARKIVET_VIEWER_MAP[prefix] ?? false;
+  };
+
 
   // Wrapper for openseadragon.waitForViewerReady that handles the old viewer case
   async function waitForViewerReady() {
@@ -24,7 +61,7 @@
 
     return (
       url.hostname === "media.digitalarkivet.no" &&
-      /\/view\/\d+\/\d+\/\d+$/.test(url.pathname)
+      /^\/(?:[a-z]{2}\/)?view\//i.test(url.pathname)
     );
   }
 
@@ -41,10 +78,6 @@
 
     try {
       const url = new URL(quickLink);
-
-      if (url.hostname === "www.digitalarkivet.no") {
-        url.hostname = "goto.digitalarkivet.no";
-      }
 
       newViewerUrl = url.href;
     } catch (e) {
@@ -211,13 +244,14 @@
     if (!link) return null;
     const parsed = new URL(link);
 
-    if (parsed.hostname === "nye.digitalarkivet.no" || parsed.hostname === "media.digitalarkivet.no") {
+    if (parsed.hostname === "nye.digitalarkivet.no") {
       return { status: "needs-fix" };
     }
 
-    const match = parsed.pathname.match(/^\/(kb\d+)$/i);
-
+    const match = parsed.pathname.match(/^\/([a-z]{2}\d{14})$/);
+console.log("Digitalarkivet getPageKey:", match);
     if (!match) {
+      if (parsed.hostname === "media.digitalarkivet.no") return { status: "needs-fix" };
       return { status: "not-applicable" };
     }
 

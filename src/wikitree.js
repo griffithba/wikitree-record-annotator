@@ -67,7 +67,7 @@
 
     icon.src = chrome.runtime.getURL("icons/highlighter-invalid32.png");
     icon.alt = "Archive link needs updating";
-    icon.title = "Archive link cannot be matched to an annotated page";
+    icon.title = "Old style link cannot be used for annotation";
 
     Object.assign(icon.style, {
       width: "24px",

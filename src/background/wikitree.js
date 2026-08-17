@@ -49,16 +49,19 @@ async function _fetchWikiTreeProfile(wtId) {
     form.append("fields", "FirstName,MiddleName,LastNameAtBirth,BirthDate,DeathDate");
     form.append("appId", "wikitree-record-annotator");
 
-/* POST stopped working, so switched to GET for now. 
-     const res = await fetch("https://api.wikitree.com/api.php", {
+    let res = await fetch("https://api.wikitree.com/api.php", {
       method: "POST",
       body: form
     });
- */
-    const res = await fetch(
-      "https://api.wikitree.com/api.php?" + form.toString()
-    );
-    
+
+    // if POST fails, try GET
+    if (!res.ok || !res.headers.get("content-type")?.includes("application/json")) {
+      console.log("WT fetch POST failed, trying GET");
+      res = await fetch(
+        "https://api.wikitree.com/api.php?" + form.toString()
+      );
+    }
+
     const data = await res.json();
 
     const person = data?.[0]?.person;
