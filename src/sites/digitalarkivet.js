@@ -34,20 +34,20 @@
    * @param {string} rawId - The tracking ID (e.g., "kb20070614610123")
    * @returns {boolean} - true if new viewer, false if old or unrecognized.
    */
-  const isNewViewerRecord = (rawId) => {
+  function isNewViewerRecord(rawId) {
     if (typeof rawId !== 'string' || rawId.length < 2) {
       return false;
     }
     const prefix = rawId.slice(0, 2).toLowerCase();
-  
+
     // Missing or unknown codes default to false (legacy viewer fallback)
     return DIGITALARKIVET_VIEWER_MAP[prefix] ?? false;
-  };
+  }
 
 
   // Wrapper for openseadragon.waitForViewerReady that handles the old viewer case
   async function waitForViewerReady() {
-    if (_isOldViewer()) {
+    if (await _outdatedLink()) {
       await _handleOldViewer();
       return false;
     }
@@ -56,13 +56,20 @@
   }
 
 
-  function _isOldViewer() {
+  async function _outdatedLink() {
     const url = new URL(window.location.href);
 
-    return (
-      url.hostname === "media.digitalarkivet.no" &&
-      /^\/(?:[a-z]{2}\/)?view\//i.test(url.pathname)
-    );
+    if (url.hostname === "media.digitalarkivet.no") {
+      const permalink = document.querySelector("#reader_link")?.value;
+
+      const keyStruct = await getPageKey(permalink);
+
+      if (keyStruct && isNewViewerRecord(keyStruct?.page)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
 
@@ -249,7 +256,7 @@
     }
 
     const match = parsed.pathname.match(/^\/([a-z]{2}\d{14})$/);
-console.log("Digitalarkivet getPageKey:", match);
+
     if (!match) {
       if (parsed.hostname === "media.digitalarkivet.no") return { status: "needs-fix" };
       return { status: "not-applicable" };
