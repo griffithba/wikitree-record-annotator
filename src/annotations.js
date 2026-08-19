@@ -32,6 +32,8 @@
 
     _annotations = await _getAnnotationsForCurrentPage() || [];
 
+    ui.updateUnannotatedCount();
+
     console.log(`Loaded ${_annotations.length} annotations for page ${key.book} ${key.page}`, 
                 _annotations);
     
