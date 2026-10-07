@@ -12,6 +12,7 @@
         const container = getViewerContainer();
 
         if (container) {
+          injectStyles();
           injectPageScript();
           resolve(true);
           return;
@@ -28,6 +29,21 @@
   // get the OpenSeadragon container (the element the overlay should attach to)
   function getViewerContainer() {
     return document.querySelector(".openseadragon-canvas");
+  }
+
+
+  function injectStyles() {
+    if (document.getElementById("wt-openseadragon-styles")) return;
+
+    const style = document.createElement("style");
+    style.id = "wt-openseadragon-styles";
+    style.textContent = `
+      .navigator {
+        z-index: 1;
+      }
+    `;
+
+    document.head.appendChild(style);
   }
 
 
