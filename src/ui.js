@@ -642,6 +642,10 @@
           selectedId =
             otherInput.value.trim();
 
+          if (!isPlausibleWikiTreeId(selectedId)) {
+            alert("Enter a valid WikiTree ID.");
+            return;
+          }
         } else {
 
           selectedId =
@@ -669,6 +673,17 @@
       _makeDraggable(title, dialog);
     });
   } 
+
+
+  /**
+   * 
+   * Check if a string is a plausible WikiTree ID (no spaces or quotes)
+   * @param {string} value - String to check
+   * @returns boolean
+   */
+  function isPlausibleWikiTreeId(value) {
+    return /^[^\s"']+$/.test(value);
+  }
 
 
   /**
