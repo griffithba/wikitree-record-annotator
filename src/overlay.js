@@ -97,7 +97,7 @@
       
       // Look for the toolbar container associated with this specific ID & frame index in the parent layer
       let toolbarWrapper = layer.querySelector(
-        `foreignObject[data-annotation-id="${id}"][data-toolbar-for="${frameIndex}"]`
+        `foreignObject[data-annotation-id="${CSS.escape(id)}"][data-toolbar-for="${frameIndex}"]`
       );
 
       if (id === selectedId) {
@@ -160,24 +160,24 @@
           // Remove the toolbar and handles if this frame is not the active one
           toolbarWrapper?.remove();
           layer.querySelector(
-            `.resize-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+            `.resize-handle-group[data-annotation-id="${CSS.escape(id)}"][data-frame-index="${frameIndex}"]`
           )?.remove();
           layer.querySelector(
-            `.rotate-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+            `.rotate-handle-group[data-annotation-id="${CSS.escape(id)}"][data-frame-index="${frameIndex}"]`
           )?.remove();
 
         }
       } else {
         frame.classList.remove("wt-selected");
         
-        const specificToolbar = layer.querySelector(`foreignObject[data-annotation-id="${id}"]`);
+        const specificToolbar = layer.querySelector(`foreignObject[data-annotation-id="${CSS.escape(id)}"]`);
         specificToolbar?.remove();
         
         layer.querySelector(
-          `.resize-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+          `.resize-handle-group[data-annotation-id="${CSS.escape(id)}"][data-frame-index="${frameIndex}"]`
         )?.remove();
         layer.querySelector(
-          `.rotate-handle-group[data-annotation-id="${id}"][data-frame-index="${frameIndex}"]`
+          `.rotate-handle-group[data-annotation-id="${CSS.escape(id)}"][data-frame-index="${frameIndex}"]`
         )?.remove();
      }
     });
@@ -321,7 +321,7 @@
 
       const id = frame.dataset.annotationId;
       document
-        .querySelectorAll(`[data-annotation-id="${id}"]`)
+        .querySelectorAll(`[data-annotation-id="${CSS.escape(id)}"]`)
         .forEach(el => {
           el.classList.add("wt-hover");
         });
@@ -332,7 +332,7 @@
 
       const id = frame.dataset.annotationId;
       document
-        .querySelectorAll(`[data-annotation-id="${id}"]`)
+        .querySelectorAll(`[data-annotation-id="${CSS.escape(id)}"]`)
         .forEach(el => {
           el.classList.remove("wt-hover");
         });
@@ -387,7 +387,7 @@
       // Highlight ALL frames for this annotation
       requestAnimationFrame(() => {
         document.querySelectorAll(
-          `[data-annotation-id="${annotationId}"]`
+          `[data-annotation-id="${CSS.escape(annotationId)}"]`
         ).forEach(frame => {
           frame.classList.add("wt-ref-highlight");
         });
